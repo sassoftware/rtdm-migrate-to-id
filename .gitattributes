@@ -1,0 +1,12 @@
+# Use Unix line endings
+*.sh text eol=lf
+*.bat text eol=crlf
+Dockerfile text eol=lf
+*.html text
+*.js text
+*.css text
+*.txt text
+*.md text
+*.jar binary
+*.war binary
+*.png binary

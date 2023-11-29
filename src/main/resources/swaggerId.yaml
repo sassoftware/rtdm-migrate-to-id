@@ -1,0 +1,2495 @@
+swagger: '2.0'
+host: 'swagger.na.sas.com'
+schemes:
+  - http
+info:
+  version: '7'
+  title: Decisions
+  description: The Decisions API supports the life cycle of decision data.
+
+basePath: /decisions
+
+tags:
+  - name: Root
+    description: Contains the operations for the root resource.
+  - name: Decisions
+    description: Contains the operations to create, read, and delete decisions.
+
+paths:
+  /:
+    get:
+      operationId: root
+      tags:
+        - Root
+      summary: Get a list of top-level links
+      description: Returns a list of top-level resource links for this API.
+      produces:
+        - application/vnd.sas.api+json
+      responses:
+        '200':
+          description: The request succeeded. A collection of link objects was returned.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.api/v1/api.json'
+  /flows:
+    get:
+      operationId: getDecisions
+      tags:
+        - Decisions
+      summary: Get a list of all decisions
+      description: Returns a resource collection of all decisions.
+      parameters:
+        - name: name
+          in: query
+          type: string
+          description: Name of the decision to match.
+        - name: filter
+          description: The criteria for filtering the decision flows. See [Filtering in REST APIs](https://developer.sas.com/apis/rest/Topics/#filters).
+          in: query
+          type: string
+          format: filter-criteria
+        - name: sortBy
+          description: The criteria for sorting the decision flows. See [Sorting in REST APIs](https://developer.sas.com/apis/rest/Topics/#sorting).
+          in: query
+          type: string
+          format: sort-criteria
+        - name: start
+          in: query
+          type: integer
+          description: 'The starting index of the first item in a page. The index is 0-based. Default is 0. '
+        - name: limit
+          in: query
+          type: integer
+          description: 'The maximum number of items to return in this page of results. The actual number of returned items might be less if the collection has been exhausted. The default limit is 10. '
+        - name: Accept-Item
+          in: header
+          type: string
+          description: 'If provided, this should be an alternative media type that the service recognizes. If the media type is not one that the service can provide, a 406 response is returned.'
+        - name: stepObjectUri
+          in: query
+          type: string
+          format: uri
+          description: |
+            If provided, only decisions that contain a step object matching this
+            URI are returned. The supported step types to search for are model
+            steps, rule set steps, or custom object steps. For models and rule
+            sets, the URI should include only the object's ID (no revision). For
+            custom objects, any decisions with a custom object step referencing an
+            object whose URI starts with the provided value is returned.
+
+            Examples:
+            - Model step: `/modelRepository/models/{id}`
+            - Rule set step: `/businessRules/ruleSets/{id}`
+            - Custom object: `/decisions/flows/{decisionId}`
+      produces:
+        - application/vnd.sas.collection+json
+        - application/json
+      responses:
+        200:
+          description: The request succeeded.
+          schema:
+            $ref: '#/definitions/decisionCollection'
+        406:
+          description: The specified resource can generate only the response entities that have unacceptable content characteristics.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    post:
+      summary: Create a decision
+      operationId: createDecision
+      description: Creates a new decision based on the provided content.
+      tags:
+        - Decisions
+      parameters:
+        - name: decision
+          in: body
+          description: Decision summary to create a decision.
+          required: true
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision/v7/decision.yaml'
+        - name: parentFolderUri
+          in: query
+          description: Folder in which the new decision is placed.
+          required: false
+          type: string
+          format: '/folders/folders/{parentFolderId}'
+        - name: fromRevisionUri
+          in: query
+          type: string
+          description: "This value specifies the URI of the decision revision this new decision
+           is being created from.  This property allows for the lineage of a decision to be traced.
+           The valid format for this parameter is '/decisions/flows/${decisionId}/revisions/${revisionId}'"
+      consumes:
+        - application/vnd.sas.decision+json
+        - application/json
+      produces:
+        - application/vnd.sas.decision+json
+        - application/json
+      responses:
+        201:
+          description: The decision was created.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+            Location:
+              type: string
+              format: uri
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision/v6/decision.yaml'
+        400:
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  /flows/{decisionId}:
+    head:
+      summary: Get headers for a decision
+      description: Retrieves the headers for the provided decision.
+      operationId: getDecisionHeaders
+      tags:
+        - Decisions
+      parameters:
+        - name: decisionId
+          in: path
+          required: true
+          type: string
+          description: The identifier for the decision.
+      responses:
+        200:
+          description: The request succeeded.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+        404:
+          description: No decision exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    get:
+      summary: Get decision content
+      description: Retrieves the contents of a decision.
+      operationId: getDecision
+      tags:
+        - Decisions
+      parameters:
+        - name: decisionId
+          in: path
+          required: true
+          type: string
+          description: Identifier for the decision.
+      produces:
+        - application/vnd.sas.decision+json
+        - application/json
+      responses:
+        200:
+          description: The request succeeded.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision/v6/decision.yaml'
+        404:
+          description: No decision exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    put:
+      summary: Update a decision
+      description: Updates the decision.
+      operationId: updateDecision
+      tags:
+        - Decisions
+      parameters:
+        - name: decisionId
+          in: path
+          required: true
+          type: string
+          description: Identifier for the decision.
+        - name: if-match
+          in: header
+          required: true
+          type: string
+          description: Etag value from when the originating object was retrieved.
+        - name: decision
+          in: body
+          required: true
+          description: Decision content to use in update
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision/v6/decision.yaml'
+      consumes:
+        - application/vnd.sas.decision+json
+        - application/json
+      produces:
+        - application/vnd.sas.decision+json
+        - application/json
+      responses:
+        200:
+          description: The request succeeded.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision/v6/decision.yaml'
+        400:
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        404:
+          description: No decision exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        412:
+          description: "The `If-Match` request header did not match the resource's entity tag, or the
+              `If-Unmodified-Since` request header did not match the resource's last modified timestamp."
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        428:
+          description: "The request headers did not include a `If-Match` or `If-Unmodified-Since` precondition."
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    delete:
+      summary: Delete a decision
+      operationId: deleteDecision
+      tags:
+        - Decisions
+      description: Deletes the specified decision.
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the decision.
+      responses:
+        '204':
+          description: The decision was deleted.
+        '404':
+          description: No decision exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        '500':
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  /flows/{decisionId}/code:
+    get:
+      summary: Get decision code
+      operationId: getDecisionCode
+      description: Retrieves the DS2 package code, which can then be used to execute the decision.
+      tags:
+        - Decisions
+      parameters:
+        - name: decisionId
+          in: path
+          required: true
+          type: string
+          description: Identifier for the decision.
+        - name: codeTarget
+          in: query
+          type: string
+          description: >
+            The type of platform or scenario that the generated code is
+            used in. If the generated DS2 is going to be run in the SAS Micro Analytic
+            Service, "microAnalyticService" should be chosen. If the code is
+            included as part of another decision, and therefore should not be
+            wrapped in a driver, "subDecision" should be chosen. In all other
+            cases, "others" should be chosen.
+          enum:
+            - microAnalyticService
+            - others
+            - subDecision
+      produces:
+        - text/vnd.sas.source.ds2
+      responses:
+        200:
+          description: The request succeeded.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+          schema:
+            type: string
+            format: ds2
+        404:
+          description: No decision code exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  '/flows/{decisionId}/mappedCode':
+    post:
+      summary: Get the mapped code for a decision
+      operationId: getMappedDecisionCode
+      tags:
+        - Decisions
+      description: Returns the code that is used to run the decision based on the provided data and mapping information in the request.
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the decision.
+        - name: scoreCodeGenerationRequest
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/scoreCodeGenerationRequest'
+          description: The information for scoreDefinitionId and hints.
+      consumes:
+        - application/vnd.sas.score.code.generation.request+json
+        - application/json
+      produces:
+        - application/vnd.sas.score.mapped.code+json
+        - application/json
+      responses:
+        '200':
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.mapped.code/v1/mappedCode.yaml'
+        '400':
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        '500':
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  '/flows/{decisionId}/mappedCode#unbound':
+    post:
+      summary: Get decision code without score definition
+      operationId: getMappedDecisionCodeUnbounded
+      tags:
+        - Decisions
+      description: Returns the code to be able to run the decision based on mapping to a static input and output data set of SASEP.IN and SASEP.OUT rather than binding to a score definition.
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the decision.
+        - name: scoreCodeGenerationRequest
+          in: body
+          required: true
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.code.generation.request.unbound/v1/unboundScoreCodeGenerationRequest.yaml'
+          description: The information for the mapping and hints to be used during building the execution code.
+      consumes:
+        - application/vnd.sas.score.code.generation.request.unbound+json
+      produces:
+        - application/vnd.sas.score.mapped.code+json
+      responses:
+        '200':
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.mapped.code/v1/mappedCode.yaml'
+        '400':
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        '500':
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  '/flows/{decisionId}/mappedCode#unboundCodeOnly':
+    post:
+      summary: Get decision code not bound to a score definition
+      operationId: getMappedDecisionCodeUnboundedText
+      tags:
+        - Decisions
+      description: Returns the code directly as text without being wrapped in a JSON model, that a user can use to be able to run the decision based on mapping to a static input and output data set of SASEP.IN and SASEP.OUT rather than binding to a score definition.
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the decision.
+        - name: scoreCodeGenerationRequest
+          in: body
+          required: true
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.code.generation.request.unbound/v1/unboundScoreCodeGenerationRequest.yaml'
+          description: The information for the mapping and hints to be used during building the execution code.
+      consumes:
+        - application/vnd.sas.score.code.generation.request.unbound+json
+      produces:
+        - text/vnd.sas.source.ds2
+      responses:
+        '200':
+          description: The request succeeded.
+        '400':
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        '500':
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  '/flows/{decisionId}/analysisCode':
+    post:
+      summary: Get the analysis code for a decision
+      operationId: getAnalysisCode
+      tags:
+        - Decisions
+      description: Returns the analysis code that is used to generate the rule fired or path tracking reports based on the scoring definition.
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the decision.
+        - name: analysisCodeGenerationRequest
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/analysisCodeGenerationRequest'
+          description: The information for scoreExecutionId and hints.
+      consumes:
+        - application/vnd.sas.score.analysis.code.generation.request+json
+        - application/json
+      produces:
+        - application/vnd.sas.score.analysis.code+json
+        - application/json
+      responses:
+        '200':
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.analysis.code/v1/analysisCode.yaml'
+        '400':
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        '500':
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  /flows/{decisionId}/externalArtifacts:
+    get:
+      summary: Get a list of external artifacts for a decision
+      description: |
+        Returns a list of external artifacts used by this decision. Objects used by a step of the steps collection in a decision flow are considered external artifacts. Some examples of such objects are files and web services. This endpoint returns the collection of external artifacts. The collection might be empty if there is no external artifact used by any step of the decision.
+        The expected number of external artifacts is small. Therefore, this endpoint does not support any paging, filtering, or sorting of parameters.
+      operationId: getDecisionExternalArtifacts
+      tags:
+        - Decisions
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          description: Id of the decision.
+          required: true
+        - name: AcceptType
+          in: header
+          type: string
+          enum:
+            - application/vnd.sas.collection+json
+            - application/json
+          description: Select the desired representation.
+          default: application/vnd.sas.collection+json
+        - name: Accept-Item
+          in: header
+          type: string
+          enum:
+            - application/vnd.sas.decision.external.artifact+json
+          description: Used for selecting desired item representation.
+          default: application/vnd.sas.decision.external.artifact+json
+      produces:
+        - application/vnd.sas.collection+json
+        - application/json
+      responses:
+        '200':
+          description: The request succeeded.
+          schema:
+            $ref: '#/definitions/externalArtifactsCollection'
+        '404':
+          description: No resource exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  /flows/{decisionId}/revisions:
+    get:
+      summary: Get all revisions for a decision
+      description: Retrieves a list of all revisions that exist for a decision.
+      operationId: getDecisionRevisions
+      tags:
+        - Decisions
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for a decision
+        - name: filter
+          description: The criteria for filtering the decision flow revisions. See [Filtering in REST APIs](https://developer.sas.com/apis/rest/Topics/#filters).
+          in: query
+          type: string
+          format: filter-criteria
+        - name: sortBy
+          description: The criteria for sorting the decision flow revisions. See [Sorting in REST APIs](https://developer.sas.com/apis/rest/Topics/#sorting).
+          in: query
+          type: string
+          format: sort-criteria
+        - name: start
+          in: query
+          type: integer
+          description: 'The starting index of the first item in a page. The index is 0-based. Default is 0. '
+        - name: limit
+          in: query
+          type: integer
+          description: 'The maximum number of items to return in this page of results. The actual number of returned items might be less if the collection has been exhausted. The default is 10. '
+        - name: Accept-Item
+          in: header
+          type: string
+          description: 'If provided, this should be an alternative media type that the service recognizes.  If the media type is not one that the service can provide, a 406 response is returned.'
+      produces:
+        - application/vnd.sas.collection+json
+        - application/json
+      responses:
+        200:
+          description: The request succeeded.
+          schema:
+            $ref: '#/definitions/decisionCollection'
+        404:
+          description: No decision exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    post:
+      summary: Create a decision revision
+      operationId: createDecisionRevision
+      tags:
+        - Decisions
+      description: Creates a new revision for the decision.
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for a decision
+        - name: revisionType
+          in: query
+          type: string
+          description: "Valid Values are 'major' or 'minor'. This value determines
+           how the server generates the major or minor revision numbers. If major is provided
+           the next available major revision number is initiated. For example, if
+           the decision has revisions 1.0, 1.1, 1.2, 2.0, 2.1, when creating a new
+           major revision it results in 3.0. If minor is provided, then the next
+           available minor revision number is reserved based on the existing revisions.
+           This parameter is defaulted to 'minor', if not supplied."
+          enum:
+            - major
+            - minor
+        - name: fromRevisionUri
+          in: query
+          type: string
+          description: "This value specifies the URI of the decision revision this new decision
+           is being created from.  This property allows for the lineage of a decision to be traced.
+           The valid format for this parameter is '/decisions/flows/${decisionId}/revisions/${revisionId}'"
+        - name: revision
+          in: body
+          required: true
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision/v6/decision.yaml'
+      consumes:
+        - application/vnd.sas.decision+json
+        - application/json
+      produces:
+        - application/vnd.sas.decision+json
+        - application/json
+      responses:
+        201:
+          description: A revision of the decision was created.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+            Location:
+              type: string
+              format: uri
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision/v6/decision.yaml'
+        400:
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        404:
+          description: No decision exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  /flows/{decisionId}/revisions/{revisionId}:
+    head:
+      summary: Get headers for a decision revision
+      description: Gets the header information for the decision revision.
+      operationId: getDecisionRevisionHeaders
+      tags:
+        - Decisions
+      parameters:
+        - name: decisionId
+          in: path
+          required: true
+          type: string
+          description: Identifier for the decision.
+        - name: revisionId
+          in: path
+          required: true
+          type: string
+          description: Identifier for the decision revision.
+      responses:
+        200:
+          description: The request succeeded.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+        404:
+          description: No decision revision exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    get:
+      summary: Get content for a decision revision
+      description: Retrieves the content for the decision revision requested.
+      operationId: getDecisionRevision
+      tags:
+        - Decisions
+      parameters:
+        - name: decisionId
+          in: path
+          required: true
+          type: string
+          description: Identifier for the decision.
+        - name: revisionId
+          in: path
+          required: true
+          type: string
+          description: Identifier for the decision revision.
+      produces:
+        - application/vnd.sas.decision+json
+        - application/json
+      responses:
+        200:
+          description: The request succeeded.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision/v6/decision.yaml'
+        404:
+          description: No decision revision exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    delete:
+      summary: Delete a locked decision revision
+      operationId: deleteDecisionRevision
+      tags:
+        - Decisions
+      description: Deletes the specified locked decision revision.
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the decision.
+        - name: revisionId
+          in: path
+          required: true
+          type: string
+          description: Identifier for the decision revision.
+      responses:
+        '204':
+          description: The decision revision was deleted.
+        '500':
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  /flows/{decisionId}/revisions/{revisionId}/code:
+    get:
+      summary: Get code for a decision revision
+      description: Retrieves the DS2 package code, which can then be used to execute the decision revision.
+      operationId: getDecisionRevisionCode
+      tags:
+        - Decisions
+      parameters:
+        - name: decisionId
+          in: path
+          required: true
+          type: string
+          description: Identifier for the decision.
+        - name: revisionId
+          in: path
+          required: true
+          type: string
+          description: Identifier for the decision revision.
+        - name: codeTarget
+          in: query
+          type: string
+          description: >
+            The type of platform or scenario that the generated code is
+            used in. If the generated DS2 code is going to be run in the SAS Micro Analytic
+            Service, then the "microAnalyticService" type should be specified. If the code is
+            included as part of another decision, and therefore should not be
+            wrapped in a driver, "subDecision" should be specified. In all other
+            cases, "others" should be specified.
+          enum:
+            - microAnalyticService
+            - others
+            - subDecision
+      produces:
+        - text/vnd.sas.source.ds2
+      responses:
+        200:
+          description: The request succeeded.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+          schema:
+            type: string
+            format: ds2
+        404:
+          description: No code for the decision revision exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  '/flows/{decisionId}/revisions/{revisionId}/mappedCode':
+    post:
+      summary: Get the mapped code of a decision revision
+      operationId: getMappedCodeRevision
+      tags:
+        - Decisions
+      description: Returns the code bound to data specified in the score request for execution for the decision revision.
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the decision.
+        - name: revisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the revision.
+        - name: scoreCodeGenerationRequest
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/scoreCodeGenerationRequest'
+          description: The information for scoreDefinitionId and hints.
+      consumes:
+        - application/vnd.sas.score.code.generation.request+json
+        - application/json
+      produces:
+        - application/vnd.sas.score.mapped.code+json
+        - application/json
+      responses:
+        '200':
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.mapped.code/v1/mappedCode.yaml'
+        '400':
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        '500':
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  '/flows/{decisionId}/revisions/{revisionId}/mappedCode#unbound':
+    post:
+      summary: Get decision revision code without a score definition
+      operationId: getMappedCodeRevisionUnbound
+      tags:
+        - Decisions
+      description: Returns the code to be able to run the decision revision based on mapping to a static input and output data set of SASEP.IN and SASEP.OUT rather than binding to a score definition.
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the decision.
+        - name: revisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the revision.
+        - name: scoreCodeGenerationRequest
+          in: body
+          required: true
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.code.generation.request.unbound/v1/unboundScoreCodeGenerationRequest.yaml'
+          description: The information for the mapping and hints.
+      consumes:
+        - application/vnd.sas.score.code.generation.request.unbound+json
+        - application/json
+      produces:
+        - application/vnd.sas.score.mapped.code+json
+        - application/json
+      responses:
+        '200':
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.mapped.code/v1/mappedCode.yaml'
+        '400':
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        '500':
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  '/flows/{decisionId}/revisions/{revisionId}/mappedCode#unboundCodeOnly':
+    post:
+      summary: Get code for decision revision not bound to score definition
+      operationId: getMappedCodeRevisionUnboundText
+      tags:
+        - Decisions
+      description: Returns the code directly as text without being wrapped in a JSON model, that a user can use to be able to run the decision revision based on mapping to a static input and output data set of SASEP.IN and SASEP.OUT rather than binding to a score definition.
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the decision.
+        - name: revisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the revision.
+        - name: scoreCodeGenerationRequest
+          in: body
+          required: true
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.code.generation.request.unbound/v1/unboundScoreCodeGenerationRequest.yaml'
+          description: The information for the mapping and hints to be used during building the execution code.
+      consumes:
+        - application/vnd.sas.score.code.generation.request.unbound+json
+        - application/json
+      produces:
+        - text/vnd.sas.source.ds2
+      responses:
+        '200':
+          description: The request succeeded.
+        '400':
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        '500':
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  '/flows/{decisionId}/revisions/{revisionId}/analysisCode':
+    post:
+      summary: Get analysis code for decision revision
+      operationId: getAnalysisCodeRevision
+      tags:
+        - Decisions
+      description: Retrieves the analysis code that is required for the collection rule fired or path tracking information for the decision revision.
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the decision.
+        - name: revisionId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the revision.
+        - name: analysisCodeGenerationRequest
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/analysisCodeGenerationRequest'
+          description: Analysis request information including the type and name of the analysis that is being performed.
+      consumes:
+        - application/vnd.sas.score.analysis.code.generation.request+json
+        - application/json
+      produces:
+        - application/vnd.sas.score.analysis.code+json
+        - application/json
+      responses:
+        '200':
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.analysis.code/v1/analysisCode.yaml'
+        '400':
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        '500':
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  /flows/{decisionId}/revisions/{revisionId}/externalArtifacts:
+    get:
+      summary: Get list of external artifacts for decision revision
+      description: |
+        Returns the list of external artifacts used by a decision revision. Objects used by a step of the steps collection in a decision flow are considered external artifacts. Some examples of such objects are files and web services. This endpoint returns the collection of external artifacts. The collection might be empty if there is no external artifact used by any step of the decision.
+        The expected number of external artifacts is small. Therefore, this endpoint does not support any paging, filtering, or sorting of parameters.
+      operationId: getDecisionRevisionExternalArtifacts
+      tags:
+        - Decisions
+      parameters:
+        - name: decisionId
+          in: path
+          type: string
+          description: Id of the decision.
+          required: true
+        - name: revisionId
+          in: path
+          type: string
+          required: true
+          description: Id of the revision.
+        - name: AcceptType
+          in: header
+          type: string
+          enum:
+            - application/vnd.sas.collection+json
+            - application/json
+          description: Select the desired representation.
+          default: application/vnd.sas.collection+json
+        - name: Accept-Item
+          in: header
+          type: string
+          enum:
+            - application/vnd.sas.decision.external.artifact+json
+          description: Used for selecting desired item representation.
+          default: application/vnd.sas.decision.external.artifact+json
+      produces:
+        - application/vnd.sas.collection+json
+        - application/json
+      responses:
+        '200':
+          description: The request succeeded.
+          schema:
+            $ref: '#/definitions/externalArtifactsCollection'
+        '404':
+          description: No resource exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+
+
+
+
+  /codeFiles:
+    get:
+      tags:
+        - CodeFiles
+      summary: Get a collection of code files
+      description: Returns a collection of code files based on the specified pagination, filtering, and sorting options. The items in the collection, depend on the `Accept-Item` header.
+      operationId: getCodeFiles
+      produces:
+        - application/vnd.sas.collection+json
+        - application/json
+      parameters:
+        - name: Accept-Item
+          description: Used for selecting desired item representation.
+          in: header
+          type: string
+          format: media-type
+          enum:
+            - application/vnd.sas.decision.code.file+json
+            - application/vnd.sas.summary+json
+          default: application/vnd.sas.summary+json
+        - name: start
+          description: The index of the first code file to return.
+          in: query
+          type: integer
+          format: int64
+          default: 0
+        - name: limit
+          description: The maximum number of code files to return.
+          in: query
+          type: integer
+          format: int32
+          default: 20
+        - name: filter
+          in: query
+          type: string
+          format: filter-criteria
+          description: The criteria for filtering the code files. See [Filtering in REST APIs](https://developer.sas.com/apis/rest/Topics/#filters).
+        - name: sortBy
+          in: query
+          type: string
+          format: sort-criteria
+          description: The criteria for sorting the code files. See [Sorting in REST APIs](https://developer.sas.com/apis/rest/Topics/#sorting).
+      responses:
+        200:
+          schema:
+            $ref: "#/definitions/codeFileCollection"
+          description: The request succeeded.
+          examples:
+            application/vnd.sas.collection+json: |-
+              {
+                "links": [
+                  {
+                    "method": "GET",
+                    "rel": "collection",
+                    "href": "/decisions/codeFiles",
+                    "uri": "/decisions/codeFiles",
+                    "type": "application/vnd.sas.collection",
+                    "itemType": "application/vnd.sas.decision.code.file"
+                  },
+                  {
+                    "method": "GET",
+                    "rel": "self",
+                    "href": "/decisions/codeFiles?start=0&limit=20",
+                    "uri": "/decisions/codeFiles?start=0&limit=20",
+                    "type": "application/vnd.sas.collection",
+                    "itemType": "application/vnd.sas.decision.code.file"
+                  },
+                  {
+                    "method": "POST",
+                    "rel": "create",
+                    "href": "/decisions/codeFiles",
+                    "uri": "/decisions/codeFiles",
+                    "type": "application/vnd.sas.decision.code.file",
+                    "responseType": "application/vnd.sas.decision.code.file"
+                  }
+                ],
+                "name": "codeFiles",
+                "accept": "application/vnd.sas.decision.code.file",
+                "start": 0,
+                "count": 1,
+                "items": [
+                  {
+                    "creationTimeStamp": "2017-06-02T15:38:30.988Z",
+                    "modifiedTimeStamp": "2017-06-02T15:38:30.988Z",
+                    "createdBy": "sasdemo",
+                    "modifiedBy": "sasdemo",
+                    "id": "36f6498b-b612-412c-9182-f0bfbd970d51",
+                    "name": "BadCar",
+                    "type": "decisionDS2PackageFile",
+                    "fileUri": "/files/files/0c7281d8-063d-49dd-be6b-392e9c9e930c",
+                    "status": "valid",
+                    "signature": [
+                      {
+                        "name": "Make",
+                        "dataType": "string",
+                        "direction": "input"
+                      },
+                      {
+                        "name": "Odometer",
+                        "dataType": "decimal",
+                        "direction": "input"
+                      },
+                      {
+                        "name": "Bad",
+                        "dataType": "decimal",
+                        "direction": "inOut"
+                      }
+                    ],
+                    "links":[
+                        {
+                           "method": "GET",
+                           "rel": "up",
+                           "href": "/decisions/codeFiles",
+                           "uri": "/decisions/codeFiles",
+                           "type": "application/vnd.sas.collection",
+                           "itemType": "application/vnd.sas.decision.code.file"
+                        },
+                        {
+                           "method": "GET",
+                           "rel": "self",
+                           "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                           "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                           "type": "application/vnd.sas.decision.code.file"
+                        },
+                        {
+                           "method": "GET",
+                           "rel": "alternate",
+                           "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                           "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                           "type": "application/vnd.sas.summary"
+                        },
+                        {
+                           "method": "DELETE",
+                           "rel": "delete",
+                           "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                           "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51"
+                        }
+                    ],
+                    "version":1
+                  }
+                ],
+                "limit": 20,
+                "version": 2
+              }
+        400:
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+          examples:
+            application/vnd.sas.error+json: |-
+              {
+                "httpStatusCode": 400,
+                "message": "The start parameter must be greater or equal to zero"
+              }
+    post:
+      tags:
+        - CodeFiles
+      summary: Create a code file
+      description: Creates a new code file based on the representation in the request body.
+      operationId: createCodeFile
+      consumes:
+        - application/vnd.sas.decision.code.file+json
+        - application/json
+      produces:
+        - application/vnd.sas.decision.code.file+json
+        - application/json
+      parameters:
+        - name: codeFile
+          in: body
+          required: true
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.code.file/v5/codeFile.yaml'
+          description: Code file details that needs to be created.
+        - name: fromRevisionUri
+          in: query
+          type: string
+          description: "This value specifies the URI of the code file revision this new code file is being created from.This property allows for the lineage of a code file to be traced.
+             The valid format for this parameter is '/decisions/codeFiles/${codeFileId}/revisions/${revisionId}'"
+          format: '/decisions/codeFiles/{codeFileId}/revisions/{revisionId}'
+      responses:
+        201:
+          description: A code file was created.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.code.file/v5/codeFile.yaml'
+          headers:
+            Location:
+              type: string
+              format: uri
+              description: The URL of the code file.
+            ETag:
+              type: string
+              description: The entity tag for the code file.
+            Last-Modified:
+              type: string
+              format: date-time
+              description: The timestamp in `EEE, dd MMM yyyy HH:mm:ss GMT` format when the code file was last modified.
+          examples:
+            application/vnd.sas.decision.code.file+json: |-
+              {
+                "creationTimeStamp": "2017-06-02T15:38:30.988Z",
+                "modifiedTimeStamp": "2017-06-02T15:38:30.988Z",
+                "createdBy": "sasdemo",
+                "modifiedBy": "sasdemo",
+                "id": "36f6498b-b612-412c-9182-f0bfbd970d51",
+                "name": "BadCar",
+                "type": "decisionDS2PackageFile",
+                "fileUri": "/files/files/0c7281d8-063d-49dd-be6b-392e9c9e930c",
+                "status": "valid",
+                "signature": [
+                  {
+                    "name": "Make",
+                    "dataType": "string",
+                    "direction": "input"
+                  },
+                  {
+                    "name": "Odometer",
+                    "dataType": "decimal",
+                    "direction": "input"
+                  },
+                  {
+                    "name": "Bad",
+                    "dataType": "decimal",
+                    "direction": "inOut"
+                  }
+                ],
+                "links":[
+                  {
+                     "method": "GET",
+                     "rel": "up",
+                     "href": "/decisions/codeFiles",
+                     "uri": "/decisions/codeFiles",
+                     "type": "application/vnd.sas.collection",
+                     "itemType": "application/vnd.sas.decision.code.file"
+                  },
+                  {
+                     "method": "GET",
+                     "rel": "self",
+                     "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "type": "application/vnd.sas.decision.code.file"
+                  },
+                  {
+                     "method": "GET",
+                     "rel": "alternate",
+                     "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "type": "application/vnd.sas.summary"
+                  },
+                  {
+                     "method": "DELETE",
+                     "rel": "delete",
+                     "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51"
+                  }
+                ],
+                "version":1
+              }
+        400:
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+          examples:
+            application/vnd.sas.error+json: |-
+              {
+                "httpStatusCode": 400,
+                "message": "The codeFile was not valid.",
+                "details": [
+                  "exception: com.sas.commons.rest.exceptions.http.BadRequestException",
+                  "correlator: a050b184-cfc3-46e2-bc76-8bc8c166c32b",
+                  "path: /decisions/codeFiles",
+                  "FieldError: type: Must not be null."
+                ]
+              }
+
+
+  /codeFiles/{codeFileId}#summary:
+    get:
+      tags:
+        - CodeFiles
+      summary: Get the summary for a code file
+      description: Returns the summary representation of the specified code file.
+      operationId: getCodeFileSummary
+      produces:
+        - application/vnd.sas.summary+json
+        - application/json
+      parameters:
+        - name: codeFileId
+          description: The unique identifier for the code file.
+          in: path
+          type: string
+          required: true
+        - name: AcceptType
+          in: header
+          description: Need to set this to application/vnd.sas.summary+json to get summary of code file.
+          type: string
+          format: media-type
+          required: true
+      responses:
+        200:
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.temp/v1/resourceSummary.json'
+          headers:
+            ETag:
+              type: string
+              description: The entity tag for the code file.
+            Last-Modified:
+              type: string
+              format: date-time
+              description: The timestamp in `EEE, dd MMM yyyy HH:mm:ss GMT` format when the code file was last modified.
+          examples:
+            application/vnd.sas.summary+json: |-
+              {
+                "creationTimeStamp": "2017-06-02T15:38:30.988Z",
+                "modifiedTimeStamp": "2017-06-02T15:38:30.988Z",
+                "createdBy": "sasdemo",
+                "modifiedBy": "sasdemo",
+                "id": "36f6498b-b612-412c-9182-f0bfbd970d51",
+                "type": "decisionDS2PackageFile",
+                "name": "BadCar",
+                "links":[
+                  {
+                     "method": "GET",
+                     "rel": "up",
+                     "href": "/decisions/codeFiles",
+                     "uri": "/decisions/codeFiles",
+                     "type": "application/vnd.sas.collection",
+                     "itemType": "application/vnd.sas.decision.code.file"
+                  },
+                  {
+                     "method": "GET",
+                     "rel": "self",
+                     "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "type": "application/vnd.sas.decision.code.file"
+                  },
+                  {
+                     "method": "GET",
+                     "rel": "alternate",
+                     "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "type": "application/vnd.sas.summary"
+                  },
+                  {
+                     "method": "DELETE",
+                     "rel": "delete",
+                     "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51"
+                  }
+                ],
+                "version":1
+              }
+        404:
+          description: No code file exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+          examples:
+            application/vnd.sas.error+json: |-
+              {
+                "httpStatusCode": 404,
+                "message": "The code file with ID \"2eda64df-3540-4b6e-b6f6-1090c5f6ce48\" could not be found."
+              }
+
+  /codeFiles/{codeFileId}:
+    get:
+      tags:
+        - CodeFiles
+      summary: Get a code file
+      description: Returns the representation of the specified code file.
+      operationId: getCodeFile
+      produces:
+        - application/vnd.sas.decision.code.file+json
+        - application/json
+      parameters:
+        - name: codeFileId
+          description: The unique identifier for the code file.
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.code.file/v5/codeFile.yaml'
+          headers:
+            ETag:
+              type: string
+              description: The entity tag for the code file.
+            Last-Modified:
+              type: string
+              format: date-time
+              description: The timestamp in `EEE, dd MMM yyyy HH:mm:ss GMT` format when the code file was last modified.
+          examples:
+            application/vnd.sas.decision.code.file+json: |-
+              {
+                "creationTimeStamp": "2017-06-02T15:38:30.988Z",
+                "modifiedTimeStamp": "2017-06-02T15:38:30.988Z",
+                "createdBy": "sasdemo",
+                "modifiedBy": "sasdemo",
+                "id": "36f6498b-b612-412c-9182-f0bfbd970d51",
+                "name": "BadCar",
+                "type": "decisionDS2PackageFile",
+                "fileUri": "/files/files/0c7281d8-063d-49dd-be6b-392e9c9e930c",
+                "status": "valid",
+                "signature": [
+                  {
+                    "name": "Make",
+                    "dataType": "string",
+                    "direction": "input"
+                  },
+                  {
+                    "name": "Odometer",
+                    "dataType": "decimal",
+                    "direction": "input"
+                  },
+                  {
+                    "name": "Bad",
+                    "dataType": "decimal",
+                    "direction": "inOut"
+                  }
+                ],
+                "links":[
+                  {
+                     "method": "GET",
+                     "rel": "up",
+                     "href": "/decisions/codeFiles",
+                     "uri": "/decisions/codeFiles",
+                     "type": "application/vnd.sas.collection",
+                     "itemType": "application/vnd.sas.decision.code.file"
+                  },
+                  {
+                     "method": "GET",
+                     "rel": "self",
+                     "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "type": "application/vnd.sas.decision.code.file"
+                  },
+                  {
+                     "method": "GET",
+                     "rel": "alternate",
+                     "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "type": "application/vnd.sas.summary"
+                  },
+                  {
+                     "method": "DELETE",
+                     "rel": "delete",
+                     "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51"
+                  }
+                ],
+                "version":1
+              }
+        404:
+          description: No code file exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+          examples:
+            application/vnd.sas.error+json: |-
+              {
+                "httpStatusCode": 404,
+                "message": "The code file with ID \"2eda64df-3540-4b6e-b6f6-1090c5f6ce48\" could not be found."
+              }
+    delete:
+      tags:
+        - CodeFiles
+      summary: Delete a code file
+      description: Deletes the specified code file.
+      operationId: deleteCodeFile
+      parameters:
+        - name: codeFileId
+          description: The unique identifier for the code file.
+          in: path
+          type: string
+          required: true
+      responses:
+        204:
+          description: The code file was deleted.
+        404:
+          description: No code file exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+          examples:
+            application/vnd.sas.error+json: |-
+              {
+                "httpStatusCode": 404,
+                "message": "The code file with ID \"2eda64df-3540-4b6e-b6f6-1090c5f6ce48\" could not be found."
+              }
+    put:
+      tags:
+        - CodeFiles
+      summary: Update a code file
+      description: Updates a code file based on the representation in the request body. Only name and description can be updated with this.
+      operationId: updateCodeFile
+      consumes:
+        - application/vnd.sas.decision.code.file+json
+        - application/json
+      produces:
+        - application/vnd.sas.decision.code.file+json
+        - application/json
+      parameters:
+        - name: codeFile
+          in: body
+          required: true
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.code.file/v5/codeFile.yaml'
+          description: The unique identifier for the code file.
+        - name: codeFileId
+          in: path
+          required: true
+          type: string
+          description: The identifier for the decision.
+        - name: if-match
+          in: header
+          required: true
+          type: string
+          description: Etag value from when the originating object was retrieved.
+      responses:
+        200:
+          description: The code file was updated.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.code.file/v5/codeFile.yaml'
+          headers:
+            Location:
+              type: string
+              format: uri
+              description: The URL of the code file.
+            ETag:
+              type: string
+              description: The entity tag for the code file.
+            Last-Modified:
+              type: string
+              format: date-time
+              description: The timestamp in `EEE, dd MMM yyyy HH:mm:ss GMT` format when the code file was last modified.
+          examples:
+            application/vnd.sas.decision.code.file+json: |-
+              {
+                "creationTimeStamp": "2017-06-02T15:38:30.988Z",
+                "modifiedTimeStamp": "2017-06-02T15:38:30.988Z",
+                "createdBy": "sasdemo",
+                "modifiedBy": "sasdemo",
+                "id": "36f6498b-b612-412c-9182-f0bfbd970d51",
+                "name": "BadCar",
+                "type": "decisionDS2PackageFile",
+                "fileUri": "/files/files/0c7281d8-063d-49dd-be6b-392e9c9e930c",
+                "status": "valid",
+                "signature": [
+                  {
+                    "name": "Make",
+                    "dataType": "string",
+                    "direction": "input"
+                  },
+                  {
+                    "name": "Odometer",
+                    "dataType": "decimal",
+                    "direction": "input"
+                  },
+                  {
+                    "name": "Bad",
+                    "dataType": "decimal",
+                    "direction": "inOut"
+                  }
+                ],
+                "links":[
+                  {
+                     "method": "GET",
+                     "rel": "up",
+                     "href": "/decisions/codeFiles",
+                     "uri": "/decisions/codeFiles",
+                     "type": "application/vnd.sas.collection",
+                     "itemType": "application/vnd.sas.decision.code.file"
+                  },
+                  {
+                     "method": "GET",
+                     "rel": "self",
+                     "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "type": "application/vnd.sas.decision.code.file"
+                  },
+                  {
+                     "method": "GET",
+                     "rel": "alternate",
+                     "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "type": "application/vnd.sas.summary"
+                  },
+                  {
+                     "method": "DELETE",
+                     "rel": "delete",
+                     "href": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51",
+                     "uri": "/decisions/codeFiles/36f6498b-b612-412c-9182-f0bfbd970d51"
+                  }
+                ],
+                "version":1
+              }
+        400:
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        412:
+          description: "The `If-Match` request header did not match the resource's entity tag."
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        428:
+          description: "The request headers did not include a `If-Match` or `If-Unmodified-Since` precondition."
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+
+  /codeFiles/{codeFileId}/mappedCode:
+    post:
+      tags:
+        - CodeFiles
+      summary: Get the mapped code of this code file based on the given information
+      description: Returns the code to be able to run the code file based on the provided data and mapping information in the request.
+      operationId: getMappedCodeCodeFile
+      consumes:
+        - application/vnd.sas.score.code.generation.request+json
+        - application/json
+      produces:
+        - application/vnd.sas.score.mapped.code+json
+        - application/json
+      parameters:
+        - name: codeFileId
+          in: path
+          type: string
+          required: true
+          description: The code file ID.
+        - name: scoreCodeGenerationRequest
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/scoreCodeGenerationRequest'
+          description: The information for the scoreDefinitionId and hints.
+      responses:
+        '200':
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.mapped.code/v1/mappedCode.yaml'
+        '400':
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        '500':
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+
+  /codeFiles/{codeFileId}/revisions:
+    get:
+      tags:
+        - CodeFileRevisions
+      summary: Get a collection of code files revisions of a given code file.
+      description: Returns a collection of code file revisions based on the specified pagination, filtering, and sorting options. The items in the collection, depend on the `Accept-Item` header.
+      operationId: getCodeFileRevisions
+      produces:
+        - application/vnd.sas.collection+json
+        - application/json
+      parameters:
+        - name: codeFileId
+          description: The unique identifier for the code file.
+          in: path
+          type: string
+          required: true
+        - name: Accept-Item
+          description: Used for selecting desired item representation.
+          in: header
+          type: string
+          format: media-type
+          enum:
+            - application/vnd.sas.decision.code.file+json
+            - application/vnd.sas.summary+json
+          default: application/vnd.sas.summary+json
+        - name: start
+          description: The index of the first code file to return.
+          in: query
+          type: integer
+          format: int64
+          default: 0
+        - name: limit
+          description: The maximum number of code files to return.
+          in: query
+          type: integer
+          format: int32
+          default: 20
+        - name: filter
+          in: query
+          type: string
+          format: filter-criteria
+          description: The criteria for filtering the code files. See [Filtering in REST APIs](https://developer.sas.com/apis/rest/Topics/#filters).
+        - name: sortBy
+          in: query
+          type: string
+          format: sort-criteria
+          description: The criteria for sorting the code files. See [Sorting in REST APIs](https://developer.sas.com/apis/rest/Topics/#sorting).
+      responses:
+        200:
+          schema:
+            $ref: "#/definitions/codeFileCollection"
+          description: The request succeeded.
+        400:
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    post:
+      tags:
+        - CodeFileRevisions
+      summary: Create a code file revision
+      description: Creates a new code file revision based on the representation in the request body.
+      operationId: createCodeFileRevision
+      consumes:
+        - application/vnd.sas.decision.code.file+json
+        - application/json
+      produces:
+        - application/vnd.sas.decision.code.file+json
+        - application/json
+      parameters:
+        - name: codeFileId
+          description: The unique identifier for the code file.
+          in: path
+          type: string
+          required: true
+        - name: revisionType
+          in: query
+          type: string
+          required: false
+          description: "Valid values are `major` or `minor`. This value determines how the server generates the `major` and `minor` numbers. If a `major` number is provided, the next available major version number is started. For example, if the code file has revisions 1.0, 1.1, 1.2, 2.0, and 2.1, creating a new major revision results in 3.0. If a `minor` number is provided, then the next available minor revision number is reserved based on the existing revisions. For example, if the existing revisions have `major` and `minor` numbers of 1.1, 1.2, 1.3, 2.1, 2.2, and a user requests a new minor revision, then 2.3 is assigned. This parameter defaults to `minor` if not supplied."
+          enum:
+            - major
+            - minor
+        - name: codeFileRevision
+          in: body
+          required: true
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.code.file/v5/codeFile.yaml'
+          description: Code file revision details that needs to be created.
+        - name: fromRevisionUri
+          in: query
+          type: string
+          description: "This value specifies the URI of the code file revision this new code file revision is being created from.This property allows for the lineage of a code file to be traced.
+             The valid format for this parameter is '/decisions/codeFiles/${codeFileId}/revisions/${revisionId}'"
+          format: '/decisions/codeFiles/{codeFileId}/revisions/{revisionId}'
+      responses:
+        201:
+          description: A code file revision was created.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.code.file/v5/codeFile.yaml'
+          headers:
+            Location:
+              type: string
+              format: uri
+              description: The URL of the code file revision.
+            ETag:
+              type: string
+              description: The entity tag for the code file revision.
+            Last-Modified:
+              type: string
+              format: date-time
+              description: The timestamp in `EEE, dd MMM yyyy HH:mm:ss GMT` format when the code file revision was last modified.
+        400:
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+
+  /codeFiles/{codeFileId}/revisions/{revisionId}#summary:
+    get:
+      tags:
+        - CodeFileRevisions
+      summary: Get the summary for a code file revision
+      description: Returns the summary representation of the specified code file revision.
+      operationId: getCodeFileRevisionSummary
+      produces:
+        - application/vnd.sas.summary+json
+        - application/json
+      parameters:
+        - name: codeFileId
+          description: The unique identifier for the code file.
+          in: path
+          type: string
+          required: true
+        - name: revisionId
+          description: The unique identifier for the code file revision.
+          in: path
+          type: string
+          required: true
+        - name: AcceptType
+          in: header
+          description: Need to set this to application/vnd.sas.summary+json to get summary of code file revision.
+          type: string
+          format: media-type
+          required: true
+      responses:
+        200:
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.temp/v1/resourceSummary.json'
+          headers:
+            ETag:
+              type: string
+              description: The entity tag for the code file revision.
+            Last-Modified:
+              type: string
+              format: date-time
+              description: The timestamp in `EEE, dd MMM yyyy HH:mm:ss GMT` format when the code file revision was last modified.
+        404:
+          description: No code file revision exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+
+  /codeFiles/{codeFileId}/revisions/{revisionId}:
+    get:
+      tags:
+        - CodeFileRevisions
+      summary: Get a code file revision
+      description: Returns the representation of the specified code file revision.
+      operationId: getCodeFileRevision
+      produces:
+        - application/vnd.sas.decision.code.file+json
+        - application/json
+      parameters:
+        - name: codeFileId
+          description: The unique identifier for the code file.
+          in: path
+          type: string
+          required: true
+        - name: revisionId
+          description: The unique identifier for the code file revision.
+          in: path
+          type: string
+          required: true
+      responses:
+        200:
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.code.file/v5/codeFile.yaml'
+          headers:
+            ETag:
+              type: string
+              description: The entity tag for the code file revision.
+            Last-Modified:
+              type: string
+              format: date-time
+              description: The timestamp in `EEE, dd MMM yyyy HH:mm:ss GMT` format when the code file revision was last modified.
+        404:
+          description: No code file revision exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    delete:
+      tags:
+        - CodeFileRevisions
+      summary: Delete a code file revision
+      description: Deletes the specified code file revision.
+      operationId: deleteCodeFileRevision
+      parameters:
+        - name: codeFileId
+          description: The unique identifier for the code file.
+          in: path
+          type: string
+          required: true
+        - name: revisionId
+          description: The unique identifier for the code file revision.
+          in: path
+          type: string
+          required: true
+      responses:
+        204:
+          description: The code file revision was deleted.
+        404:
+          description: No code file revision exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+
+  /codeFiles/{codeFileId}/revisions/{revisionId}/mappedCode:
+    post:
+      tags:
+        - CodeFiles
+      summary: Get the mapped code of this code file revision based on the given information
+      description: Returns the code to be able to run the code file based on the provided data and mapping information in the request.
+      operationId: getMappedCodeRevisionCodeFile
+      consumes:
+        - application/vnd.sas.score.code.generation.request+json
+        - application/json
+      produces:
+        - application/vnd.sas.score.mapped.code+json
+        - application/json
+      parameters:
+        - name: codeFileId
+          in: path
+          type: string
+          required: true
+          description: The code file ID.
+        - name: revisionId
+          in: path
+          type: string
+          required: true
+          description: The code file revision ID.
+        - name: scoreCodeGenerationRequest
+          in: body
+          required: true
+          schema:
+            $ref: '#/definitions/scoreCodeGenerationRequest'
+          description: The information for the scoreDefinitionId and hints.
+      responses:
+        '200':
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.score.mapped.code/v1/mappedCode.yaml'
+        '400':
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        '500':
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+
+  /decisionNodeTypes:
+    get:
+      operationId: getDecisionNodeTypes
+      tags:
+        - DecisionNodeTypes
+      summary: Get a list of all decision node types
+      description: Returns a resource collection of all decision node types.
+      parameters:
+        - name: name
+          in: query
+          type: string
+          description: Name of the decision node type to match.
+        - name: filter
+          description: The criteria for filtering the decision node types. See [Filtering in REST APIs](https://developer.sas.com/apis/rest/Topics/#filters).
+          in: query
+          type: string
+          format: filter-criteria
+        - name: sortBy
+          description: The criteria for sorting the decision node types. See [Sorting in REST APIs](https://developer.sas.com/apis/rest/Topics/#sorting).
+          in: query
+          type: string
+          format: sort-criteria
+        - name: start
+          in: query
+          type: integer
+          description: 'The starting index of the first item in a page. The index is 0-based. Default is 0. '
+        - name: limit
+          in: query
+          type: integer
+          description: 'The maximum number of items to return in this page of results. The actual number of returned items might be less if the collection has been exhausted. The default limit is 10. '
+        - name: Accept-Item
+          in: header
+          type: string
+          description: 'If provided, this should be an alternative media type that the service recognizes. If the media type is not one that the service can provide, a 406 response is returned.'
+      produces:
+        - application/vnd.sas.collection+json
+        - application/json
+      responses:
+        200:
+          description: The request succeeded.
+          schema:
+            $ref: '#/definitions/decisionNodeTypeCollection'
+        406:
+          description: The specified resource can generate only the response entities that have unacceptable content characteristics.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    post:
+      summary: Create a decision node type
+      operationId: createDecisionNodeType
+      description: Creates a new decision node type based on the provided content.
+      tags:
+        - DecisionNodeTypes
+      parameters:
+        - name: decisionNodeType
+          in: body
+          description: DecisionNodeType representation to create a decision node type.
+          required: true
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.node.type/v1/decisionNodeType.yaml'
+      consumes:
+        - application/vnd.sas.decision.node.type+json
+        - application/json
+      produces:
+        - application/vnd.sas.decision.node.type+json
+        - application/json
+      responses:
+        201:
+          description: The decision node type was created.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+            Location:
+              type: string
+              format: uri
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.node.type/v1/decisionNodeType.yaml'
+        400:
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  /decisionNodeTypes/{nodeTypeId}:
+    head:
+      summary: Get headers for a decision node type
+      description: Retrieves the headers for the provided decision node type.
+      operationId: getDecisionNodeTypeHeaders
+      tags:
+        - DecisionNodeTypes
+      parameters:
+        - name: nodeTypeId
+          in: path
+          required: true
+          type: string
+          description: The identifier for the decision node type.
+      responses:
+        200:
+          description: The request succeeded.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+        404:
+          description: No decision node type exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    get:
+      summary: Get decision node type content
+      description: Retrieves the contents of a decision node type.
+      operationId: getDecisionNodeType
+      tags:
+        - DecisionNodeTypes
+      parameters:
+        - name: nodeTypeId
+          in: path
+          required: true
+          type: string
+          description: Identifier for the decision node type.
+      produces:
+        - application/vnd.sas.decision.node.type+json
+        - application/json
+      responses:
+        200:
+          description: The request succeeded.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.node.type/v1/decisionNodeType.yaml'
+        404:
+          description: No decision node type exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    put:
+      summary: Update a decision node type
+      description: Updates the decision node type.
+      operationId: updateDecisionNodeType
+      tags:
+        - DecisionNodeTypes
+      parameters:
+        - name: nodeTypeId
+          in: path
+          required: true
+          type: string
+          description: Identifier for the decision node type.
+        - name: if-match
+          in: header
+          required: true
+          type: string
+          description: Etag value from when the originating object was retrieved.
+        - name: decisionNodeType
+          in: body
+          required: true
+          description: Decision Node Type content to use in update
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.node.type/v1/decisionNodeType.yaml'
+      consumes:
+        - application/vnd.sas.decision.node.type+json
+        - application/json
+      produces:
+        - application/vnd.sas.decision.node.type+json
+        - application/json
+      responses:
+        200:
+          description: The request succeeded.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.node.type/v1/decisionNodeType.yaml'
+        400:
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        404:
+          description: No decision node type exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        412:
+          description: "The `If-Match` request header did not match the resource's entity tag, or the
+              `If-Unmodified-Since` request header did not match the resource's last modified timestamp."
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        428:
+          description: "The request headers did not include a `If-Match` or `If-Unmodified-Since` precondition."
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    delete:
+      summary: Delete a decision node type
+      operationId: deleteDecisionNodeType
+      tags:
+        - DecisionNodeTypes
+      description: Deletes the specified decision node type.
+      parameters:
+        - name: nodeTypeId
+          in: path
+          type: string
+          required: true
+          description: Identifier for the decision node type.
+      responses:
+        '204':
+          description: The decision node type was deleted.
+        '404':
+          description: No decision node type exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        '500':
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+  /decisionNodeTypes/{nodeTypeId}/content:
+    post:
+      summary: Add decision node type content to a decision node type
+      operationId: createDecisionNodeTypeContent
+      description: Creates a new decision node type content associated with a decision node type based on the provided content.
+      tags:
+        - DecisionNodeTypes
+      parameters:
+        - name: decisionNodeTypeContent
+          in: body
+          description: DecisionNodeTypeContent representation to create a decision node type content.
+          required: true
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.node.type/v1/decisionNodeTypeContent.yaml'
+      consumes:
+        - application/vnd.sas.decision.node.type.content+json
+        - application/json
+      produces:
+        - application/vnd.sas.decision.node.type.content+json
+        - application/json
+      responses:
+        201:
+          description: The decision node type was created.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+            Location:
+              type: string
+              format: uri
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.node.type/v1/decisionNodeTypeContent.yaml'
+        400:
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        412:
+          description: "The `If-Match` request header did not match the resource's entity tag, or the
+                      `If-Unmodified-Since` request header did not match the resource's last modified timestamp."
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        428:
+          description: "The request headers did not include a `If-Match` or `If-Unmodified-Since` precondition."
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    get:
+      summary: Get decision node type content
+      operationId: getDecisionNodeTypeContent
+      description: Retrieves the decision node type content which can then be used to represent the decision node type when the containing decision is executed.
+      tags:
+        - DecisionNodeTypes
+      parameters:
+        - name: nodeTypeId
+          in: path
+          required: true
+          type: string
+          description: Identifier for the decision node type.
+      produces:
+        - application/vnd.sas.decision.node.type.content+json
+        - application/json
+
+      responses:
+        200:
+          description: The request succeeded.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision/v6/decision.yaml'
+        404:
+          description: No decision node type code exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+    put:
+      summary: update a decision node type content
+      operationId: updateDecisionNodeTypeContent
+      description: Updates a decision node type content associated with a decision node type based on the provided content.
+      tags:
+        - DecisionNodeTypes
+      parameters:
+        - name: decisionNodeTypeContent
+          in: body
+          description: DecisionNodeTypeContent representation to update a pre-existing decision node type content.
+          required: true
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.node.type/v1/decisionNodeTypeContent.yaml'
+        - name: if-match
+          in: header
+          required: true
+          type: string
+          description: Etag value from when the originating object was retrieved.
+      consumes:
+        - application/vnd.sas.decision.node.type.content+json
+        - application/json
+      produces:
+        - application/vnd.sas.decision.node.type.content+json
+        - application/json
+      responses:
+        200:
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.node.type/v1/decisionNodeTypeContent.yaml'
+          headers:
+            ETag:
+              type: string
+              description: The entity tag for the decision node type content.
+            Last-Modified:
+              type: string
+              format: date-time
+              description: The timestamp when the decision node type content was last modified. The timestamp is in the format `EEE, dd MMM yyyy HH:mm:ss GMT`.
+        201:
+          description: The decision node type content was updated.
+          headers:
+            Last-Modified:
+              type: string
+              format: date-time
+            Location:
+              type: string
+              format: uri
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.node.type/v1/decisionNodeTypeContent.yaml'
+        400:
+          description: The request was invalid.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        412:
+          description: The `If-Match` request header did not match the resource's entity tag, or the `If-Unmodified-Since` request header did not match the resource's last modified timestamp.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        428:
+          description: The request headers did not include a `If-Match` or `If-Unmodified-Since` precondition.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+        500:
+          description: The request could not be fulfilled because of an unexpected server error.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+
+  /decisionNodeTypes/{nodeTypeId}/decisionStepCode:
+    get:
+      tags:
+        - DecisionNodeTypes
+      summary: Get decision node type decision step code (static decision node types only)
+      description: Returns the decision step code for the specified decision node type of type static.
+      operationId: getDecisionNodeTypeDecisionStepCode
+      produces:
+        - application/json
+        - application/vnd.sas.decision.step.code+json
+      parameters:
+        - name: nodeTypeId
+          description: The unique identifier for the decision node type.
+          in: path
+          type: string
+          required: true
+        - name: AcceptType
+          in: header
+          description: Need to set this to application/vnd.sas.decision.step.code+json to get the decision step code for the decision node type.
+          type: string
+          format: media-type
+          required: true
+        - name: codeTarget
+          description: Target where the DS2 code is deployed.
+          in: query
+          type: string
+          default: others
+          enum:
+            - others
+            - microAnalyticService
+      responses:
+        200:
+          description: The request succeeded.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.step.code/v1/decisionStepCode.yaml'
+          headers:
+            ETag:
+              type: string
+              description: The entity tag for the decision node type.
+            Last-Modified:
+              type: string
+              format: date-time
+              description: The timestamp when the decision node type was last modified. The timestamp is in the format `EEE, dd MMM yyyy HH:mm:ss GMT`.
+        404:
+          description: No decisionNodeType exists at the requested path.
+          schema:
+            $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.error/v2/error2.json'
+
+
+
+definitions:
+  scoreCodeGenerationRequest:
+    title: Score Code Generation Request
+    description: Request that contains hints to generate mapped code using the Scoring Definition by Score Object.
+    required:
+      - scoreDefinitionId
+    properties:
+      scoreDefinitionId:
+        type: string
+        description: Score definition ID that is used for generating mapped code. Should be used only if scoreDefinition is not used.
+      hints:
+        type: object
+        description: Hints for generating mapped code. The mapped code request is forwarded to the Score object of the score definition. The Score object should understand these hints.
+        additionalProperties:
+          type: string
+      version:
+        type: integer
+        description: This media type's schema version number. This representation is version 1.
+    example:
+      scoreDefinitionId: 9f0c13ae-6a27-11e6-8b77-86f30ca893d3
+      hints:
+        outputLibraryName: PUBLIC
+  analysisCodeGenerationRequest:
+    title: Analysis Code Generation Request
+    description: Request that contains hints to generate analysis code using the Scoring Execution API.
+    required:
+      - analysisType
+      - scoreExecutionId
+    properties:
+      scoreExecutionId:
+        type: string
+        description: Score execution ID.
+      analysisType:
+        type: string
+        format: enumeration
+        enum:
+          - ruleFiredDetails
+          - ruleFiredSummary
+          - decisionPathNodes
+          - decisionPathFrequency
+          - decisionNodesCounts
+        description: Type of analysis that needs to be performed.
+      hints:
+        type: object
+        description: Hints for generating analysis code.
+        additionalProperties:
+          type: string
+      version:
+        type: integer
+        description: This media type's schema version number. This representation is version 1.
+    example:
+      scoreExecutionId: 6f4bced9-5bbd-476c-8ef8-3378678b0702
+      analysisType: ruleFiredSummary
+      hints:
+        outputLibraryName: PUBLIC
+  decisionCollection:
+    title: Decision Collection
+    description: A paginated list of decision representations, with optional links to first, prev, next, and last page of the collection.
+    allOf:
+      - $ref: 'http://swagger.na.sas.com/reference/schema/baseCollection/v2/baseCollection2.json'
+      - type: object
+        required:
+          - items
+        properties:
+          items:
+            type: array
+            items:
+              $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision/v6/decision.yaml'
+            description: Array consisting of one page of Decision resources.
+          version:
+            type: integer
+            description: This media type's schema version number. This representation is version 1.
+  codeFileCollection:
+    title: Code File Collection
+    description: One page of decision representations, with optional links to first, prev, next, and last page of the collection.
+    allOf:
+      - $ref: 'http://swagger.na.sas.com/reference/schema/baseCollection/v2/baseCollection2.json'
+      - type: object
+        required:
+          - items
+        properties:
+          items:
+            type: array
+            items:
+              $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.code.file/v5/codeFile.yaml'
+            description: Array consisting of one page of Decision resources.
+          version:
+            type: integer
+            description: This media type's schema version number. This representation is version 1.
+  externalArtifactsCollection:
+    title: External Artifacts Collection
+    description: A collection of external artifact representation
+    allOf:
+      - $ref: 'http://swagger.na.sas.com/reference/schema/baseCollection/v2/baseCollection2.json'
+      - type: object
+        properties:
+          items:
+            type: array
+            description: The actual results of a query.
+            items:
+              $ref: '#/definitions/externalArtifact'
+          version:
+            type: integer
+            description: This media type's schema version number. This representation is version 1.
+  externalArtifact:
+    title: External Artifact
+    properties:
+      name:
+        type: string
+        description: An assigned name of the artifact.
+      artifactType:
+        type: string
+        description: The type of artifact.
+      artifactProperties:
+        type: object
+        description: A map of keys to strings that are relevant for this artifact type. For example, for an analytic store, this map has a key for the `astoreUri`.
+      parentURI:
+        type: string
+        description: The URI of the object, such as the model or business rule set, that makes use of this artifact.
+      version:
+        type: integer
+        description: This media type's schema version number. This representation is version 1.
+  decisionNodeTypeCollection:
+    title: Decision Node Types Collection
+    description: A paginated list of decision node type representations, with optional links to first, prev, next, and last page of the collection.
+    allOf:
+      - $ref: 'http://swagger.na.sas.com/reference/schema/baseCollection/v2/baseCollection2.json'
+      - type: object
+        required:
+          - items
+        properties:
+          items:
+            type: array
+            items:
+              $ref: 'http://swagger.na.sas.com/reference/schema/application/vnd.sas.decision.node.type/v1/decisionNodeType.yaml'
+            description: Array consisting of one page of Decision Node Type resources.
+          version:
+            type: integer
+            description: This media type's schema version number. This representation is version 1.
