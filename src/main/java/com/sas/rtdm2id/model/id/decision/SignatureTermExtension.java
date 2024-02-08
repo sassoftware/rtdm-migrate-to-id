@@ -49,7 +49,9 @@ public class SignatureTermExtension {
 
     DECIMAL("decimal"),
 
-    INTEGER("integer");
+    INTEGER("integer"),
+
+    DATETIME("datetime");
 
     private String value;
 

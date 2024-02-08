@@ -127,7 +127,7 @@ public class Step {
   private List<Mapping> mappings = null;
 
   @JsonProperty("decisionNodeLinkTarget")
-  private DecisionNodeLinkStep decisionNodeLinkTarget = null;
+  private String decisionNodeLinkTarget = null;
 
   @JsonProperty("defaultCase")
   private ConditionBranch defaultCase = null;
@@ -461,7 +461,7 @@ public class Step {
     this.mappings = mappings;
   }
 
-  public Step decisionNodeLinkTarget(DecisionNodeLinkStep decisionNodeLinkTarget) {
+  public Step decisionNodeLinkTarget(String decisionNodeLinkTarget) {
     this.decisionNodeLinkTarget = decisionNodeLinkTarget;
     return this;
   }
@@ -472,11 +472,11 @@ public class Step {
    * @return decisionNodeLinkTarget
    **/
   @ApiModelProperty(value = "The linkLabel of the decision step that a DecisionNodeLinkStep targets.")
-  public DecisionNodeLinkStep getDecisionNodeLinkTarget() {
+  public String getDecisionNodeLinkTarget() {
     return decisionNodeLinkTarget;
   }
 
-  public void setDecisionNodeLinkTarget(DecisionNodeLinkStep decisionNodeLinkTarget) {
+  public void setDecisionNodeLinkTarget(String decisionNodeLinkTarget) {
     this.decisionNodeLinkTarget = decisionNodeLinkTarget;
   }
 

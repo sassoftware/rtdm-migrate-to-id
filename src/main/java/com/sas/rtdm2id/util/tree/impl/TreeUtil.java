@@ -20,6 +20,7 @@ public class TreeUtil {
     private final Map<Short, String> objIdToNodeIdMap = new HashMap<>();
     private final Map<String, RTDMObject> nodeIdObjectHashMap = new HashMap<>();
     private final Map<String, Short> nodeIdObjIdMap = new HashMap<>();
+    private final Map<String, String> nodeIdInputNodesMap = new HashMap<>();
 
     public GenericTree<Short> createTree(Batch.LogicalUnit logicalUnit) {
         StartNodeDataDO startNodeDataDO = logicalUnit.getStartNodeDataDO();
@@ -33,36 +34,42 @@ public class TreeUtil {
             nodeIdObjIdMap.put(replyNodeDataDO.getNodeId(), replyNodeDataDO.getObjid());
             nodeIdObjectHashMap.put(replyNodeDataDO.getNodeId(), new RTDMObject("reply", replyNodeDataDO));
             objIdToNodeIdMap.put(replyNodeDataDO.getObjid(), replyNodeDataDO.getNodeId());
+            nodeIdInputNodesMap.put(replyNodeDataDO.getNodeId(), replyNodeDataDO.getInputNodes().getValue());
         }
         for (SplitNodeDataDO splitNodeDataDO : logicalUnit.getSplitNodeDataDOs()) {
             objIdOutputNodesMap.put(splitNodeDataDO.getObjid(), splitNodeDataDO.getOutputNodes().getValue());
             nodeIdObjIdMap.put(splitNodeDataDO.getNodeId(), splitNodeDataDO.getObjid());
             nodeIdObjectHashMap.put(splitNodeDataDO.getNodeId(), new RTDMObject("split", splitNodeDataDO));
             objIdToNodeIdMap.put(splitNodeDataDO.getObjid(), splitNodeDataDO.getNodeId());
+            nodeIdInputNodesMap.put(splitNodeDataDO.getNodeId(), splitNodeDataDO.getInputNodes().getValue());
         }
         for (CellNodeDataDO cellNodeDataDO : logicalUnit.getCellNodeDataDOs()) {
             objIdOutputNodesMap.put(cellNodeDataDO.getObjid(), cellNodeDataDO.getOutputNodes().getValue());
             nodeIdObjIdMap.put(cellNodeDataDO.getNodeId(), cellNodeDataDO.getObjid());
             nodeIdObjectHashMap.put(cellNodeDataDO.getNodeId(), new RTDMObject("cell", cellNodeDataDO));
             objIdToNodeIdMap.put(cellNodeDataDO.getObjid(), cellNodeDataDO.getNodeId());
+            nodeIdInputNodesMap.put(cellNodeDataDO.getNodeId(), cellNodeDataDO.getInputNodes().getValue());
         }
         for (MultiSelectNodeDataDO multiSelectNodeDataDO : logicalUnit.getMultiSelectNodeDataDOs()) {
             objIdOutputNodesMap.put(multiSelectNodeDataDO.getObjid(), multiSelectNodeDataDO.getOutputNodes().getValue());
             nodeIdObjIdMap.put(multiSelectNodeDataDO.getNodeId(), multiSelectNodeDataDO.getObjid());
             nodeIdObjectHashMap.put(multiSelectNodeDataDO.getNodeId(), new RTDMObject("multiSelect", multiSelectNodeDataDO));
             objIdToNodeIdMap.put(multiSelectNodeDataDO.getObjid(), multiSelectNodeDataDO.getNodeId());
+            nodeIdInputNodesMap.put(multiSelectNodeDataDO.getNodeId(), multiSelectNodeDataDO.getInputNodes().getValue());
         }
         for (ProcessNodeDataDO processNodeDataDO : logicalUnit.getProcessNodeDataDOs()) {
             objIdOutputNodesMap.put(processNodeDataDO.getObjid(), processNodeDataDO.getOutputNodes().getValue());
             nodeIdObjIdMap.put(processNodeDataDO.getNodeId(), processNodeDataDO.getObjid());
             nodeIdObjectHashMap.put(processNodeDataDO.getNodeId(), new RTDMObject("custom", processNodeDataDO));
             objIdToNodeIdMap.put(processNodeDataDO.getObjid(), processNodeDataDO.getNodeId());
+            nodeIdInputNodesMap.put(processNodeDataDO.getNodeId(), processNodeDataDO.getInputNodes().getValue());
         }
         for (SubDiagramNodeDataDO subDiagramNodeDataDO : logicalUnit.getSubDiagramNodeDataDOs()) {
             objIdOutputNodesMap.put(subDiagramNodeDataDO.getObjid(), subDiagramNodeDataDO.getOutputNodes().getValue());
             nodeIdObjIdMap.put(subDiagramNodeDataDO.getNodeId(), subDiagramNodeDataDO.getObjid());
             nodeIdObjectHashMap.put(subDiagramNodeDataDO.getNodeId(), new RTDMObject("subdiagram", subDiagramNodeDataDO));
             objIdToNodeIdMap.put(subDiagramNodeDataDO.getObjid(), subDiagramNodeDataDO.getNodeId());
+            nodeIdInputNodesMap.put(subDiagramNodeDataDO.getNodeId(), subDiagramNodeDataDO.getInputNodes().getValue());
         }
 
         // Handle unsupported nodes
@@ -71,6 +78,7 @@ public class TreeUtil {
             nodeIdObjIdMap.put(assignmentNodeDataDO.getNodeId(), assignmentNodeDataDO.getObjid());
             nodeIdObjectHashMap.put(assignmentNodeDataDO.getNodeId(), new RTDMObject("assignment", assignmentNodeDataDO));
             objIdToNodeIdMap.put(assignmentNodeDataDO.getObjid(), assignmentNodeDataDO.getNodeId());
+            nodeIdInputNodesMap.put(assignmentNodeDataDO.getNodeId(), assignmentNodeDataDO.getInputNodes().getValue());
         }
 
         for (CHandRHNodeDataDO cHandRHNodeDataDO : logicalUnit.getCHandRHNodeDataDOs()) {
@@ -78,6 +86,7 @@ public class TreeUtil {
             nodeIdObjIdMap.put(cHandRHNodeDataDO.getNodeId(), cHandRHNodeDataDO.getObjid());
             nodeIdObjectHashMap.put(cHandRHNodeDataDO.getNodeId(), new RTDMObject("cHandRH", cHandRHNodeDataDO));
             objIdToNodeIdMap.put(cHandRHNodeDataDO.getObjid(), cHandRHNodeDataDO.getNodeId());
+            nodeIdInputNodesMap.put(cHandRHNodeDataDO.getNodeId(), cHandRHNodeDataDO.getInputNodes().getValue());
         }
 
         // TODO - refactor so not duplicating code
@@ -86,6 +95,7 @@ public class TreeUtil {
             nodeIdObjIdMap.put(stagedTreatmentsNodeDataDO.getNodeId(), stagedTreatmentsNodeDataDO.getObjid());
             nodeIdObjectHashMap.put(stagedTreatmentsNodeDataDO.getNodeId(), new RTDMObject("stagedTreatment", stagedTreatmentsNodeDataDO));
             objIdToNodeIdMap.put(stagedTreatmentsNodeDataDO.getObjid(), stagedTreatmentsNodeDataDO.getNodeId());
+            nodeIdInputNodesMap.put(stagedTreatmentsNodeDataDO.getNodeId(), stagedTreatmentsNodeDataDO.getInputNodes().getValue());
         }
 
         for (RemoveStagedTreatmentsNodeDataDO removeStagedTreatmentsNodeDataDO : logicalUnit.getRemoveStagedTreatmentsNodeDataDOs()) {
@@ -93,6 +103,7 @@ public class TreeUtil {
             nodeIdObjIdMap.put(removeStagedTreatmentsNodeDataDO.getNodeId(), removeStagedTreatmentsNodeDataDO.getObjid());
             nodeIdObjectHashMap.put(removeStagedTreatmentsNodeDataDO.getNodeId(), new RTDMObject("removeStagedTreatment", removeStagedTreatmentsNodeDataDO));
             objIdToNodeIdMap.put(removeStagedTreatmentsNodeDataDO.getObjid(), removeStagedTreatmentsNodeDataDO.getNodeId());
+            nodeIdInputNodesMap.put(removeStagedTreatmentsNodeDataDO.getNodeId(), removeStagedTreatmentsNodeDataDO.getInputNodes().getValue());
         }
 
         return generateTree(objIdOutputNodesMap, nodeIdObjIdMap, rootObjId);
@@ -123,6 +134,10 @@ public class TreeUtil {
         }
     }
 
+    public Map<String, String> getNodeIdInputNodesMap() {
+        return nodeIdInputNodesMap;
+    }
+
     public Map<Short, String> getObjIdOutputNodesMap() {
         return objIdOutputNodesMap;
     }
@@ -146,6 +161,7 @@ public class TreeUtil {
 
     public void clearMaps() {
         nodeIdObjIdMap.clear();
+        nodeIdInputNodesMap.clear();
         objIdOutputNodesMap.clear();
         nodeIdObjectHashMap.clear();
         objIdToNodeIdMap.clear();

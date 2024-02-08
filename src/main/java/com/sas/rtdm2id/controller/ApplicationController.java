@@ -42,8 +42,9 @@ public class ApplicationController {
             @ApiParam(value = "login") @RequestParam String login,
             @ApiParam(value = "password") @RequestParam String password,
             @RequestParam(value = "parentFolderUri", defaultValue = "/folders/folders/@myFolder", required = false) String parentFolderUri,
-            @RequestParam(value = "protocol", defaultValue = "http", required = false) String protocol) {
-        return new ResponseEntity<>(new Rtdm2IdResponse<>(new Meta(0, "OK"), applicationService.createDiagram(baseIp, xml, login, password, protocol, parentFolderUri))
+            @RequestParam(value = "protocol", defaultValue = "http", required = false) String protocol,
+            @RequestParam(value = "useCrossBranchLinks", defaultValue = "true", required = false) String useCrossBranchLinks) {
+        return new ResponseEntity<>(new Rtdm2IdResponse<>(new Meta(0, "OK"), applicationService.createDiagram(baseIp, xml, login, password, protocol, parentFolderUri, useCrossBranchLinks))
                 , HttpStatus.CREATED);
     }
 

@@ -47,7 +47,7 @@ public class RootNode implements Serializable {
     private String codeEverBeenPublished;
     @XmlElement(name = "FirstOccurrenceToPublish", required = true)
     private String firstOccurrenceToPublish;
-    @XmlElement(name = "FormattedValue", required = true)
+    @XmlElement(name = "FormattedValues", required = true)
     private String formattedValues;
     @XmlElement(name = "LoadedFromOldDavLocation", required = true)
     private String loadedFromOldDavLocation;

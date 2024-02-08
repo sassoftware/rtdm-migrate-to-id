@@ -33,11 +33,11 @@ public class AssignmentNodeConverter {
            if (variable.getValue() != null){
               com.sas.rtdm2id.model.rtdm.extension.ValueTypeVarInfoDO valueTypeVarInfoDO =  variable.getValue().getValueTypeVarInfoDO();
               final String varInfo = valueTypeVarInfoDO != null ? valueTypeVarInfoDO.getVarInfoId() : "";
-              commonProcessing.checkForCalcVariable(varInfo, variable.getTypeDescription(), stepList, step, varOriginalName);
+              commonProcessing.checkForCalcVariable(varInfo, variable.getTypeDescription(), stepList, step, varOriginalName, assignmentNodeDataDO.getNodeId());
            }
         });
         updateRuleSet(assignmentNodeDataDO, step, decision);
-        stepList.add(step);
+        commonProcessing.addStep(stepList, step, assignmentNodeDataDO.getNodeId());
         return stepList;
     }
 

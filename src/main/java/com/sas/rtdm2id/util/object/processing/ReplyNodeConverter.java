@@ -35,17 +35,17 @@ public class ReplyNodeConverter {
         IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
         List<Step> stepList = new ArrayList<>();
         Step step = mapStorage.getRuleSetStepMap().get(commonProcessing.makeReplyNodeRuleSetName(replyNodeDataDO));
-        replyNodeDataDO.getEventReply().getReplyVars().getIBVariableDOs().forEach(variable->{
+        getIbVariableDOS(replyNodeDataDO).forEach(variable->{
            IBVariableDO ibVariableDOMapped = mapper.ibVariableDoGet(variable);
            String varOriginalName = ibVariableDOMapped.getName();
            if (variable.getValue() != null) {
               ValueTypeVarInfoDO valueTypeVarInfoDO =  variable.getValue().getValueTypeVarInfoDO();
               final String varInfo = valueTypeVarInfoDO != null ? valueTypeVarInfoDO.getVarInfoId() : "";
-              commonProcessing.checkForCalcVariable(varInfo, ibVariableDOMapped.getTypeDescription(), stepList, step, varOriginalName);
+              commonProcessing.checkForCalcVariable(varInfo, ibVariableDOMapped.getTypeDescription(), stepList, step, varOriginalName, replyNodeDataDO.getNodeId());
            }
         });
         updateRuleSet(replyNodeDataDO, step, decision);
-        stepList.add(step);
+        commonProcessing.addStep(stepList, step, replyNodeDataDO.getNodeId());
         return stepList;
     }
 
@@ -72,7 +72,13 @@ public class ReplyNodeConverter {
     }
 
     private List<ReplyNodeDataDO.EventReply.ReplyVars.IBVariableDO> getIbVariableDOS(ReplyNodeDataDO replyNodeDataDO) {
-        return replyNodeDataDO.getEventReply() != null ? replyNodeDataDO.getEventReply().getReplyVars().getIBVariableDOs()
-                : replyNodeDataDO.getTreatmentReplyVariables().getIBVariableDOs();
+        if (replyNodeDataDO.getEventReply() != null) {
+            return replyNodeDataDO.getEventReply().getReplyVars().getIBVariableDOs();
+        } else {
+            if (replyNodeDataDO.getTreatmentReplyVariables()!=null) {
+                return replyNodeDataDO.getTreatmentReplyVariables().getIBVariableDOs();
+            }
+        }
+        return new ArrayList<>();
     }
 }

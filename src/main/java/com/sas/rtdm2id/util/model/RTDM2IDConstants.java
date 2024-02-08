@@ -36,6 +36,10 @@ public class RTDM2IDConstants {
     public static final String READ_DATA_CONSTANT = "read data";
     public static final String UPDATE_DATA_CONSTANT = "updated date";
     public static final String INSERT_DATA_CONSTANT = "insert data";
+    public static final String MISSING_CONSTANT = "Missing";
+
+    public static final String MISSING_VALUE = "(Missing)";
+    public static final String REMAINDER_VALUE = "(Remainder)";
 
     public static final String CALCULATED_DATA_TYPE_CHARACTER = "0";
     public static final String CALCULATED_DATA_TYPE_NUMERIC_NOMINAL = "3";
@@ -142,6 +146,8 @@ public class RTDM2IDConstants {
     public static final String LIKE = "like";
     public static final String IS_MISSING = "isMissing";
     public static final String IN_LIST = "inList";
+    public static final String RANGE_BRANCH_TYPE = "range";
+    public static final String EQUALS_BRANCH_TYPE = "equals";
 
     // RTDM Process Type Constants
     public static final int PROCESS_TYPE_UNKNOWN = -1;
@@ -158,6 +164,8 @@ public class RTDM2IDConstants {
     public static final int PROCESS_TYPE_DSCODEACTIVITY = 10;
     public static final int PROCESS_TYPE_JAVACODEACTIVITY = 11;
     public static final int PROCESS_TYPE_SELF_LEARNER = 12;
+
+    public static final String RANDOM_NUMBER_VARIABLE = "random_number";
 
     private RTDM2IDConstants() {
 

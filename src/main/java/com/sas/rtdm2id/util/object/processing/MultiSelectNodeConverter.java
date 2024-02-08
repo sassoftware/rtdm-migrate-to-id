@@ -36,11 +36,11 @@ public class MultiSelectNodeConverter {
         Step step = new Step();
         step.setType(Step.TypeEnum.CONDITION);
         ConditionStep conditionStep = new ConditionStep();
-        createDecisionVariables(filterNodeDOs, stepList, step, decision);
+        createDecisionVariables(filterNodeDOs, stepList, step, decision,  multiSelectNodeDataDO.getNodeId());
         step.setName(multiSelectNodeDataDO.getNodeName());
         step.setConditionExpression(filterExpression);
         step.setCondition(conditionStep);
-        stepList.add(step);
+        commonProcessing.addStep(stepList, step, multiSelectNodeDataDO.getNodeId());
 
         return stepList;
     }
@@ -78,10 +78,10 @@ public class MultiSelectNodeConverter {
         return childObjIds;
     }
 
-    private void createDecisionVariables(List<FilterNodeDO> filterNodeDOs, List<Step> stepList, Step step, Decision decision) {
+    private void createDecisionVariables(List<FilterNodeDO> filterNodeDOs, List<Step> stepList, Step step, Decision decision, String nodeId) {
             for (FilterNodeDO filterNodeDO : filterNodeDOs) {
                 final VarRef filterNodeVarRef = filterNodeDO.getVarRef();
-                commonProcessing.checkForCalcVariable(filterNodeVarRef.getVarInfoId(),filterNodeVarRef.getType(), stepList, step, filterNodeVarRef.getVarName());
+                commonProcessing.checkForCalcVariable(filterNodeVarRef.getVarInfoId(),filterNodeVarRef.getType(), stepList, step, filterNodeVarRef.getVarName(), nodeId);
                 if (commonProcessing.checkForGlobalVariable(filterNodeVarRef, step, filterNodeVarRef.getVarName(), decision, false)) {
                     commonProcessing.addNewSignatureItem(filterNodeVarRef, "none", decision);
                 }

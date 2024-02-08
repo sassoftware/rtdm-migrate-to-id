@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.sas</groupId>
     <artifactId>rtdm-migrate-to-id</artifactId>
-    <version>0.8.2</version>
+    <version>0.11.2</version>
     <name>rtdm-migrate-to-id</name>
     <description>Project for migrating campaigns from SAS Real-Time Decision Manager to SAS Intelligent Decisioning</description>
 

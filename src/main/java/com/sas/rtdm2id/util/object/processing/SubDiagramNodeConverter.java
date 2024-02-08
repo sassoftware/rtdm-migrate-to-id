@@ -106,14 +106,16 @@ public class SubDiagramNodeConverter {
                 : subDiagramNodeDataDO.getSubdiagramEvent().getRequestVars().getIBVariableDOs()) {
             IBVariableDO ibVariableDOInner = mapper.ibVariableDoGet(ibVariableDO);
             
-            ValueTypeVarInfoDO valueTypeVarInfoDO = ibVariableDOInner.getValue().getValueTypeVarInfoDO();
-            final String varInfoSource = valueTypeVarInfoDO != null ? valueTypeVarInfoDO.getVarInfoSource() : "";
-            if (SOURCE_GLOBAL.equals(varInfoSource)) {
-                commonProcessing.addGlobalVariableMappingForSubDecision(ibVariableDOInner, INPUT_DIRECTION, step, decision);
-            } else {
-                commonProcessing.addMapping(ibVariableDOInner, INPUT_DIRECTION, step, false, decision);
+            if (ibVariableDOInner.getValue()!=null) {
+                ValueTypeVarInfoDO valueTypeVarInfoDO = ibVariableDOInner.getValue().getValueTypeVarInfoDO();
+                final String varInfoSource = valueTypeVarInfoDO != null ? valueTypeVarInfoDO.getVarInfoSource() : "";
+                if (SOURCE_GLOBAL.equals(varInfoSource)) {
+                    commonProcessing.addGlobalVariableMappingForSubDecision(ibVariableDOInner, INPUT_DIRECTION, step, decision);
+                } else {
+                    commonProcessing.addMapping(ibVariableDOInner, INPUT_DIRECTION, step, false, decision);
+                }
+                commonProcessing.addNewSignatureItem(ibVariableDOInner, "none", decision, null);
             }
-            commonProcessing.addNewSignatureItem(ibVariableDOInner, "none", decision, null);
         }
         for (ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO ibVariableDO
                 : subDiagramNodeDataDO.getSubdiagramEvent().getReplyVars().getIBVariableDOs()) {
@@ -121,7 +123,7 @@ public class SubDiagramNodeConverter {
             commonProcessing.addMapping(ibVariableDOInner, OUTPUT_DIRECTION, step, false, decision);
             commonProcessing.addNewSignatureItem(ibVariableDOInner, "none", decision, null);
         }
-        stepList.add(step);
+        commonProcessing.addStep(stepList, step, subDiagramNodeDataDO.getNodeId());
         return stepList;
     }
 
@@ -133,17 +135,17 @@ public class SubDiagramNodeConverter {
         if (inputValuesStep!=null) {
             // Unsupported nodes are converted into DS2 code files but we don't create a ruleset node to
             // represent the custom node inputs so inputValuesStep is null in this scenario
-            stepList.add(inputValuesStep);
+            commonProcessing.addStep(stepList, inputValuesStep, subDiagramNodeDataDO.getNodeId());
         }
 
         SubdiagramEvent subdiagramEvent = subDiagramNodeDataDO.getSubdiagramEvent();
         if (subdiagramEvent.getRequestVars()!=null) {
-            processCustomObjectInputMapping(subdiagramEvent, decision, stepList, step);
+            processCustomObjectInputMapping(subDiagramNodeDataDO, decision, stepList, step);
             updateRuleSet(subdiagramEvent.getRequestVars(), inputValuesStep, decision);
         }
 
         step.setCustomObject(mapStorage.getCustomObjectStepHashMap().get(objId));
-        stepList.add(step);
+        commonProcessing.addStep(stepList, step, subDiagramNodeDataDO.getNodeId());
         return stepList;
     }
 
@@ -163,7 +165,7 @@ public class SubDiagramNodeConverter {
                 Signature signature = new Signature();
                 signature.setDataType(commonProcessing.getDatatypeOfVar(ibVariableDO.getTypeDescription()).getValue());
 
-                signature.setName(commonProcessing.sanitizeVariableName(ibVariableDO.getName()));
+                signature.setName(commonProcessing.sanitizeAndReduceVariableName(ibVariableDO.getName()));
                 signature.setDirection(IN_OUT_DIRECTION);
                 if (!signatureList.contains(signature)) {
                     signatureList.add(signature);
@@ -188,7 +190,9 @@ public class SubDiagramNodeConverter {
         }
     }
 
-    private void processCustomObjectInputMapping(SubdiagramEvent subdiagramEvent, Decision decision, List<Step> stepList, Step step) {
+    private void processCustomObjectInputMapping(SubDiagramNodeDataDO subDiagramNodeDataDO, Decision decision, List<Step> stepList, Step step) {
+        SubdiagramEvent subdiagramEvent = subDiagramNodeDataDO.getSubdiagramEvent();
+        
         IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
 
         for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO : subdiagramEvent.getRequestVars().getIBVariableDOs()) {
@@ -198,7 +202,7 @@ public class SubDiagramNodeConverter {
                 ValueTypeVarInfoDO valueTypeVarInfoDO = ibVariableDOMapped.getValue().getValueTypeVarInfoDO();
                 String varName = ibVariableDO.getName();
                 final String varInfo = valueTypeVarInfoDO != null ? valueTypeVarInfoDO.getVarInfoId() : "";
-                if (!commonProcessing.checkForCalcVariable(varInfo,ibVariableDOMapped.getTypeDescription(), stepList, step, varOriginalName)) {
+                if (!commonProcessing.checkForCalcVariable(varInfo,ibVariableDOMapped.getTypeDescription(), stepList, step, varOriginalName, subDiagramNodeDataDO.getNodeId())) {
                     final String varInfoSource = valueTypeVarInfoDO != null ? valueTypeVarInfoDO.getVarInfoSource() : "";
                     if (SOURCE_GLOBAL.equals(varInfoSource)) {
                         commonProcessing.addGlobalVariableMappingForSubDecision(ibVariableDOMapped, INPUT_DIRECTION, step, decision);

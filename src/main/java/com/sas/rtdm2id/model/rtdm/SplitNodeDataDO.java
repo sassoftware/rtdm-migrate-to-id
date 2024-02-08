@@ -58,6 +58,7 @@ import com.sas.rtdm2id.model.rtdm.extension.IntervalLineItemDO;
         "publishState",
         "readyToUpdateCounts",
         "rebuildCells",
+        "seedVarRefDO",
         "sortByList",
         "splitCriteriaList",
         "splitOnNodeDataDO",
@@ -155,6 +156,8 @@ public class SplitNodeDataDO
     protected String rebuildCells;
     @XmlElement(name = "SortByList", required = true)
     protected SplitNodeDataDO.SortByList sortByList;
+    @XmlElement(name = "SeedVarRefDO")
+    protected SplitOnNodeDataDO.VarRefDO seedVarRefDO;
     @XmlElement(name = "SplitCriteriaList", required = true)
     protected SplitNodeDataDO.SplitCriteriaList splitCriteriaList;
     @XmlElement(name = "SplitOnNodeDataDO", required = true)
@@ -564,7 +567,14 @@ public class SplitNodeDataDO
         this.rebuildCells = value;
     }
 
-       
+    public SplitOnNodeDataDO.VarRefDO getSeedVarRefDO() {
+        return seedVarRefDO;
+    }
+
+    public void setSeedVarRefDO(SplitOnNodeDataDO.VarRefDO seedVarRefDO) {
+        this.seedVarRefDO = seedVarRefDO;
+    }
+
     public SplitNodeDataDO.SortByList getSortByList() {
         return sortByList;
     }
@@ -762,13 +772,10 @@ public class SplitNodeDataDO
 
         private final static long serialVersionUID = -1L;
         @XmlElement(name = "SplitNodeLineItemDO")
-        protected List<LineItems.SplitNodeLineItemDO> splitNodeLineItemDOs;
+        protected List<LineItems.SplitNodeLineItemDO> splitNodeLineItemDOs = new ArrayList<LineItems.SplitNodeLineItemDO>();
 
            
         public List<LineItems.SplitNodeLineItemDO> getSplitNodeLineItemDOs() {
-            if (splitNodeLineItemDOs == null) {
-                splitNodeLineItemDOs = new ArrayList<LineItems.SplitNodeLineItemDO>();
-            }
             return this.splitNodeLineItemDOs;
         }
 

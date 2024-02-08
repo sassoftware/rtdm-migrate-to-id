@@ -18,6 +18,7 @@ import com.sas.rtdm2id.model.id.decision.SignatureTermExtension;
 import com.sas.rtdm2id.model.id.decision.Step;
 import com.sas.rtdm2id.model.id.files.CustomNodeRequest;
 import com.sas.rtdm2id.model.id.files.DecisionCodeFileResponse;
+import com.sas.rtdm2id.model.id.globals.GlobalVariable;
 import com.sas.rtdm2id.model.id.rules.Action;
 import com.sas.rtdm2id.model.id.rules.Rule;
 import com.sas.rtdm2id.model.id.rules.RuleSet;
@@ -89,8 +90,10 @@ public class ProcessNodeConverter {
         this.mapStorage = mapStorage;
     }
 
-    public List<Step> addCustomObjectStep(ProcessNodeDataDO.Process process, Decision decision, Short objId,
-                                          String nodeName) {
+    public List<Step> addCustomObjectStep(ProcessNodeDataDO processNodeDataDO, Decision decision, Short objId, String nodeName) {
+        
+        ProcessNodeDataDO.Process process = processNodeDataDO.getProcess();
+        
         List<Step> stepList = new LinkedList<>();
         Step step = new Step();
         Step extractDataStep = null;
@@ -98,7 +101,7 @@ public class ProcessNodeConverter {
         Step inputValuesStep = mapStorage.getRuleSetStepMap().get(nodeName + "_input_values");
         if (process != null) {
             if (process.getInputVariableList() != null) {
-                processCustomObjectInputMapping(process, decision, stepList, step);
+                processCustomObjectInputMapping(processNodeDataDO, decision, stepList, step);
                 updateRuleSet(process.getInputVariableList(), inputValuesStep, decision);
             }
             if (process.getOutputVariableList() != null) {
@@ -118,11 +121,13 @@ public class ProcessNodeConverter {
         if (inputValuesStep!=null) {
             // Unsupported nodes are converted into DS2 code files but we don't create a ruleset node to
             // represent the custom node inputs so inputValuesStep is null in this scenario
-            stepList.add(inputValuesStep);
+            commonProcessing.addStep(stepList, inputValuesStep, processNodeDataDO.getNodeId());
         }
         step.setCustomObject(mapStorage.getCustomObjectStepHashMap().get(objId));
-        stepList.add(step);
-        if (extractDataStep != null) stepList.add(extractDataStep);
+        commonProcessing.addStep(stepList, step, processNodeDataDO.getNodeId());
+        if (extractDataStep != null) {
+            commonProcessing.addStep(stepList, extractDataStep, processNodeDataDO.getNodeId());
+        }
         return stepList;
     }
 
@@ -206,8 +211,10 @@ public class ProcessNodeConverter {
 
                     commonProcessing.addAction(mapper.ibVariableDoGet(ibVariableDO), actionList, signatureList, step, decision);
                     
-                    if (!commonProcessing.checkForGlobalVariableRuleSet(ibVariableDO)) {
+                    GlobalVariable globalVariable = commonProcessing.checkForGlobalVariableRuleSet(ibVariableDO);
+                    if (globalVariable != null) {
                         commonProcessing.addMapping(mapper.ibVariableDoGet(ibVariableDO), INPUT_DIRECTION, step, false, decision);
+                        commonProcessing.addNewSignatureItemGlobalVariable(globalVariable.getName(), "none", decision);
                     }
                     rule.setActions(actionList);
                     ruleUpdated = true;
@@ -245,10 +252,13 @@ public class ProcessNodeConverter {
                 CustomObjectStep codeStep = new CustomObjectStep();
                 CodeFileCollection codeFileCollection = null;
 
-                // Search for SQL nodes by name rather than description 
-                if (PROCESS_TYPE_READ_DATA == process.getProcess().getProcessType()) {
+                // Search for SQL and custom nodes by name rather than description 
+                if (PROCESS_TYPE_READ_DATA == process.getProcess().getProcessType() || 
+                        PROCESS_TYPE_INSERT_DATA == process.getProcess().getProcessType()  || 
+                        PROCESS_TYPE_UPDATE_DATA == process.getProcess().getProcessType() ||
+                        PROCESS_TYPE_CUSTOM == process.getProcess().getProcessType()) {
                     codeFileCollection
-                        = commonProcessing.getCodeFileCollection(mapStorage.getBaseIp(), process.getProcess().getPhysicalName(), accessToken, "/decisions/codeFiles");
+                        = commonProcessing.getCodeFileCollection(mapStorage.getBaseIp(), process.getProcess().getName()!=null ? process.getProcess().getName() : process.getProcess().getPhysicalName(), accessToken, "/decisions/codeFiles");
 
                 } else {
                     codeFileCollection
@@ -417,7 +427,7 @@ public class ProcessNodeConverter {
         boolean isDataGridOut = false;
         if (CUSTOM_CONSTANT.equals(process.getProcess().getProcessTypeDescription())
                 || MODEL_CONSTANT.equals(process.getProcess().getProcessTypeDescription())) {
-            customNodeRequest.setBody(modifyDS2CodeToIDFormat(process.getProcess().getDs2code(), process.getProcess().getProcessTypeDescription(), process.getProcess().getName()));
+            customNodeRequest.setBody(modifyDS2CodeToIDFormat(process));
             customNodeRequest.setType(DECISION_DS2_CODE_FILE_CONSTANT);
         } else if (GROOVY_CONSTANT.equals(process.getProcess().getProcessTypeDescription())
                 || WEB_SERVICE_CONSTANT.equals(process.getProcess().getProcessTypeDescription())
@@ -480,28 +490,39 @@ public class ProcessNodeConverter {
         }
     }
 
-    private String modifyDS2CodeToIDFormat(String ds2code, String processTypeDescription, String modelName) {
+    private String modifyDS2CodeToIDFormat(ProcessNodeDataDO process) {
         // This is not reliable as there could be a space after the semi-colon
         //int startIndex = ds2code.indexOf("package");
         //int lastIndexOf = ds2code.lastIndexOf("=yes;") + 4;
         //ds2code = ds2code.replace(ds2code.substring(startIndex, lastIndexOf), "package \"${PACKAGE_NAME}\" /inline;");
 
-        // TODO: Use CodeRegexParser from dcm commons
+        String ds2code = process.getProcess().getDs2code();
+        String processTypeDescription = process.getProcess().getProcessTypeDescription();
+        String modelName = process.getProcess().getName();
+
         String originalPackageName = extractPackageNameFromDS2Code(ds2code);
 
         ds2code = ds2code.replace(originalPackageName, "\"${PACKAGE_NAME}\"");
         ds2code = ds2code.replace("/overwrite=yes", "/inline");
 
-        if (MODEL_CONSTANT.equals(processTypeDescription)) {
-            ds2code = "// Model from RTDM: " + modelName + NEW_LINE_STRING + ds2code;
+        if (ds2code.contains("sqlstmt")) {
+            // Certain sqlstmt commands do not compile in ID
+            // For example: sqlstmt_pkg = _NEW_ sqlstmt(sqlQuery,[TEMP_TRX_P]);	
+            // For now enclose DS2 code in quotes to allow migration code to continue
+            // Use of sqlstmt can be evaluated later in another story
+            return processJavaCodeOrWebServiceOrBusinessRulesForId(process);
+        } else {
+            if (MODEL_CONSTANT.equals(processTypeDescription)) {
+                ds2code = "// Model from RTDM: " + modelName + NEW_LINE_STRING + ds2code;
+            }
+
+            ds2code = convertIntToDouble(ds2code);
+            ds2code = convertTapPackages(ds2code);
+
+            ds2code = convertExecuteListsToDatagrid(ds2code);
+            int lastIndexOf = ds2code.indexOf("endpackage;") + 11;
+            ds2code = ds2code.substring(0, lastIndexOf);
         }
-
-        ds2code = convertIntToDouble(ds2code);
-        ds2code = convertTapPackages(ds2code);
-
-        ds2code = convertExecuteListsToDatagrid(ds2code);
-        int lastIndexOf = ds2code.indexOf("endpackage;") + 11;
-        ds2code = ds2code.substring(0, lastIndexOf);
 
         return ds2code;
     }
@@ -697,22 +718,32 @@ public class ProcessNodeConverter {
         // Insert comment inside execute method containing node properties
         ds2Code.append("/*").append(NEW_LINE_STRING);
         ds2Code.append(processNodeDataDO.getNodeName()).append(" Node migrated from RTDM").append(NEW_LINE_STRING);
-        ds2Code.append(process.getName()).append(" Groovy process not supported").append(NEW_LINE_STRING);
         ds2Code.append(NEW_LINE_STRING);
 
-        // Existing code could contain quotes
-        // Since we're embedding the entire execute method code in quotes we need to escape these quotes
-        String replacementCode = process.getDs2code().replaceAll("\"", "\\\\\"");
+        if (PROCESS_TYPE_WEB_SERVICE==process.getProcessType()) {
+            // Web processes don't have DS2 code, it's a web service
+            ds2Code.append("Web Process node is not supported.").append(NEW_LINE_STRING);
+            ds2Code.append("    Description: ").append(process.getDescription()).append(NEW_LINE_STRING);
+            ds2Code.append("    Name :").append(process.getName()).append(NEW_LINE_STRING);
 
-        //Remove any existing comments from code
-        Matcher matcher1 = javaComment1Pattern.matcher(replacementCode);
-        Matcher matcher2 = javaComment2Pattern.matcher(replacementCode);
-        
-        replacementCode = matcher1.replaceAll(EMPTY_STRING);
-        replacementCode = matcher2.replaceAll(EMPTY_STRING);
+            // Escape backslashes in URL
+            ds2Code.append("    Web Service: ").append(process.getPhysicalActivityMethodName().replaceAll("\"", "\\\\\"")).append(NEW_LINE_STRING);
+        } else {
+            ds2Code.append("Groovy Process node is not supported.").append(NEW_LINE_STRING);
+            // Existing code could contain quotes
+            // Since we're embedding the entire execute method code in quotes we need to escape these quotes
+            String replacementCode = process.getDs2code().replaceAll("\"", "\\\\\"");
 
-        replacementCode = replacementCode.replaceAll("//*", EMPTY_STRING);
-        ds2Code.append(replacementCode);
+            //Remove any existing comments from code
+            Matcher matcher1 = javaComment1Pattern.matcher(replacementCode);
+            Matcher matcher2 = javaComment2Pattern.matcher(replacementCode);
+            
+            replacementCode = matcher1.replaceAll(EMPTY_STRING);
+            replacementCode = matcher2.replaceAll(EMPTY_STRING);
+
+            replacementCode = replacementCode.replaceAll("//*", EMPTY_STRING);
+            ds2Code.append(replacementCode);
+        }
 
         ds2Code.append("*/");
 
@@ -807,11 +838,13 @@ public class ProcessNodeConverter {
         Mapping mapping = new Mapping();
         mapping.setTargetDecisionTermName(commonProcessing.sanitizeVariableName(signatureTerm.getName()));
         mapping.setDirection(Mapping.DirectionEnum.OUTPUT);
-        mapping.setStepTermName(commonProcessing.sanitizeVariableName(signatureTerm.getName().replace("_out", "_dgo")));
+        mapping.setStepTermName(commonProcessing.sanitizeAndReduceVariableName(signatureTerm.getName().replace("_out", "_dgo")));
         commonProcessing.checkMappingForDuplicate(mapping, step);
     }
 
-    private void processCustomObjectInputMapping(ProcessNodeDataDO.Process process, Decision decision, List<Step> stepList, Step step) {
+    private void processCustomObjectInputMapping(ProcessNodeDataDO processNodeDataDO, Decision decision, List<Step> stepList, Step step) {
+        ProcessNodeDataDO.Process process = processNodeDataDO.getProcess();
+        
         IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
 
         for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO : process.getInputVariableList().getIBVariableDOs()) {
@@ -821,7 +854,7 @@ public class ProcessNodeConverter {
                 ValueTypeVarInfoDO valueTypeVarInfoDO = ibVariableDOMapped.getValue().getValueTypeVarInfoDO();
                 String varName = ibVariableDO.getName();
                 final String varInfo = valueTypeVarInfoDO != null ? valueTypeVarInfoDO.getVarInfoId() : "";
-                if (!commonProcessing.checkForCalcVariable(varInfo,ibVariableDOMapped.getTypeDescription(), stepList, step, varOriginalName)) {
+                if (!commonProcessing.checkForCalcVariable(varInfo,ibVariableDOMapped.getTypeDescription(), stepList, step, varOriginalName, processNodeDataDO.getNodeId())) {
                     if (ibVariableDO.getTypeDescription().contains("list")) {
                         List<SignatureTermExtension> signatureTermExtensionList = new ArrayList<>();
 
@@ -843,7 +876,7 @@ public class ProcessNodeConverter {
                 }
                 if (valueTypeVarInfoDO != null) {
                     VarRef varRef = VarRefMapper.VAR_REF_MAPPER.varRefGet(valueTypeVarInfoDO);
-                    commonProcessing.checkForAdditionalVariables(varName, varRef, "none", decision);
+                    commonProcessing.checkForAdditionalVariables(varName, varRef, "none", decision, ibVariableDOMapped.getTypeDescription());
                 }
             } else {
                 // Even if no value assigned we need the mappings and signature items
@@ -918,7 +951,8 @@ public class ProcessNodeConverter {
 
     private SignatureTermExtension.DataTypeEnum getDataTypeForExtension(SignatureTerm.DataTypeEnum type) {
         if (type.equals(SignatureTerm.DataTypeEnum.DECIMAL)
-                || type.equals(SignatureTerm.DataTypeEnum.INTEGER)) {
+                || type.equals(SignatureTerm.DataTypeEnum.INTEGER)
+                || type.equals(SignatureTerm.DataTypeEnum.DATETIME)) {
             return SignatureTermExtension.DataTypeEnum.fromValue(type.getValue());
         }
         return SignatureTermExtension.DataTypeEnum.STRING;

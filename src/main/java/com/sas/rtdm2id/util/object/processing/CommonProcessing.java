@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sas.rtdm2id.dao.MapStorage;
 import com.sas.rtdm2id.mapper.IBVariableDOMapperImpl;
 import com.sas.rtdm2id.mapper.VarRefMapper;
+import com.sas.rtdm2id.model.id.decision.BranchCase;
 import com.sas.rtdm2id.model.id.decision.CodeFile;
 import com.sas.rtdm2id.model.id.decision.CodeFileCollection;
 import com.sas.rtdm2id.model.id.decision.ConditionBranch;
@@ -25,14 +26,7 @@ import com.sas.rtdm2id.model.id.rules.Action;
 import com.sas.rtdm2id.model.id.rules.Rule;
 import com.sas.rtdm2id.model.id.rules.RuleSet;
 import com.sas.rtdm2id.model.id.rules.Signature;
-import com.sas.rtdm2id.model.rtdm.AssignmentNodeDataDO;
-import com.sas.rtdm2id.model.rtdm.Batch;
-import com.sas.rtdm2id.model.rtdm.CHandRHNodeDataDO;
-import com.sas.rtdm2id.model.rtdm.ProcessNodeDataDO;
-import com.sas.rtdm2id.model.rtdm.RemoveStagedTreatmentsNodeDataDO;
-import com.sas.rtdm2id.model.rtdm.ReplyNodeDataDO;
-import com.sas.rtdm2id.model.rtdm.StagedTreatmentsNodeDataDO;
-import com.sas.rtdm2id.model.rtdm.ValueTypeVarInfoDO;
+import com.sas.rtdm2id.model.rtdm.*;
 import com.sas.rtdm2id.model.rtdm.SplitNodeDataDO.SplitOnNodeDataDO.VarRefDO;
 import com.sas.rtdm2id.model.rtdm.extension.CalculatedItemDO;
 import com.sas.rtdm2id.model.rtdm.extension.SubDiagramNodeDataDO;
@@ -91,6 +85,11 @@ public class CommonProcessing {
                 addRulesetForCalculatedItem(calculatedItemDO);
             }
         }
+        List<SplitNodeDataDO> splitNodeDataDOS = batch.getLogicalUnit().getSplitNodeDataDOs();
+        splitNodeDataDOS.stream().filter(splitNodeDataDO -> splitNodeDataDO.getSplitType().equals("percents")).forEach(splitNodeDataDO -> {
+            findOrAddRuleSet(makeSplitNodeRuleSetName(splitNodeDataDO) + "_random-number", "");
+        });
+
         List<ReplyNodeDataDO> replyNodeDataDOs = batch.getLogicalUnit().getReplyNodeDataDOs();
         if (!replyNodeDataDOs.isEmpty()) {
             for (ReplyNodeDataDO replyNodeDataDO : replyNodeDataDOs) {
@@ -381,7 +380,7 @@ public class CommonProcessing {
         return null;
     }
 
-    public boolean checkForCalcVariable(String varInfoId, String type, List<Step> stepList, Step originStep, String varName) {
+    public boolean checkForCalcVariable(String varInfoId, String type, List<Step> stepList, Step originStep, String varName, String nodeId) {
         if (!varInfoId.isEmpty()) {
             String source = varInfoId.substring(0, varInfoId.indexOf("."));
             if (CALCULATED_DATA_ITEMS_FOLDER.equals(source)) {
@@ -393,7 +392,7 @@ public class CommonProcessing {
                     addMapping(variableName, varName, originStep, true);
                     if (!mapStorage.getCalculatedVariableRulesetNodes().contains(step)){
                         updateRuleSet(variableName, type, step);
-                        stepList.add(step);
+                        addStep(stepList, step, nodeId);
                         mapStorage.getCalculatedVariableRulesetNodes().add(step);
                     }
                 }
@@ -422,7 +421,7 @@ public class CommonProcessing {
     }
 
     public void checkForAdditionalVariables(String varName, VarRef varRef, String direction, Decision decision, String varType) {
-        if (!"Missing".equals(varRef.getVarName())) {
+        if (!"Missing".equals(varRef.getVarName()) || !varName.equals(varRef.getVarName())) {
             addNewSignatureItem(varRef, direction, decision, varType);
         }
     }
@@ -438,7 +437,7 @@ public class CommonProcessing {
                 if (globalVariable != null) {
                     addNewSignatureItemGlobalVariable(globalVariableName, "none", decision);
                     if (originStep != null) {
-                        addMapping(globalVariableName, varName, originStep, isRuleSet);
+                    //    addMapping(globalVariableName, varName, originStep, isRuleSet);
                     }
                 }
 
@@ -454,7 +453,7 @@ public class CommonProcessing {
         return true;
     }
 
-    public boolean checkForGlobalVariableRuleSet(ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO) {
+    public GlobalVariable checkForGlobalVariableRuleSet(ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO) {
         if (ibVariableDO!=null) {
             if (ibVariableDO.getValue()!=null) {
                 ValueTypeVarInfoDO valueTypeVarInfoDO = ibVariableDO.getValue().getValueTypeVarInfoDO();
@@ -463,16 +462,17 @@ public class CommonProcessing {
                     String varInfoSource = valueTypeVarInfoDO.getVarInfoSource();
                     if (RTDM2IDConstants.SOURCE_GLOBAL.equals(varInfoSource)) {
                         // Create Global Variable
-                        String globalVariableName = sanitizeVariableName(varInfoId);
+                        String name = varInfoId.substring(varInfoId.indexOf(".") + 1);
+                        String globalVariableName = sanitizeVariableName(SOURCE_GLOBAL + "." + name);
                         GlobalVariable globalVariable = createGlobalVariable(globalVariableName, valueTypeVarInfoDO.getType());
                         if (globalVariable != null) {
-                            return true;
+                            return globalVariable;
                         }
                     }
                 }
             }
         }
-        return false;
+        return null;
     }
 
     public void checkMappingForDuplicate(Mapping mapping, Step step) {
@@ -493,7 +493,7 @@ public class CommonProcessing {
         RuleSetStep ruleSetForUpdate = step.getRuleSet();
         if (Boolean.FALSE.equals(mapStorage.getRuleSetIsUpdated().get(ruleSetForUpdate.getName()))) {
             Mapping mapping = new Mapping();
-            mapping.setStepTermName(sanitizeVariableName(calculatedVariableName));
+            mapping.setStepTermName(sanitizeAndReduceVariableName(calculatedVariableName));
             mapping.setTargetDecisionTermName(sanitizeVariableName(calculatedVariableName));
             mapping.setDirection(Mapping.DirectionEnum.OUTPUT);
             checkMappingForDuplicate(mapping, step);
@@ -568,7 +568,7 @@ public class CommonProcessing {
 
             Signature signature = new Signature();
             signature.setDataType(getDatatypeOfVar(ibVariableDO.getTypeDescription()).getValue());
-            signature.setName(sanitizeVariableName(changeVariableNameToFormat(ibVariableDOInner.getName())));
+            signature.setName(sanitizeAndReduceVariableName(changeVariableNameToFormat(ibVariableDOInner.getName())));
             signature.setDirection(OUTPUT_DIRECTION);
 
             handleIncomingSignatureUpdate(OUTPUT_DIRECTION, signatureList, signature);
@@ -637,7 +637,7 @@ public class CommonProcessing {
                 value = "'" + ibVariableDO.getValue().getStringValue() + "'";
             }
         }
-        action.setExpression(sanitizeVariableName(ibVariableDO.getName()) + " = " + value);
+        action.setExpression(sanitizeAndReduceVariableName(ibVariableDO.getName()) + " = " + value);
         actionList.add(action);
     }
 
@@ -706,7 +706,7 @@ public class CommonProcessing {
     /*
      * Add new signature item for a global variable
      */
-    private void addNewSignatureItemGlobalVariable(String globalVariableName, String direction, Decision decision) {
+    public void addNewSignatureItemGlobalVariable(String globalVariableName, String direction, Decision decision) {
         SignatureTerm signatureItem = new SignatureTerm();
         GlobalVariable globalVariable = mapStorage.getGlobalVariableMap().get(globalVariableName);
         signatureItem.setDataType(getDatatypeOfVar(globalVariable.getDataType()));
@@ -717,7 +717,7 @@ public class CommonProcessing {
 
     public void addNewSignatureItemForDataGridExtension(IBVariableDO ibVariableDO, String direction, Decision decision) {
         SignatureTerm signatureItem = new SignatureTerm();
-        signatureItem.setDataType(SignatureTerm.DataTypeEnum.STRING); // DATAGRID_GETSTRING
+        signatureItem.setDataType(getDatatypeOfVar(ibVariableDO.getTypeDescription()));
         if (signatureItem.getDataType().equals(SignatureTerm.DataTypeEnum.DATAGRID)) {
             signatureItem.setDataGridExtension(new ArrayList<>());
         }
@@ -806,13 +806,14 @@ public class CommonProcessing {
     public void addMapping(IBVariableDO ibVariableDO, String direction, Step step, boolean isReplyVar, Decision decision) {
         Mapping mapping = new Mapping();
         mapping.setDirection(Mapping.DirectionEnum.fromValue(direction));
-        String termName = (ibVariableDO.getPhysicalName()!=null && !ibVariableDO.getPhysicalName().isEmpty()) ? ibVariableDO.getPhysicalName() : ibVariableDO.getName();
+        String termName = (ibVariableDO.getName()!=null && !ibVariableDO.getName().isEmpty()) ? ibVariableDO.getName() : ibVariableDO.getPhysicalName();
         mapping.setTargetDecisionTermName(sanitizeVariableName(changeVariableNameToFormat(termName)));
-        mapping.setStepTermName(sanitizeVariableName(termName));
+        mapping.setStepTermName(sanitizeAndReduceVariableName(termName));
         if (ibVariableDO.getValue() != null && ibVariableDO.getValue().getValueTypeVarInfoDO() != null) {
             if (!isReplyVar) {
-                mapping.setTargetDecisionTermName(sanitizeVariableName(changeVariableNameToFormat(buildVariableName(ibVariableDO.getValue().getValueTypeVarInfoDO()))));
-
+                if (!RTDM2IDConstants.SOURCE_GLOBAL.equals(ibVariableDO.getValue().getValueTypeVarInfoDO().getVarInfoSource())){
+                    mapping.setTargetDecisionTermName(sanitizeVariableName(changeVariableNameToFormat(buildVariableName(ibVariableDO.getValue().getValueTypeVarInfoDO()))));
+                }
                 // If the value is a variable assignment like a RTDM global variable or identifier, etc. then we
                 // need to create a signature item for it.
                 addDataPickerSignatureItems(ibVariableDO, direction, decision, step);
@@ -839,7 +840,7 @@ public class CommonProcessing {
         Mapping mapping = new Mapping();
         mapping.setDirection(Mapping.DirectionEnum.fromValue(direction));
         mapping.setTargetDecisionTermName(sanitizeVariableName(changeVariableNameToFormat(ibVariableDO.getName())));
-        mapping.setStepTermName(sanitizeVariableName(ibVariableDO.getName()));
+        mapping.setStepTermName(sanitizeAndReduceVariableName(ibVariableDO.getName()));
         if (!isReplyVar) {
             mapping.setTargetDecisionTermName(sanitizeVariableName(ibVariableDO.getName()));
         }
@@ -851,7 +852,7 @@ public class CommonProcessing {
         String targetDecisionTermNameChanged = sanitizeVariableName(changeVariableNameToFormat(targetDecisionTermName));
         mapping.setTargetDecisionTermName(targetDecisionTermNameChanged);
         mapping.setDirection(Mapping.DirectionEnum.INPUT);
-        mapping.setStepTermName(sanitizeVariableName(stepTermName));
+        mapping.setStepTermName(sanitizeAndReduceVariableName(stepTermName));
         if (isRuleSet) {
             mapping.setStepTermName(targetDecisionTermNameChanged);
         }
@@ -875,18 +876,95 @@ public class CommonProcessing {
     }
 
     public ConditionBranch createConditionBranch(String nodeId, boolean needToGetNextNode) {
+        String nextNodeIdForCell = getNextNodeIdForCell(nodeId);
+
         ConditionBranch conditionBranch = new ConditionBranch();
-        List<Step> innerStep = mapStorage.getNodeIdStepMap().get(needToGetNextNode ? getNextNodeIdForCell(nodeId) : nodeId);
+        List<Step> innerStep = mapStorage.getNodeIdStepMap().get(needToGetNextNode ? nextNodeIdForCell : nodeId);
         if (innerStep == null) {
             conditionBranch.setSteps(Collections.emptyList());
         } else {
             mapStorage.getExistingNodeIds().add(getNextNodeIdForCell(nodeId));
-            conditionBranch.setSteps(innerStep);
+
+            // If more than one branch case shares the same downstream node then use cross-branch links
+            String linkLabel = mapStorage.getNodeIdLinkLabelMap().get(nextNodeIdForCell);
+            if (mapStorage.isUseCrossBranchLinks() && linkLabel!=null) {
+                // The downstream RTDM node contains a link label which means it has multiple input nodes
+
+                if (!mapStorage.getCrossBranchLinksAdded().contains(linkLabel)) {
+                    // Whatever input node gets processed first will contain the original set of inner steps to the downstream node
+                    conditionBranch.setSteps(innerStep);
+
+                    // All subsequent input nodes will use a cross-branch link step
+                    mapStorage.getCrossBranchLinksAdded().add(linkLabel);
+                    return conditionBranch;
+                } else {
+                    // Create a new set of inner steps that cross-branch link to the step containing the link label
+                    List<Step> crossBranchLinkSteps = mapStorage.getCrossBranchLinkSteps().get(linkLabel);
+                    List<Step> newInnerStep = new ArrayList<>();
+                    newInnerStep.addAll(crossBranchLinkSteps);
+                    conditionBranch.setSteps(newInnerStep);
+                }
+            } else {
+                // No cross-branch link required, use the original inner steps
+                conditionBranch.setSteps(innerStep);
+            }
         }
         return conditionBranch;
     }
 
-    private String getNextNodeIdForCell(String cellNodeId) {
+    public void addStep(List<Step> stepList, Step step, String nodeId) {
+        // Some RTDM nodes convert to multiple nodes in ID. These can include the following:
+        // 1. A ruleset containing a calculated variable expression (if the RTDM node references a calculated variable)
+        // 2. An _input_values ruleset to represent the input variable assignments to the node
+        // 3. The actual node itself
+        //
+        // This means the ID step list for a given node can consist up to 3 steps.
+        // 
+        // If a cross-branch link is required then add it to the 1st step in the list. Since addStep for a given node
+        // can be called up to 3 times we need to check if the link label has been added to the step list yet. This is
+        // done by checking getNodeIdLinkLabelMap for the presence of a link label for this node.
+
+        if (mapStorage.isUseCrossBranchLinks()) {
+            if (mapStorage.getNodeIdLinkLabelMap().get(nodeId)==null) {
+                // Find out how many input nodes this RTDM node has. This is different than the comments above. What we're checking
+                // here is if the RTDM node has multiple input nodes. If it does then we need to utilize cross-branch link steps
+                // otherwise the migration tool will create duplicate paths in the Decision (one for each input node).
+                List<String> nodes = Arrays.asList(treeUtil.getNodeIdInputNodesMap().get(nodeId).split(REGEXP));
+            
+                if (nodes.size() > 1) {
+                    // Multiple inputs nodes so this node requires a linkLabel
+                    String linkLabel = UUID.randomUUID().toString();
+                    step.setLinkLabel(linkLabel);
+    
+                    mapStorage.getNodeIdLinkLabelMap().put(nodeId, linkLabel);
+    
+                    List<Step> crossBranchLinkSteps = createCrossBranchLinkSteps(linkLabel);
+                    mapStorage.getCrossBranchLinkSteps().put(linkLabel, crossBranchLinkSteps);
+                }
+            }
+        }
+
+        stepList.add(step);
+
+    }
+
+    private List<Step> createCrossBranchLinkSteps(String linkLabel) {
+        Step crossBranchLinkStep = createCrossBranchLinkStep(linkLabel);
+
+        List<Step> crossBranchLinkSteps = new ArrayList<>();
+        crossBranchLinkSteps.add(crossBranchLinkStep);
+
+        return crossBranchLinkSteps;
+    }
+
+    private Step createCrossBranchLinkStep(String linkLabel) {
+        Step crossBranchLinkStep = new Step();
+        crossBranchLinkStep.setType(Step.TypeEnum.NODE_LINK);
+        crossBranchLinkStep.setDecisionNodeLinkTarget(linkLabel);
+        return crossBranchLinkStep;
+    }
+
+    public String getNextNodeIdForCell(String cellNodeId) {
         Short objId = treeUtil.getNodeIdObjIdMap().get(cellNodeId);
         String[] nodes = treeUtil.getObjIdOutputNodesMap().get(objId).split(REGEXP);
         return nodes[0];
@@ -894,10 +972,8 @@ public class CommonProcessing {
 
     public void setMappingNameFields(Mapping mapping, IBVariableDO ibVariableDO) {
         String name = buildVariableName(ibVariableDO.getValue().getValueTypeVarInfoDO());
-
-        name = sanitizeVariableName(changeVariableNameToFormat(name));
-        mapping.setStepTermName(name);
-        mapping.setTargetDecisionTermName(name);
+        mapping.setStepTermName(sanitizeAndReduceVariableName(changeVariableNameToFormat(name)));
+        mapping.setTargetDecisionTermName(sanitizeVariableName(changeVariableNameToFormat(name)));
     }
 
     public String makeCalculatedDataItemRuleSetName(CalculatedItemDO calculatedItemDO) {
@@ -906,6 +982,10 @@ public class CommonProcessing {
 
     public String makeReplyNodeRuleSetName(ReplyNodeDataDO replyNodeDataDO) {
         return makeNameValid(replyNodeDataDO.getNodeName() + "_" + replyNodeDataDO.getNodeId());
+    }
+
+    public String makeSplitNodeRuleSetName(SplitNodeDataDO splitNodeDataDO) {
+        return makeNameValid(splitNodeDataDO.getNodeName() + "_" + splitNodeDataDO.getNodeId());
     }
 
     public String makeProcessNodeRuleSetName(ProcessNodeDataDO processNodeDataDO) {
@@ -929,7 +1009,7 @@ public class CommonProcessing {
     }
 
     public String makeRemoveStagedTreatmentName(RemoveStagedTreatmentsNodeDataDO removeStagedTreatmentsNodeDataDO) {
-        return makeNameValid(removeStagedTreatmentsNodeDataDO.getNodeName() + "_" + removeStagedTreatmentsNodeDataDO.getObjid());
+        return makeNameValid(removeStagedTreatmentsNodeDataDO.getNodeName() + "_" + removeStagedTreatmentsNodeDataDO.getNodeId());
     }
 
     private void addDataPickerSignatureItems(IBVariableDO ibVariableDO, String direction, Decision decision, Step step) {
@@ -987,14 +1067,16 @@ public class CommonProcessing {
                 value = transferInSIDFormat(expression,varsInExpresion);
             }
 
-            action.setExpression(changeVariableNameToFormat(calculatedItemDO.getName()) + "=" + value);
+            String calculatedVariableName = sanitizeAndReduceVariableName(SOURCE_CALCULATED_DATA_ITEM + "." + calculatedItemDO.getName());
+
+            action.setExpression(changeVariableNameToFormat(calculatedVariableName) + "=" + value);
             actionList.add(action);
             rule.setActions(actionList);
             rule.setConditional("if");
             rule.setRuleFiredTrackingEnabled(false);
             rule.setName(calculatedItemDO.getId());
             Signature signature = new Signature();
-            signature.setName(sanitizeAndReduceVariableName(changeVariableNameToFormat(calculatedItemDO.getName())));
+            signature.setName(changeVariableNameToFormat(calculatedVariableName));
             signature.setDataType(dataType);
             signature.setDirection(OUTPUT_DIRECTION);
             signatureList.add(signature);
@@ -1162,7 +1244,7 @@ public class CommonProcessing {
             processEventVars(decision, ibVariableDOInner, OUTPUT_DIRECTION, ibVariableDOInner.getValue());
             Signature signature = new Signature();
             signature.setDataType(getDatatypeOfVar(ibVariableDO.getTypeDescription()).getValue());
-            signature.setName(sanitizeVariableName(changeVariableNameToFormat(ibVariableDOInner.getName())));
+            signature.setName(sanitizeAndReduceVariableName(changeVariableNameToFormat(ibVariableDOInner.getName())));
             signature.setDirection(IN_OUT_DIRECTION);
             handleIncomingSignatureUpdate(IN_OUT_DIRECTION, signatureList, signature);
             
@@ -1178,8 +1260,8 @@ public class CommonProcessing {
             if (ibVariableDOInner.getValue() != null) {
                 VarRef varRef = VarRefMapper.VAR_REF_MAPPER.varRefGet(ibVariableDOInner.getValue().getValueTypeVarInfoDO());
                 if (varRef != null
-                        && checkForGlobalVariable(varRef, step, ibVariableDOInner.getPhysicalName(), decision, true)) {
-                    checkForAdditionalVariables(ibVariableDOInner.getPhysicalName(), varRef
+                        && checkForGlobalVariable(varRef, step, ibVariableDOInner.getName(), decision, true)) {
+                    checkForAdditionalVariables(ibVariableDOInner.getName(), varRef
                             , OUTPUT_DIRECTION, decision, ibVariableDOInner.getTypeDescription());
                 }
             }
@@ -1214,9 +1296,9 @@ public class CommonProcessing {
             case SOURCE_NODE:
                 // Upstream Nodes folder (return Node Name + "." + Output Variable Name)
                 // Example: Read Database.AGE
-                String varName = valueTypeVarInfoDO.getVarInfoPhysicalName() !=null 
-                    ? valueTypeVarInfoDO.getVarInfoPhysicalName() 
-                    : valueTypeVarInfoDO.getVarName();
+                String varName = valueTypeVarInfoDO.getVarName() !=null 
+                    ? valueTypeVarInfoDO.getVarName() 
+                    : valueTypeVarInfoDO.getVarInfoPhysicalName();
                 variableName = valueTypeVarInfoDO.getVarInfoSourceName() + "." + varName;
                 break;
             case SOURCE_CALCULATED_DATA_ITEM:
@@ -1319,9 +1401,9 @@ public class CommonProcessing {
 
     private String getVariableNameFromValueTypeVarInfoDO(ValueTypeVarInfoDO valueTypeVarInfoDO) {
         return getSourceName(valueTypeVarInfoDO) + "." + 
-            (valueTypeVarInfoDO.getVarInfoPhysicalName() !=null 
-                ? valueTypeVarInfoDO.getVarInfoPhysicalName() 
-                : valueTypeVarInfoDO.getVarName());
+            (valueTypeVarInfoDO.getVarName() !=null 
+                ? valueTypeVarInfoDO.getVarName() 
+                : valueTypeVarInfoDO.getVarInfoPhysicalName());
     }
 
     private String getSourceName(ValueTypeVarInfoDO valueTypeVarInfoDO) {
@@ -1342,7 +1424,7 @@ public class CommonProcessing {
 
     private String buildVariableName(IBVariableDO ibVariableDO, String varInfoSource) {
         // Build a display value for the variable name the same way that RTDM does
-        String name = (ibVariableDO.getPhysicalName() !=null && !ibVariableDO.getPhysicalName().isEmpty()) ? ibVariableDO.getPhysicalName() : ibVariableDO.getName();
+        String name = (ibVariableDO.getName() !=null && !ibVariableDO.getName().isEmpty()) ? ibVariableDO.getName() : ibVariableDO.getPhysicalName();
         return varInfoSource!=null ? varInfoSource + "." + name : name;
     }
 

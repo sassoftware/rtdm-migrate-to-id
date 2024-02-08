@@ -17,6 +17,7 @@ import com.sas.rtdm2id.model.rtdm.*;
 import com.sas.rtdm2id.model.rtdm.extension.SubDiagramNodeDataDO;
 import com.sas.rtdm2id.model.rtdm.extension.VarRef;
 import com.sas.rtdm2id.util.model.IBVariableDO;
+import com.sas.rtdm2id.util.model.RTDM2IDConstants;
 import com.sas.rtdm2id.util.model.RTDMObject;
 import com.sas.rtdm2id.util.object.processing.*;
 import com.sas.rtdm2id.util.tree.impl.GenericTree;
@@ -131,11 +132,17 @@ public class Converter {
     private void walkTree(GenericTreeNode<Short> node, Decision decision) {
         for (GenericTreeNode<Short> innerNode : node.getChildren()) {
             Short objId = innerNode.getData();
-            RTDMObject rtdmObject = treeUtil.getRTDMObjectByObjId(objId);
-            if (rtdmObject!=null) {
-                List<Step> idObjectList = processRTDMObject(rtdmObject, decision, objId);
-                mapStorage.getNodeIdStepMap().put(treeUtil.getObjIdToNodeIdMap().get(objId), idObjectList);
+
+            // Make sure the node is only processed once
+            String nodeId = treeUtil.getObjIdToNodeIdMap().get(objId);
+            if (mapStorage.getNodeIdStepMap().get(nodeId)==null) {
+                RTDMObject rtdmObject = treeUtil.getRTDMObjectByObjId(objId);
+                if (rtdmObject!=null) {
+                    List<Step> idObjectList = processRTDMObject(rtdmObject, decision, objId);
+                    mapStorage.getNodeIdStepMap().put(nodeId, idObjectList);
+                }
             }
+
             walkTree(innerNode, decision);
         }
     }
@@ -145,7 +152,7 @@ public class Converter {
         switch (rtdmObject.getObjectType()) {
             case CUSTOM_CONSTANT:
                 ProcessNodeDataDO processNodeDataDO = (ProcessNodeDataDO) rtdmObject.getObject();
-                stepList = processNodeConverter.addCustomObjectStep(processNodeDataDO.getProcess(), decision, objId, commonProcessing.makeProcessNodeRuleSetName(processNodeDataDO));
+                stepList = processNodeConverter.addCustomObjectStep(processNodeDataDO, decision, objId, commonProcessing.makeProcessNodeRuleSetName(processNodeDataDO));
                 break;
             case "multiSelect":
                 MultiSelectNodeDataDO multiSelectNodeDataDO = (MultiSelectNodeDataDO) rtdmObject.getObject();
@@ -153,7 +160,7 @@ public class Converter {
                 break;
             case "split":
                 SplitNodeDataDO splitNodeDataDO = (SplitNodeDataDO) rtdmObject.getObject();
-                stepList = splitNodeConverter.createBranch(splitNodeDataDO, decision);
+                stepList = splitNodeConverter.createBranch(splitNodeDataDO, decision, commonProcessing.makeSplitNodeRuleSetName(splitNodeDataDO));
                 break;
             case "subdiagram":
                 SubDiagramNodeDataDO subDiagramNodeDataDO = (SubDiagramNodeDataDO) rtdmObject.getObject();
@@ -174,8 +181,8 @@ public class Converter {
             // Unsupported nodes will be converted into Code File nodes
             case "cHandRH":
                 CHandRHNodeDataDO cHandRHNodeDataDO = (CHandRHNodeDataDO) rtdmObject.getObject();
-                stepList.add(confirmContactNodeConverter.addCustomObjectStep(cHandRHNodeDataDO, decision, objId, commonProcessing.makeConfirmContactNodeRuleSetName(cHandRHNodeDataDO)));
-                stepList.add(confirmContactNodeConverter.createRecordContactStep(cHandRHNodeDataDO, decision));
+                commonProcessing.addStep(stepList, confirmContactNodeConverter.addCustomObjectStep(cHandRHNodeDataDO, decision, objId, commonProcessing.makeConfirmContactNodeRuleSetName(cHandRHNodeDataDO)), cHandRHNodeDataDO.getNodeId());
+                commonProcessing.addStep(stepList, confirmContactNodeConverter.createRecordContactStep(cHandRHNodeDataDO, decision), cHandRHNodeDataDO.getNodeId());
                 break;
             case "stagedTreatment":
                 StagedTreatmentsNodeDataDO stagedTreatmentsNodeDataDO = (StagedTreatmentsNodeDataDO) rtdmObject.getObject();
@@ -258,10 +265,59 @@ public class Converter {
             Short lastObjId = objIDStack.peek();
             String nodeIdInsideBranchOrCondition = treeUtil.getObjIdToNodeIdMap().get(lastObjId);
             ConditionBranch conditionBranch = mapStorage.getBranchNodeIdConditionBranchMap().get(nodeIdInsideBranchOrCondition);
+            
             String nodeIdToInsert = treeUtil.getObjIdToNodeIdMap().get(objId);
-            List<Step> stepList = mapStorage.getNodeIdStepMap().get(nodeIdToInsert);
-            if (stepList != null && !stepList.isEmpty()) {
-                processStepList(conditionBranch, stepList);
+
+            if (mapStorage.isUseCrossBranchLinks()) {
+                boolean skipDownstreamNodes = false;
+                List<Step> downstreamSteps = conditionBranch.getSteps();
+                if (downstreamSteps != null && !downstreamSteps.isEmpty()) {
+                    Step finalStep = downstreamSteps.get(downstreamSteps.size() - 1);
+                    if (finalStep.getDecisionNodeLinkTarget()!=null) {
+                        // Do not add any downstream nodes beyond the cross-branch link
+                        skipDownstreamNodes = true;
+                    }
+                }
+    
+                if (skipDownstreamNodes == false) {
+                    List<Step> stepList = mapStorage.getNodeIdStepMap().get(nodeIdToInsert);
+                    if (stepList != null && !stepList.isEmpty()) {
+                        // Check if a link label exists on the first step
+                        Step initialStep = stepList.get(0);
+                        String linkLabel = initialStep.getLinkLabel();
+                        if (linkLabel!=null) {
+                            if (mapStorage.getDecisionNodeLinkMap().contains(linkLabel)) {
+                                // If path has already been processed then use a cross-branch link step
+                                stepList = mapStorage.getCrossBranchLinkSteps().get(linkLabel); 
+                            } else {
+                                // First time this link label has been processed
+                                // The processStepList method below will be called with the original stepList (with the link label) 
+                                // Next time we find a step list with this link label we'll use a cross-branch link step
+                                mapStorage.getDecisionNodeLinkMap().add(linkLabel);
+                            }
+                        }
+    
+                        // Prevent a decisionNodeLinkTarget being added onto a step list containing a linkLabel
+                        if (!conditionBranch.getSteps().isEmpty()) {
+                            Step firstConditionBranchStep = conditionBranch.getSteps().get(0);
+                            if (firstConditionBranchStep.getDecisionNodeLinkTarget()!=null) {
+                                if (!stepList.isEmpty()) {
+                                    Step firstStep = stepList.get(0);
+                                    if (firstStep.getLinkLabel()!=null) {
+                                        conditionBranch.setSteps(stepList);
+                                    }
+                                }
+                            }
+                        }
+    
+                        processStepList(conditionBranch, stepList);
+                    }
+                }
+            } else {
+                List<Step> stepList = mapStorage.getNodeIdStepMap().get(nodeIdToInsert);
+                if (stepList != null && !stepList.isEmpty()) {
+                    processStepList(conditionBranch, stepList);
+                }
             }
         }
     }
@@ -270,6 +326,30 @@ public class Converter {
         for (Step step : stepList) {
             List<Step> copy = new LinkedList<>(conditionBranch.getSteps());
             int indexOf = copy.indexOf(step);
+
+            if (mapStorage.isUseCrossBranchLinks()) {
+                if (!copy.isEmpty() && !stepList.isEmpty()) {
+                    for (Step copyStep : copy) {
+                        String copyStepLinkLabel = copyStep.getLinkLabel();
+    
+                        if (copyStepLinkLabel!=null) {
+                            for (Step step1 : stepList) {
+                                String stepDecisionNodeLinkTarget = step1.getDecisionNodeLinkTarget();
+                                
+                                if (stepDecisionNodeLinkTarget!=null) {
+                                    if (copyStepLinkLabel.equals(stepDecisionNodeLinkTarget)) {
+                                        // Avoid a cross-branch link that links to itself
+                                        // This can occur when two immediate upstream nodes feed into the same reply node
+                                        conditionBranch.setSteps(copy);
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             if (indexOf == -1) {
                 copy.add(step);
                 conditionBranch.setSteps(copy);
@@ -309,17 +389,19 @@ public class Converter {
 
         for (SplitNodeDataDO.LineItems.SplitNodeLineItemDO splitNodeLineItemDO
                 : splitNodeDataDO.getLineItems().getSplitNodeLineItemDOs()) {
-            if ("(Missing)".equals(splitNodeLineItemDO.getValue()) || "(Remainder)".equals(splitNodeLineItemDO.getValue())) {
+            if (RTDM2IDConstants.REMAINDER_VALUE.equals(splitNodeLineItemDO.getValue())) {
                 ConditionBranch conditionBranch = commonProcessing.createConditionBranch(splitNodeLineItemDO.getCellId(), true);
-                mapStorage.getBranchNodeIdConditionBranchMap().put(splitNodeLineItemDO.getCellId(), conditionBranch);
-                step.setDefaultCase(conditionBranch);
-                break;
+                mapStorage.getBranchNodeIdConditionBranchMap().put(splitNodeLineItemDO.getCellId(), conditionBranch);             
+                if (RTDM2IDConstants.REMAINDER_VALUE.equals(splitNodeLineItemDO.getValue())) {
+                    step.setDefaultCase(conditionBranch);
+                }
             }
         }
+
         for (BranchCase branchCase : step.getBranchCases()) {
             ConditionBranch conditionBranch = commonProcessing.createConditionBranch(branchCase.getLabel(), true);
             mapStorage.getBranchNodeIdConditionBranchMap().put(branchCase.getLabel(), conditionBranch);
-            branchCase.setOnTrue(conditionBranch);
+            branchCase.setOnTrue(conditionBranch); // this is also updating the nodeIdStepMap entry since the calling method (connectConditionsInsideMap) is iterating the steps from the nodeIdStepMap
         }
     }
 }

@@ -43,11 +43,11 @@ Migrating campaigns from RTDM to ID is a 3-step process.
 Run the migration tool from a command/shell window.
 
 ```shell script
-java -jar rtdm-migrate-to-id-0.8.2.jar
+java -jar rtdm-migrate-to-id-0.11.2.jar
 
 or
 # if port 8080 already in use
-java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.8.2.jar
+java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.11.2.jar
 ```
 
 This row inside command/shell will tell you that service successfully started
@@ -63,7 +63,7 @@ Authenticate with SAS Viya to get an authorization token.
 Once authenticated user can POST requests.
 
 ```shell script
-POST: localhost:8080/api/rtdm2id/create-diagram?baseIp={{ID environment}}&login={username}&password={password}&protocol={protocol}&parentFolderUri={parentFolderUri}
+POST: localhost:8080/api/rtdm2id/create-diagram?baseIp={{ID environment}}&login={username}&password={password}&protocol={protocol}&parentFolderUri={parentFolderUri}&useCrossBranchLinks={useCrossBranchLinks}
 Authorization: Bearer {{token}}
 Content-Type: application/xml
 Body: Extract XML generated from SAS Customer Intelligence Integration Utilities
@@ -73,6 +73,10 @@ Example Body: extract/extracted_campaign.xml
 The parameter protocol is optional. The default value is "http" if not provided. If the target environment is using HTTPS for secure online transactions then protocol must be provided with a value of "https".
 
 The parameter parentFolderUri is optional. The default value is /folders/folders/@myFolder if not provided.
+
+The parameter useCrossBranchLinks is optional. The default value is "true".
+The use of cross-branch link nodes in the migration tool is an experimental feature. This feature is enabled by default. Cross-branch links will be created in the migrated Decision if the RTDM campaign contains a node with multiple input nodes. If the migration tool generates an error related to cross-branch links then set this parameter to "false".
+
 ### Capabilities
 
 * Creation of DS2 Node process in ID from RTDM DS2 Process

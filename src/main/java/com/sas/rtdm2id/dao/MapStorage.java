@@ -22,8 +22,11 @@ public class MapStorage {
     private String baseIp;
     private String protocol;
     private String parentFolderUri;
+    private boolean useCrossBranchLinks;
 
     private final List<String> existingNodeIds = new ArrayList<>();
+    private final List<String> crossBranchLinksAdded = new ArrayList<>();
+    private final List<String> decisionNodeLinkMap = new ArrayList<>();
 
     private final Map<String, Step> ruleSetStepMap = new HashMap<>();
     private final Map<String, GlobalVariable> globalVariableMap = new HashMap<>();
@@ -36,6 +39,8 @@ public class MapStorage {
     private final Map<String, String> calculatedVariableMap = new HashMap<>();
     private final Set<Step> calculatedVariableRulesetNodes = new HashSet<>();
     private final Map<String, String> varInfoIdToVariableNameMap = new HashMap<>();
+    private final Map<String, String> nodeIdLinkLabelMap = new HashMap<>();
+    private final Map<String, List<Step>> crossBranchLinkSteps = new HashMap<>();
 
     public void clearListsAndMaps() {
         ruleSetStepMap.clear();
@@ -50,6 +55,10 @@ public class MapStorage {
         calculatedVariableMap.clear();
         calculatedVariableRulesetNodes.clear();
         varInfoIdToVariableNameMap.clear();
+        nodeIdLinkLabelMap.clear();
+        crossBranchLinksAdded.clear();
+        decisionNodeLinkMap.clear();
+        crossBranchLinkSteps.clear();
     }
 
 }

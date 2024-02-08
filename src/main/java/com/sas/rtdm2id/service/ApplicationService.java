@@ -87,7 +87,7 @@ public class ApplicationService {
         }
     }
 
-    public String createDiagram(String baseIp, Batch batch, String login, String password, String protocol, String parentFolderUri) {
+    public String createDiagram(String baseIp, Batch batch, String login, String password, String protocol, String parentFolderUri, String useCrossBranchLinks) {
         OAuthTokenResponse oAuthTokenResponse = getAccessToken(baseIp, login, password, protocol);
         if (oAuthTokenResponse == null) {
             return "Could not get access token for ip = " + baseIp + " try to get access token again!";
@@ -98,6 +98,7 @@ public class ApplicationService {
         String decisionJson = null;
 
         mapStorage.setParentFolderUri(parentFolderUri);
+        mapStorage.setUseCrossBranchLinks(new Boolean(useCrossBranchLinks));
 
         try {
             if (!commonProcessing.findDecision(batch.getLogicalUnit().getCampaignDO().getName())) {
