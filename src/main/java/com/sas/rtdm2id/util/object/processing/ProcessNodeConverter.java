@@ -109,7 +109,7 @@ public class ProcessNodeConverter {
                     processCustomObjectMapping(process, step, decision);
                 } else {
                     SignatureTerm signatureTermDatagrid
-                            = processDataProcessMapping(process.getOutputVariableList().getIBVariableDOs()
+                            = processDataProcessMapping(process.getOutputVariableList().getIbVariableDOs()
                             , step, decision, process.getName());
 
                     extractDataStep = mapStorage.getRuleSetStepMap().get(nodeName + "_extract_values");
@@ -185,7 +185,7 @@ public class ProcessNodeConverter {
         Rule rule = new Rule();
 
         RuleSetStep ruleSetForUpdate = step.getRuleSet();
-        List<ProcessNodeDataDO.Process.InputVariableList.IBVariableDO> ibVariableDOs = inputVariableList.getIBVariableDOs();
+        List<ProcessNodeDataDO.Process.InputVariableList.IBVariableDO> ibVariableDOs = inputVariableList.getIbVariableDOs();
         List<Signature> signatureList = new ArrayList<>();
         List<Action> actionList = new ArrayList<>();
 
@@ -598,7 +598,7 @@ public class ProcessNodeConverter {
         StringBuilder stb = new StringBuilder("select ");
 
         for (ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO outputVars :
-                process.getOutputVariableList().getIBVariableDOs()) {
+                process.getOutputVariableList().getIbVariableDOs()) {
             String datatypeOfVarForSQLNode = getDatatypeOfVarForSQLNode(outputVars.getTypeDescription());
             String var = outputVars.getName() + " AS {:" + outputVars.getName()
                     + ":" + datatypeOfVarForSQLNode + "}";
@@ -611,9 +611,9 @@ public class ProcessNodeConverter {
         stb.append(" from ");
         quoteTableName(stb, process.getLibName(), process.getTableName());
         
-        if (!process.getInputVariableList().getIBVariableDOs().isEmpty()) {
+        if (!process.getInputVariableList().getIbVariableDOs().isEmpty()) {
             stb.append(" where ");
-            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVars : process.getInputVariableList().getIBVariableDOs()) {
+            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVars : process.getInputVariableList().getIbVariableDOs()) {
                 String datatypeOfVarForSQLNode = getDatatypeOfVarForSQLNode(inputVars.getTypeDescription());
                 String var = inputVars.getName() + "={?:" + inputVars.getName() + ":"
                         + datatypeOfVarForSQLNode + "}";
@@ -635,8 +635,8 @@ public class ProcessNodeConverter {
         quoteTableName(stb, process.getLibName(), process.getTableName());
 
         stb.append(" (");
-        if (!process.getInputVariableList().getIBVariableDOs().isEmpty()) {
-            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVar : process.getInputVariableList().getIBVariableDOs()) {
+        if (!process.getInputVariableList().getIbVariableDOs().isEmpty()) {
+            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVar : process.getInputVariableList().getIbVariableDOs()) {
                 stb.append(inputVar.getName());
                 stb.append(", ");
             }
@@ -647,8 +647,8 @@ public class ProcessNodeConverter {
         stb.append(" values ");
         stb.append("(");
 
-        if (!process.getInputVariableList().getIBVariableDOs().isEmpty()) {
-            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVars : process.getInputVariableList().getIBVariableDOs()) {
+        if (!process.getInputVariableList().getIbVariableDOs().isEmpty()) {
+            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVars : process.getInputVariableList().getIbVariableDOs()) {
                 String datatypeOfVarForSQLNode = getDatatypeOfVarForSQLNode(inputVars.getTypeDescription());
                 String var = "{?:" + inputVars.getName() + ":" + datatypeOfVarForSQLNode + "}";
                 var = modifyIfStringDatatype(var, datatypeOfVarForSQLNode);
@@ -672,8 +672,8 @@ public class ProcessNodeConverter {
 
         stb.append(" set ");
 
-        if (!process.getInputVariableList().getIBVariableDOs().isEmpty()) {
-            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVars : process.getInputVariableList().getIBVariableDOs()) {
+        if (!process.getInputVariableList().getIbVariableDOs().isEmpty()) {
+            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVars : process.getInputVariableList().getIbVariableDOs()) {
                 String datatypeOfVarForSQLNode = getDatatypeOfVarForSQLNode(inputVars.getTypeDescription());
                 String var = inputVars.getName() + "={?:" + inputVars.getName() + ":" + datatypeOfVarForSQLNode + "}";
                 var = modifyIfStringDatatype(var, datatypeOfVarForSQLNode);
@@ -683,9 +683,9 @@ public class ProcessNodeConverter {
             stb.delete(stb.length() - 2, stb.length());
         }
 
-        if (!process.getInputVariableList().getIBVariableDOs().isEmpty()) {
+        if (!process.getInputVariableList().getIbVariableDOs().isEmpty()) {
             stb.append(" where ");
-            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVars : process.getInputVariableList().getIBVariableDOs()) {
+            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVars : process.getInputVariableList().getIbVariableDOs()) {
                 String datatypeOfVarForSQLNode = getDatatypeOfVarForSQLNode(inputVars.getTypeDescription());
                 String var = inputVars.getName() + "={?:" + inputVars.getName() + ":"
                         + datatypeOfVarForSQLNode + "}";
@@ -847,7 +847,7 @@ public class ProcessNodeConverter {
         
         IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
 
-        for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO : process.getInputVariableList().getIBVariableDOs()) {
+        for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO : process.getInputVariableList().getIbVariableDOs()) {
             IBVariableDO ibVariableDOMapped = mapper.ibVariableDoGet(ibVariableDO);
             String varOriginalName = ibVariableDOMapped.getName();
             if (ibVariableDOMapped.getValue() != null) {
@@ -903,7 +903,7 @@ public class ProcessNodeConverter {
     }
 
     private void processCustomObjectMapping(ProcessNodeDataDO.Process process, Step step, Decision decision) {
-        List<ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO> ibVariableDOList = process.getOutputVariableList().getIBVariableDOs();
+        List<ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO> ibVariableDOList = process.getOutputVariableList().getIbVariableDOs();
 
         IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
 

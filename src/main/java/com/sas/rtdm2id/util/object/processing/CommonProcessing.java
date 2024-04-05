@@ -9,7 +9,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sas.rtdm2id.dao.MapStorage;
 import com.sas.rtdm2id.mapper.IBVariableDOMapperImpl;
 import com.sas.rtdm2id.mapper.VarRefMapper;
-import com.sas.rtdm2id.model.id.decision.BranchCase;
 import com.sas.rtdm2id.model.id.decision.CodeFile;
 import com.sas.rtdm2id.model.id.decision.CodeFileCollection;
 import com.sas.rtdm2id.model.id.decision.ConditionBranch;
@@ -37,7 +36,6 @@ import com.sas.rtdm2id.util.model.IBVariableDO;
 import com.sas.rtdm2id.util.model.RTDM2IDConstants;
 import com.sas.rtdm2id.util.tree.impl.TreeUtil;
 
-import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -47,9 +45,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URISyntaxException;
-import java.text.DateFormat;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -625,7 +620,7 @@ public class CommonProcessing {
             } else if (ibVariableDO.getValue().getDateValue() != null) {
                 String dateValueString = ibVariableDO.getValue().getDateValueString();
                 value = DateUtil.getInformateDate(dateValueString);
-                if(StringUtils.isEmpty(value)){
+                if(value.isEmpty()){
                     value = ibVariableDO.getValue().getDateValue();
                 }
             } else if (ibVariableDO.getValue().getLongValue() != null) {

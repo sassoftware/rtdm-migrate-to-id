@@ -4,6 +4,9 @@ SPDX-License-Identifier: Apache-2.0
 */
 package com.sas.rtdm2id.model.rtdm;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
@@ -108,8 +111,9 @@ import javax.xml.bind.annotation.XmlValue;
         "versionHistoryMigrated",
         "versionNumber"
 })
-public class CampaignDO
-        implements Serializable {
+@Getter
+@Setter
+public class CampaignDO implements Serializable {
 
     private final static long serialVersionUID = -1L;
     @XmlElement(name = "ActivationState")
@@ -295,918 +299,7 @@ public class CampaignDO
     @XmlAttribute(name = "objid")
     protected Byte objid;
 
-       
-    public byte getActivationState() {
-        return activationState;
-    }
 
-       
-    public void setActivationState(byte value) {
-        this.activationState = value;
-    }
-
-       
-    public byte getArchivedPublishState() {
-        return archivedPublishState;
-    }
-
-       
-    public void setArchivedPublishState(byte value) {
-        this.archivedPublishState = value;
-    }
-
-       
-    public String getAttachments() {
-        return attachments;
-    }
-
-       
-    public void setAttachments(String value) {
-        this.attachments = value;
-    }
-
-       
-    public String getAutomaticLayoutNeeded() {
-        return automaticLayoutNeeded;
-    }
-
-       
-    public void setAutomaticLayoutNeeded(String value) {
-        this.automaticLayoutNeeded = value;
-    }
-
-       
-    public String getBusinessContextId() {
-        return businessContextId;
-    }
-
-       
-    public void setBusinessContextId(String value) {
-        this.businessContextId = value;
-    }
-
-       
-    public CampaignDO.CampaignExecutionHistoryDO getCampaignExecutionHistoryDO() {
-        return campaignExecutionHistoryDO;
-    }
-
-       
-    public void setCampaignExecutionHistoryDO(CampaignDO.CampaignExecutionHistoryDO value) {
-        this.campaignExecutionHistoryDO = value;
-    }
-
-       
-    public CampaignDO.CampaignMessages getCampaignMessages() {
-        return campaignMessages;
-    }
-
-       
-    public void setCampaignMessages(CampaignDO.CampaignMessages value) {
-        this.campaignMessages = value;
-    }
-
-       
-    public String getCampaignType() {
-        return campaignType;
-    }
-
-       
-    public void setCampaignType(String value) {
-        this.campaignType = value;
-    }
-
-       
-    public CampaignDO.CheckListItems getCheckListItems() {
-        return checkListItems;
-    }
-
-       
-    public void setCheckListItems(CampaignDO.CheckListItems value) {
-        this.checkListItems = value;
-    }
-
-       
-    public String getCode() {
-        return code;
-    }
-
-       
-    public void setCode(String value) {
-        this.code = value;
-    }
-
-       
-    public String getCodeChangeUnpublished() {
-        return codeChangeUnpublished;
-    }
-
-       
-    public void setCodeChangeUnpublished(String value) {
-        this.codeChangeUnpublished = value;
-    }
-
-       
-    public String getCodeEverBeenPublished() {
-        return codeEverBeenPublished;
-    }
-
-       
-    public void setCodeEverBeenPublished(String value) {
-        this.codeEverBeenPublished = value;
-    }
-
-       
-    public CampaignDO.CustomPageDetails getCustomPageDetails() {
-        return customPageDetails;
-    }
-
-       
-    public void setCustomPageDetails(CampaignDO.CustomPageDetails value) {
-        this.customPageDetails = value;
-    }
-
-       
-    public String getDateCreated() {
-        return dateCreated;
-    }
-
-       
-    public void setDateCreated(String value) {
-        this.dateCreated = value;
-    }
-
-       
-    public String getDateModified() {
-        return dateModified;
-    }
-
-       
-    public void setDateModified(String value) {
-        this.dateModified = value;
-    }
-
-       
-    public String getDateModifiedCorrect() {
-        return dateModifiedCorrect;
-    }
-
-       
-    public void setDateModifiedCorrect(String value) {
-        this.dateModifiedCorrect = value;
-    }
-
-       
-    public String getDecisionCampaignType() {
-        return decisionCampaignType;
-    }
-
-       
-    public void setDecisionCampaignType(String value) {
-        this.decisionCampaignType = value;
-    }
-
-       
-    public CampaignDO.Definition getDefinition() {
-        return definition;
-    }
-
-       
-    public void setDefinition(CampaignDO.Definition value) {
-        this.definition = value;
-    }
-
-       
-    public String getDescription() {
-        return description;
-    }
-
-       
-    public void setDescription(String value) {
-        this.description = value;
-    }
-
-       
-    public String getDocumentOnExecute() {
-        return documentOnExecute;
-    }
-
-       
-    public void setDocumentOnExecute(String value) {
-        this.documentOnExecute = value;
-    }
-
-       
-    public byte getExecutionClientType() {
-        return executionClientType;
-    }
-
-       
-    public void setExecutionClientType(byte value) {
-        this.executionClientType = value;
-    }
-
-       
-    public String getExecutionPublishDone() {
-        return executionPublishDone;
-    }
-
-       
-    public void setExecutionPublishDone(String value) {
-        this.executionPublishDone = value;
-    }
-
-       
-    public byte getFirstOccurrenceToPublish() {
-        return firstOccurrenceToPublish;
-    }
-
-       
-    public void setFirstOccurrenceToPublish(byte value) {
-        this.firstOccurrenceToPublish = value;
-    }
-
-       
-    public String getFlowType() {
-        return flowType;
-    }
-
-       
-    public void setFlowType(String value) {
-        this.flowType = value;
-    }
-
-       
-    public CampaignDO.Folder getFolder() {
-        return folder;
-    }
-
-       
-    public void setFolder(CampaignDO.Folder value) {
-        this.folder = value;
-    }
-
-       
-    public String getForceCleanPublish() {
-        return forceCleanPublish;
-    }
-
-       
-    public void setForceCleanPublish(String value) {
-        this.forceCleanPublish = value;
-    }
-
-       
-    public String getForceIncrementalPublish() {
-        return forceIncrementalPublish;
-    }
-
-       
-    public void setForceIncrementalPublish(String value) {
-        this.forceIncrementalPublish = value;
-    }
-
-       
-    public String getForced() {
-        return forced;
-    }
-
-       
-    public void setForced(String value) {
-        this.forced = value;
-    }
-
-       
-    public String getHasAudience() {
-        return hasAudience;
-    }
-
-       
-    public void setHasAudience(String value) {
-        this.hasAudience = value;
-    }
-
-       
-    public String getHasCellRefs() {
-        return hasCellRefs;
-    }
-
-       
-    public void setHasCellRefs(String value) {
-        this.hasCellRefs = value;
-    }
-
-       
-    public String getHasCells() {
-        return hasCells;
-    }
-
-       
-    public void setHasCells(String value) {
-        this.hasCells = value;
-    }
-
-       
-    public String getHasCommunications() {
-        return hasCommunications;
-    }
-
-       
-    public void setHasCommunications(String value) {
-        this.hasCommunications = value;
-    }
-
-       
-    public String getHasDiagram() {
-        return hasDiagram;
-    }
-
-       
-    public void setHasDiagram(String value) {
-        this.hasDiagram = value;
-    }
-
-       
-    public String getHidden() {
-        return hidden;
-    }
-
-       
-    public void setHidden(String value) {
-        this.hidden = value;
-    }
-
-       
-    public String getId() {
-        return id;
-    }
-
-       
-    public void setId(String value) {
-        this.id = value;
-    }
-
-       
-    public String getIsScheduleUsed() {
-        return isScheduleUsed;
-    }
-
-       
-    public void setIsScheduleUsed(String value) {
-        this.isScheduleUsed = value;
-    }
-
-       
-    public String getLastDeployDate() {
-        return lastDeployDate;
-    }
-
-       
-    public void setLastDeployDate(String value) {
-        this.lastDeployDate = value;
-    }
-
-       
-    public String getLastRunDate() {
-        return lastRunDate;
-    }
-
-       
-    public void setLastRunDate(String value) {
-        this.lastRunDate = value;
-    }
-
-       
-    public String getLastSavedDate() {
-        return lastSavedDate;
-    }
-
-       
-    public void setLastSavedDate(String value) {
-        this.lastSavedDate = value;
-    }
-
-       
-    public String getLoadedFromOldDavLocation() {
-        return loadedFromOldDavLocation;
-    }
-
-       
-    public void setLoadedFromOldDavLocation(String value) {
-        this.loadedFromOldDavLocation = value;
-    }
-
-       
-    public String getLoading() {
-        return loading;
-    }
-
-       
-    public void setLoading(String value) {
-        this.loading = value;
-    }
-
-       
-    public String getLockedBy() {
-        return lockedBy;
-    }
-
-       
-    public void setLockedBy(String value) {
-        this.lockedBy = value;
-    }
-
-       
-    public String getMarkDeployPublish() {
-        return markDeployPublish;
-    }
-
-       
-    public void setMarkDeployPublish(String value) {
-        this.markDeployPublish = value;
-    }
-
-       
-    public float getMaxBudget() {
-        return maxBudget;
-    }
-
-       
-    public void setMaxBudget(float value) {
-        this.maxBudget = value;
-    }
-
-       
-    public byte getMaxNumContacts() {
-        return maxNumContacts;
-    }
-
-       
-    public void setMaxNumContacts(byte value) {
-        this.maxNumContacts = value;
-    }
-
-       
-    public byte getMaxNumOffers() {
-        return maxNumOffers;
-    }
-
-       
-    public void setMaxNumOffers(byte value) {
-        this.maxNumOffers = value;
-    }
-
-       
-    public String getMemberOfOptimizeGroup() {
-        return memberOfOptimizeGroup;
-    }
-
-       
-    public void setMemberOfOptimizeGroup(String value) {
-        this.memberOfOptimizeGroup = value;
-    }
-
-       
-    public String getMetadataType() {
-        return metadataType;
-    }
-
-       
-    public void setMetadataType(String value) {
-        this.metadataType = value;
-    }
-
-       
-    public String getMigratedDiagram() {
-        return migratedDiagram;
-    }
-
-       
-    public void setMigratedDiagram(String value) {
-        this.migratedDiagram = value;
-    }
-
-       
-    public float getMinBudget() {
-        return minBudget;
-    }
-
-       
-    public void setMinBudget(float value) {
-        this.minBudget = value;
-    }
-
-       
-    public byte getMinNumOffers() {
-        return minNumOffers;
-    }
-
-       
-    public void setMinNumOffers(byte value) {
-        this.minNumOffers = value;
-    }
-
-       
-    public String getModifiedUser() {
-        return modifiedUser;
-    }
-
-       
-    public void setModifiedUser(String value) {
-        this.modifiedUser = value;
-    }
-
-       
-    public String getName() {
-        return name;
-    }
-
-       
-    public void setName(String value) {
-        this.name = value;
-    }
-
-       
-    public String getNeedToPersist() {
-        return needToPersist;
-    }
-
-       
-    public void setNeedToPersist(String value) {
-        this.needToPersist = value;
-    }
-
-       
-    public String getNoWritePermission() {
-        return noWritePermission;
-    }
-
-       
-    public void setNoWritePermission(String value) {
-        this.noWritePermission = value;
-    }
-
-       
-    public String getOldVersionNumber() {
-        return oldVersionNumber;
-    }
-
-       
-    public void setOldVersionNumber(String value) {
-        this.oldVersionNumber = value;
-    }
-
-       
-    public String getOpenAsReadOnly() {
-        return openAsReadOnly;
-    }
-
-       
-    public void setOpenAsReadOnly(String value) {
-        this.openAsReadOnly = value;
-    }
-
-       
-    public String getOptimizable() {
-        return optimizable;
-    }
-
-       
-    public void setOptimizable(String value) {
-        this.optimizable = value;
-    }
-
-       
-    public String getOptimizationMethod() {
-        return optimizationMethod;
-    }
-
-       
-    public void setOptimizationMethod(String value) {
-        this.optimizationMethod = value;
-    }
-
-       
-    public String getOptimizationReadOnly() {
-        return optimizationReadOnly;
-    }
-
-       
-    public void setOptimizationReadOnly(String value) {
-        this.optimizationReadOnly = value;
-    }
-
-       
-    public String getOptimizeStatus() {
-        return optimizeStatus;
-    }
-
-       
-    public void setOptimizeStatus(String value) {
-        this.optimizeStatus = value;
-    }
-
-       
-    public String getOwner() {
-        return owner;
-    }
-
-       
-    public void setOwner(String value) {
-        this.owner = value;
-    }
-
-       
-    public String getParentScheduleFlowId() {
-        return parentScheduleFlowId;
-    }
-
-       
-    public void setParentScheduleFlowId(String value) {
-        this.parentScheduleFlowId = value;
-    }
-
-       
-    public String getPersisting() {
-        return persisting;
-    }
-
-       
-    public void setPersisting(String value) {
-        this.persisting = value;
-    }
-
-       
-    public CampaignDO.ProcessingEndDate getProcessingEndDate() {
-        return processingEndDate;
-    }
-
-       
-    public void setProcessingEndDate(CampaignDO.ProcessingEndDate value) {
-        this.processingEndDate = value;
-    }
-
-       
-    public CampaignDO.ProcessingStartDate getProcessingStartDate() {
-        return processingStartDate;
-    }
-
-       
-    public void setProcessingStartDate(CampaignDO.ProcessingStartDate value) {
-        this.processingStartDate = value;
-    }
-
-       
-    public String getPublishAll() {
-        return publishAll;
-    }
-
-       
-    public void setPublishAll(String value) {
-        this.publishAll = value;
-    }
-
-       
-    public String getPublishForExecution() {
-        return publishForExecution;
-    }
-
-       
-    public void setPublishForExecution(String value) {
-        this.publishForExecution = value;
-    }
-
-       
-    public String getPublishOnly() {
-        return publishOnly;
-    }
-
-       
-    public void setPublishOnly(String value) {
-        this.publishOnly = value;
-    }
-
-       
-    public byte getPublishState() {
-        return publishState;
-    }
-
-       
-    public void setPublishState(byte value) {
-        this.publishState = value;
-    }
-
-       
-    public CampaignDO.PublishedObjects getPublishedObjects() {
-        return publishedObjects;
-    }
-
-       
-    public void setPublishedObjects(CampaignDO.PublishedObjects value) {
-        this.publishedObjects = value;
-    }
-
-       
-    public String getReadOnly() {
-        return readOnly;
-    }
-
-       
-    public void setReadOnly(String value) {
-        this.readOnly = value;
-    }
-
-       
-    public String getRepositoryID() {
-        return repositoryID;
-    }
-
-       
-    public void setRepositoryID(String value) {
-        this.repositoryID = value;
-    }
-
-       
-    public String getRequiresCampaignPublish() {
-        return requiresCampaignPublish;
-    }
-
-       
-    public void setRequiresCampaignPublish(String value) {
-        this.requiresCampaignPublish = value;
-    }
-
-       
-    public String getSaveForExecution() {
-        return saveForExecution;
-    }
-
-       
-    public void setSaveForExecution(String value) {
-        this.saveForExecution = value;
-    }
-
-       
-    public String getSaved() {
-        return saved;
-    }
-
-       
-    public void setSaved(String value) {
-        this.saved = value;
-    }
-
-       
-    public String getScheduleUUID() {
-        return scheduleUUID;
-    }
-
-       
-    public void setScheduleUUID(String value) {
-        this.scheduleUUID = value;
-    }
-
-       
-    public String getShared() {
-        return shared;
-    }
-
-       
-    public void setShared(String value) {
-        this.shared = value;
-    }
-
-       
-    public String getStandaloneDiagram() {
-        return standaloneDiagram;
-    }
-
-       
-    public void setStandaloneDiagram(String value) {
-        this.standaloneDiagram = value;
-    }
-
-       
-    public String getSuppressPublishOnSave() {
-        return suppressPublishOnSave;
-    }
-
-       
-    public void setSuppressPublishOnSave(String value) {
-        this.suppressPublishOnSave = value;
-    }
-
-       
-    public short getSurrogateKeyNbr() {
-        return surrogateKeyNbr;
-    }
-
-       
-    public void setSurrogateKeyNbr(short value) {
-        this.surrogateKeyNbr = value;
-    }
-
-       
-    public short getSurrogateKeyNbrSaved() {
-        return surrogateKeyNbrSaved;
-    }
-
-       
-    public void setSurrogateKeyNbrSaved(short value) {
-        this.surrogateKeyNbrSaved = value;
-    }
-
-       
-    public String getTempScheduleMD5Sum() {
-        return tempScheduleMD5Sum;
-    }
-
-       
-    public void setTempScheduleMD5Sum(String value) {
-        this.tempScheduleMD5Sum = value;
-    }
-
-       
-    public String getThisVersionPublished() {
-        return thisVersionPublished;
-    }
-
-       
-    public void setThisVersionPublished(String value) {
-        this.thisVersionPublished = value;
-    }
-
-       
-    public byte getTotalCount() {
-        return totalCount;
-    }
-
-       
-    public void setTotalCount(byte value) {
-        this.totalCount = value;
-    }
-
-       
-    public CampaignDO.UserRoles getUserRoles() {
-        return userRoles;
-    }
-
-       
-    public void setUserRoles(CampaignDO.UserRoles value) {
-        this.userRoles = value;
-    }
-
-       
-    public String getUserUIRole() {
-        return userUIRole;
-    }
-
-       
-    public void setUserUIRole(String value) {
-        this.userUIRole = value;
-    }
-
-       
-    public CampaignDO.VersionHistory getVersionHistory() {
-        return versionHistory;
-    }
-
-       
-    public void setVersionHistory(CampaignDO.VersionHistory value) {
-        this.versionHistory = value;
-    }
-
-       
-    public String getVersionHistoryMigrated() {
-        return versionHistoryMigrated;
-    }
-
-       
-    public void setVersionHistoryMigrated(String value) {
-        this.versionHistoryMigrated = value;
-    }
-
-       
-    public float getVersionNumber() {
-        return versionNumber;
-    }
-
-       
-    public void setVersionNumber(float value) {
-        this.versionNumber = value;
-    }
-
-       
-    public Byte getObjid() {
-        return objid;
-    }
-
-       
-    public void setObjid(Byte value) {
-        this.objid = value;
-    }
-
-
-       
     @XmlAccessorType(XmlAccessType.FIELD)
     @XmlType(name = "", propOrder = {
             "archivedPublishState",
@@ -1223,8 +316,9 @@ public class CampaignDO
             "usedOptimizationData",
             "versionNumber"
     })
-    public static class CampaignExecutionHistoryDO
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class CampaignExecutionHistoryDO implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlElement(name = "ArchivedPublishState")
@@ -1258,156 +352,6 @@ public class CampaignDO
         @XmlAttribute(name = "objid")
         protected Byte objid;
 
-           
-        public byte getArchivedPublishState() {
-            return archivedPublishState;
-        }
-
-           
-        public void setArchivedPublishState(byte value) {
-            this.archivedPublishState = value;
-        }
-
-           
-        public String getAtLeastPartialSuccess() {
-            return atLeastPartialSuccess;
-        }
-
-           
-        public void setAtLeastPartialSuccess(String value) {
-            this.atLeastPartialSuccess = value;
-        }
-
-           
-        public String getCodeChangeUnpublished() {
-            return codeChangeUnpublished;
-        }
-
-           
-        public void setCodeChangeUnpublished(String value) {
-            this.codeChangeUnpublished = value;
-        }
-
-           
-        public String getCodeEverBeenPublished() {
-            return codeEverBeenPublished;
-        }
-
-           
-        public void setCodeEverBeenPublished(String value) {
-            this.codeEverBeenPublished = value;
-        }
-
-           
-        public byte getFirstOccurrenceToPublish() {
-            return firstOccurrenceToPublish;
-        }
-
-           
-        public void setFirstOccurrenceToPublish(byte value) {
-            this.firstOccurrenceToPublish = value;
-        }
-
-           
-        public String getLoadedFromOldDavLocation() {
-            return loadedFromOldDavLocation;
-        }
-
-           
-        public void setLoadedFromOldDavLocation(String value) {
-            this.loadedFromOldDavLocation = value;
-        }
-
-           
-        public String getLoading() {
-            return loading;
-        }
-
-           
-        public void setLoading(String value) {
-            this.loading = value;
-        }
-
-           
-        public String getNeedToPersist() {
-            return needToPersist;
-        }
-
-           
-        public void setNeedToPersist(String value) {
-            this.needToPersist = value;
-        }
-
-           
-        public String getOldVersionNumber() {
-            return oldVersionNumber;
-        }
-
-           
-        public void setOldVersionNumber(String value) {
-            this.oldVersionNumber = value;
-        }
-
-           
-        public String getPersisting() {
-            return persisting;
-        }
-
-           
-        public void setPersisting(String value) {
-            this.persisting = value;
-        }
-
-           
-        public byte getPublishState() {
-            return publishState;
-        }
-
-           
-        public void setPublishState(byte value) {
-            this.publishState = value;
-        }
-
-           
-        public String getUsedOptimizationData() {
-            return usedOptimizationData;
-        }
-
-           
-        public void setUsedOptimizationData(String value) {
-            this.usedOptimizationData = value;
-        }
-
-           
-        public float getVersionNumber() {
-            return versionNumber;
-        }
-
-           
-        public void setVersionNumber(float value) {
-            this.versionNumber = value;
-        }
-
-           
-        public String getConcreteClass() {
-            return concreteClass;
-        }
-
-           
-        public void setConcreteClass(String value) {
-            this.concreteClass = value;
-        }
-
-           
-        public Byte getObjid() {
-            return objid;
-        }
-
-           
-        public void setObjid(Byte value) {
-            this.objid = value;
-        }
-
     }
 
 
@@ -1416,34 +360,15 @@ public class CampaignDO
     @XmlType(name = "", propOrder = {
             "value"
     })
-    public static class CampaignMessages
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class CampaignMessages implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlValue
         protected String value;
         @XmlAttribute(name = "EmptyList")
         protected String emptyList;
-
-           
-        public String getValue() {
-            return value;
-        }
-
-           
-        public void setValue(String value) {
-            this.value = value;
-        }
-
-           
-        public String getEmptyList() {
-            return emptyList;
-        }
-
-           
-        public void setEmptyList(String value) {
-            this.emptyList = value;
-        }
 
     }
 
@@ -1453,23 +378,14 @@ public class CampaignDO
     @XmlType(name = "", propOrder = {
             "checkListItemDOs"
     })
-    public static class CheckListItems
-            implements Serializable {
+    @Getter
+    public static class CheckListItems implements Serializable {
 
         private final static long serialVersionUID = -1L;
+
         @XmlElement(name = "CheckListItemDO")
-        protected List<CheckListItems.CheckListItemDO> checkListItemDOs;
+        protected List<CheckListItems.CheckListItemDO> checkListItemDOs = new ArrayList<>();
 
-           
-        public List<CheckListItems.CheckListItemDO> getCheckListItemDOs() {
-            if (checkListItemDOs == null) {
-                checkListItemDOs = new ArrayList<CheckListItems.CheckListItemDO>();
-            }
-            return this.checkListItemDOs;
-        }
-
-
-           
         @XmlAccessorType(XmlAccessType.FIELD)
         @XmlType(name = "", propOrder = {
                 "archivedPublishState",
@@ -1492,8 +408,9 @@ public class CampaignDO
                 "stepType",
                 "versionNumber"
         })
-        public static class CheckListItemDO
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class CheckListItemDO implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "ArchivedPublishState")
@@ -1541,226 +458,6 @@ public class CampaignDO
             @XmlAttribute(name = "objid")
             protected Byte objid;
 
-               
-            public byte getArchivedPublishState() {
-                return archivedPublishState;
-            }
-
-               
-            public void setArchivedPublishState(byte value) {
-                this.archivedPublishState = value;
-            }
-
-               
-            public String getCodeChangeUnpublished() {
-                return codeChangeUnpublished;
-            }
-
-               
-            public void setCodeChangeUnpublished(String value) {
-                this.codeChangeUnpublished = value;
-            }
-
-               
-            public String getCodeEverBeenPublished() {
-                return codeEverBeenPublished;
-            }
-
-               
-            public void setCodeEverBeenPublished(String value) {
-                this.codeEverBeenPublished = value;
-            }
-
-               
-            public byte getFirstOccurrenceToPublish() {
-                return firstOccurrenceToPublish;
-            }
-
-               
-            public void setFirstOccurrenceToPublish(byte value) {
-                this.firstOccurrenceToPublish = value;
-            }
-
-               
-            public String getFollowUpFlag() {
-                return followUpFlag;
-            }
-
-               
-            public void setFollowUpFlag(String value) {
-                this.followUpFlag = value;
-            }
-
-               
-            public String getItemType() {
-                return itemType;
-            }
-
-               
-            public void setItemType(String value) {
-                this.itemType = value;
-            }
-
-               
-            public String getLabel() {
-                return label;
-            }
-
-               
-            public void setLabel(String value) {
-                this.label = value;
-            }
-
-               
-            public String getLoadedFromOldDavLocation() {
-                return loadedFromOldDavLocation;
-            }
-
-               
-            public void setLoadedFromOldDavLocation(String value) {
-                this.loadedFromOldDavLocation = value;
-            }
-
-               
-            public String getLoading() {
-                return loading;
-            }
-
-               
-            public void setLoading(String value) {
-                this.loading = value;
-            }
-
-               
-            public String getNeedToPersist() {
-                return needToPersist;
-            }
-
-               
-            public void setNeedToPersist(String value) {
-                this.needToPersist = value;
-            }
-
-               
-            public String getOldVersionNumber() {
-                return oldVersionNumber;
-            }
-
-               
-            public void setOldVersionNumber(String value) {
-                this.oldVersionNumber = value;
-            }
-
-               
-            public String getPageId() {
-                return pageId;
-            }
-
-               
-            public void setPageId(String value) {
-                this.pageId = value;
-            }
-
-               
-            public String getPersisting() {
-                return persisting;
-            }
-
-               
-            public void setPersisting(String value) {
-                this.persisting = value;
-            }
-
-               
-            public float getPosition() {
-                return position;
-            }
-
-               
-            public void setPosition(float value) {
-                this.position = value;
-            }
-
-               
-            public byte getPublishState() {
-                return publishState;
-            }
-
-               
-            public void setPublishState(byte value) {
-                this.publishState = value;
-            }
-
-               
-            public String getRequired() {
-                return required;
-            }
-
-               
-            public void setRequired(String value) {
-                this.required = value;
-            }
-
-               
-            public String getStatus() {
-                return status;
-            }
-
-               
-            public void setStatus(String value) {
-                this.status = value;
-            }
-
-               
-            public String getStepType() {
-                return stepType;
-            }
-
-               
-            public void setStepType(String value) {
-                this.stepType = value;
-            }
-
-               
-            public float getVersionNumber() {
-                return versionNumber;
-            }
-
-               
-            public void setVersionNumber(float value) {
-                this.versionNumber = value;
-            }
-
-               
-            public String getConcreteClass() {
-                return concreteClass;
-            }
-
-               
-            public void setConcreteClass(String value) {
-                this.concreteClass = value;
-            }
-
-               
-            public Byte getListpos() {
-                return listpos;
-            }
-
-               
-            public void setListpos(Byte value) {
-                this.listpos = value;
-            }
-
-               
-            public Byte getObjid() {
-                return objid;
-            }
-
-               
-            public void setObjid(Byte value) {
-                this.objid = value;
-            }
-
         }
 
     }
@@ -1771,34 +468,15 @@ public class CampaignDO
     @XmlType(name = "", propOrder = {
             "value"
     })
-    public static class CustomPageDetails
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class CustomPageDetails implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlValue
         protected String value;
         @XmlAttribute(name = "EmptyList")
         protected String emptyList;
-
-           
-        public String getValue() {
-            return value;
-        }
-
-           
-        public void setValue(String value) {
-            this.value = value;
-        }
-
-           
-        public String getEmptyList() {
-            return emptyList;
-        }
-
-           
-        public void setEmptyList(String value) {
-            this.emptyList = value;
-        }
 
     }
 
@@ -1860,8 +538,9 @@ public class CampaignDO
             "versionNumber",
             "whoModified"
     })
-    public static class Definition
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class Definition implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlElement(name = "AccessControls", required = true)
@@ -1974,579 +653,18 @@ public class CampaignDO
         protected String concreteClass;
         @XmlAttribute(name = "objid")
         protected Byte objid;
-
-           
-        public Definition.AccessControls getAccessControls() {
-            return accessControls;
-        }
-
-           
-        public void setAccessControls(Definition.AccessControls value) {
-            this.accessControls = value;
-        }
-
-           
-        public Definition.AllPages getAllPages() {
-            return allPages;
-        }
-
-           
-        public void setAllPages(Definition.AllPages value) {
-            this.allPages = value;
-        }
-
-           
-        public String getApprovalCampaign() {
-            return approvalCampaign;
-        }
-
-           
-        public void setApprovalCampaign(String value) {
-            this.approvalCampaign = value;
-        }
-
-           
-        public String getApprovalRequired() {
-            return approvalRequired;
-        }
-
-           
-        public void setApprovalRequired(String value) {
-            this.approvalRequired = value;
-        }
-
-           
-        public Definition.Approvers getApprovers() {
-            return approvers;
-        }
-
-           
-        public void setApprovers(Definition.Approvers value) {
-            this.approvers = value;
-        }
-
-           
-        public byte getArchivedPublishState() {
-            return archivedPublishState;
-        }
-
-           
-        public void setArchivedPublishState(byte value) {
-            this.archivedPublishState = value;
-        }
-
-           
-        public String getAttachments() {
-            return attachments;
-        }
-
-           
-        public void setAttachments(String value) {
-            this.attachments = value;
-        }
-
-           
-        public Definition.BriefData getBriefData() {
-            return briefData;
-        }
-
-           
-        public void setBriefData(Definition.BriefData value) {
-            this.briefData = value;
-        }
-
-           
-        public String getBusinessContextId() {
-            return businessContextId;
-        }
-
-           
-        public void setBusinessContextId(String value) {
-            this.businessContextId = value;
-        }
-
-           
-        public String getCampaignType() {
-            return campaignType;
-        }
-
-           
-        public void setCampaignType(String value) {
-            this.campaignType = value;
-        }
-
-           
-        public String getCellsDynamicWhenRefdByLink() {
-            return cellsDynamicWhenRefdByLink;
-        }
-
-           
-        public void setCellsDynamicWhenRefdByLink(String value) {
-            this.cellsDynamicWhenRefdByLink = value;
-        }
-
-           
-        public Definition.CheckList getCheckList() {
-            return checkList;
-        }
-
-           
-        public void setCheckList(Definition.CheckList value) {
-            this.checkList = value;
-        }
-
-           
-        public Definition.CheckListItems getCheckListItems() {
-            return checkListItems;
-        }
-
-           
-        public void setCheckListItems(Definition.CheckListItems value) {
-            this.checkListItems = value;
-        }
-
-           
-        public String getCodeChangeUnpublished() {
-            return codeChangeUnpublished;
-        }
-
-           
-        public void setCodeChangeUnpublished(String value) {
-            this.codeChangeUnpublished = value;
-        }
-
-           
-        public String getCodeEverBeenPublished() {
-            return codeEverBeenPublished;
-        }
-
-           
-        public void setCodeEverBeenPublished(String value) {
-            this.codeEverBeenPublished = value;
-        }
-
-           
-        public String getCodeSettingFromBC() {
-            return codeSettingFromBC;
-        }
-
-           
-        public void setCodeSettingFromBC(String value) {
-            this.codeSettingFromBC = value;
-        }
-
-           
-        public String getCodeType() {
-            return codeType;
-        }
-
-           
-        public void setCodeType(String value) {
-            this.codeType = value;
-        }
-
-           
-        public String getCommDynamicForExecuteComm() {
-            return commDynamicForExecuteComm;
-        }
-
-           
-        public void setCommDynamicForExecuteComm(String value) {
-            this.commDynamicForExecuteComm = value;
-        }
-
-           
-        public Definition.CustomDetailPages getCustomDetailPages() {
-            return customDetailPages;
-        }
-
-           
-        public void setCustomDetailPages(Definition.CustomDetailPages value) {
-            this.customDetailPages = value;
-        }
-
-           
-        public String getDateModified() {
-            return dateModified;
-        }
-
-           
-        public void setDateModified(String value) {
-            this.dateModified = value;
-        }
-
-           
-        public String getDecisionCampaignType() {
-            return decisionCampaignType;
-        }
-
-           
-        public void setDecisionCampaignType(String value) {
-            this.decisionCampaignType = value;
-        }
-
-           
-        public String getDefinitionType() {
-            return definitionType;
-        }
-
-           
-        public void setDefinitionType(String value) {
-            this.definitionType = value;
-        }
-
-           
-        public String getDescription() {
-            return description;
-        }
-
-           
-        public void setDescription(String value) {
-            this.description = value;
-        }
-
-           
-        public byte getFirstOccurrenceToPublish() {
-            return firstOccurrenceToPublish;
-        }
-
-           
-        public void setFirstOccurrenceToPublish(byte value) {
-            this.firstOccurrenceToPublish = value;
-        }
-
-           
-        public String getFlowType() {
-            return flowType;
-        }
-
-           
-        public void setFlowType(String value) {
-            this.flowType = value;
-        }
-
-           
-        public Definition.Folder getFolder() {
-            return folder;
-        }
-
-           
-        public void setFolder(Definition.Folder value) {
-            this.folder = value;
-        }
-
-           
-        public String getForceExecutionAllSQLNodes() {
-            return forceExecutionAllSQLNodes;
-        }
-
-           
-        public void setForceExecutionAllSQLNodes(String value) {
-            this.forceExecutionAllSQLNodes = value;
-        }
-
-           
-        public String getForced() {
-            return forced;
-        }
-
-           
-        public void setForced(String value) {
-            this.forced = value;
-        }
-
-           
-        public String getHidden() {
-            return hidden;
-        }
-
-           
-        public void setHidden(String value) {
-            this.hidden = value;
-        }
-
-           
-        public String getId() {
-            return id;
-        }
-
-           
-        public void setId(String value) {
-            this.id = value;
-        }
-
-           
-        public Definition.ImportDetails getImportDetails() {
-            return importDetails;
-        }
-
-           
-        public void setImportDetails(Definition.ImportDetails value) {
-            this.importDetails = value;
-        }
-
-           
-        public String getIncludeInitiatingStatus() {
-            return includeInitiatingStatus;
-        }
-
-           
-        public void setIncludeInitiatingStatus(String value) {
-            this.includeInitiatingStatus = value;
-        }
-
-           
-        public String getLoadedFromOldDavLocation() {
-            return loadedFromOldDavLocation;
-        }
-
-           
-        public void setLoadedFromOldDavLocation(String value) {
-            this.loadedFromOldDavLocation = value;
-        }
-
-           
-        public String getLoading() {
-            return loading;
-        }
-
-           
-        public void setLoading(String value) {
-            this.loading = value;
-        }
-
-           
-        public String getLockedBy() {
-            return lockedBy;
-        }
-
-           
-        public void setLockedBy(String value) {
-            this.lockedBy = value;
-        }
-
-           
-        public String getMetadataType() {
-            return metadataType;
-        }
-
-           
-        public void setMetadataType(String value) {
-            this.metadataType = value;
-        }
-
-           
-        public String getName() {
-            return name;
-        }
-
-           
-        public void setName(String value) {
-            this.name = value;
-        }
-
-           
-        public String getNeedToPersist() {
-            return needToPersist;
-        }
-
-           
-        public void setNeedToPersist(String value) {
-            this.needToPersist = value;
-        }
-
-           
-        public String getNoWritePermission() {
-            return noWritePermission;
-        }
-
-           
-        public void setNoWritePermission(String value) {
-            this.noWritePermission = value;
-        }
-
-           
-        public String getOldVersionNumber() {
-            return oldVersionNumber;
-        }
-
-           
-        public void setOldVersionNumber(String value) {
-            this.oldVersionNumber = value;
-        }
-
-           
-        public String getOptimizationGroup() {
-            return optimizationGroup;
-        }
-
-           
-        public void setOptimizationGroup(String value) {
-            this.optimizationGroup = value;
-        }
-
-           
-        public Definition.PageConfigurations getPageConfigurations() {
-            return pageConfigurations;
-        }
-
-           
-        public void setPageConfigurations(Definition.PageConfigurations value) {
-            this.pageConfigurations = value;
-        }
-
-           
-        public String getPersisting() {
-            return persisting;
-        }
-
-           
-        public void setPersisting(String value) {
-            this.persisting = value;
-        }
-
-           
-        public byte getPublishState() {
-            return publishState;
-        }
-
-           
-        public void setPublishState(byte value) {
-            this.publishState = value;
-        }
-
-           
-        public String getReadOnly() {
-            return readOnly;
-        }
-
-           
-        public void setReadOnly(String value) {
-            this.readOnly = value;
-        }
-
-           
-        public String getRestrictedCampaign() {
-            return restrictedCampaign;
-        }
-
-           
-        public void setRestrictedCampaign(String value) {
-            this.restrictedCampaign = value;
-        }
-
-           
-        public Definition.Schedule getSchedule() {
-            return schedule;
-        }
-
-           
-        public void setSchedule(Definition.Schedule value) {
-            this.schedule = value;
-        }
-
-           
-        public String getShared() {
-            return shared;
-        }
-
-           
-        public void setShared(String value) {
-            this.shared = value;
-        }
-
-           
-        public String getSharedId() {
-            return sharedId;
-        }
-
-           
-        public void setSharedId(String value) {
-            this.sharedId = value;
-        }
-
-           
-        public Definition.SharedIn getSharedIn() {
-            return sharedIn;
-        }
-
-           
-        public void setSharedIn(Definition.SharedIn value) {
-            this.sharedIn = value;
-        }
-
-           
-        public Definition.StatusList getStatusList() {
-            return statusList;
-        }
-
-           
-        public void setStatusList(Definition.StatusList value) {
-            this.statusList = value;
-        }
-
-           
-        public float getVersionNumber() {
-            return versionNumber;
-        }
-
-           
-        public void setVersionNumber(float value) {
-            this.versionNumber = value;
-        }
-
-           
-        public String getWhoModified() {
-            return whoModified;
-        }
-
-           
-        public void setWhoModified(String value) {
-            this.whoModified = value;
-        }
-
-           
-        public String getConcreteClass() {
-            return concreteClass;
-        }
-
-           
-        public void setConcreteClass(String value) {
-            this.concreteClass = value;
-        }
-
-           
-        public Byte getObjid() {
-            return objid;
-        }
-
-           
-        public void setObjid(Byte value) {
-            this.objid = value;
-        }
-
-
            
         @XmlAccessorType(XmlAccessType.FIELD)
         @XmlType(name = "", propOrder = {
                 "userAndGroupDOs"
         })
-        public static class AccessControls
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class AccessControls implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "UserAndGroupDO")
-            protected List<AccessControls.UserAndGroupDO> userAndGroupDOs;
-
-               
-            public List<AccessControls.UserAndGroupDO> getUserAndGroupDOs() {
-                if (userAndGroupDOs == null) {
-                    userAndGroupDOs = new ArrayList<AccessControls.UserAndGroupDO>();
-                }
-                return this.userAndGroupDOs;
-            }
-
-
+            protected List<AccessControls.UserAndGroupDO> userAndGroupDOs = new ArrayList<>();
                
             @XmlAccessorType(XmlAccessType.FIELD)
             @XmlType(name = "", propOrder = {
@@ -2574,8 +692,9 @@ public class CampaignDO
                     "versionNumber",
                     "viewInPortal"
             })
-            public static class UserAndGroupDO
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class UserAndGroupDO implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlElement(name = "Approve", required = true)
@@ -2632,273 +751,13 @@ public class CampaignDO
                 protected Byte objid;
 
                    
-                public String getApprove() {
-                    return approve;
-                }
-
-                   
-                public void setApprove(String value) {
-                    this.approve = value;
-                }
-
-                   
-                public byte getArchivedPublishState() {
-                    return archivedPublishState;
-                }
-
-                   
-                public void setArchivedPublishState(byte value) {
-                    this.archivedPublishState = value;
-                }
-
-                   
-                public String getCanBeEdited() {
-                    return canBeEdited;
-                }
-
-                   
-                public void setCanBeEdited(String value) {
-                    this.canBeEdited = value;
-                }
-
-                   
-                public String getCodeChangeUnpublished() {
-                    return codeChangeUnpublished;
-                }
-
-                   
-                public void setCodeChangeUnpublished(String value) {
-                    this.codeChangeUnpublished = value;
-                }
-
-                   
-                public String getCodeEverBeenPublished() {
-                    return codeEverBeenPublished;
-                }
-
-                   
-                public void setCodeEverBeenPublished(String value) {
-                    this.codeEverBeenPublished = value;
-                }
-
-                   
-                public String getDisplayName() {
-                    return displayName;
-                }
-
-                   
-                public void setDisplayName(String value) {
-                    this.displayName = value;
-                }
-
-                   
-                public String getEdit() {
-                    return edit;
-                }
-
-                   
-                public void setEdit(String value) {
-                    this.edit = value;
-                }
-
-                   
-                public byte getFirstOccurrenceToPublish() {
-                    return firstOccurrenceToPublish;
-                }
-
-                   
-                public void setFirstOccurrenceToPublish(byte value) {
-                    this.firstOccurrenceToPublish = value;
-                }
-
-                   
-                public String getId() {
-                    return id;
-                }
-
-                   
-                public void setId(String value) {
-                    this.id = value;
-                }
-
-                   
-                public String getIsAGroup() {
-                    return isAGroup;
-                }
-
-                   
-                public void setIsAGroup(String value) {
-                    this.isAGroup = value;
-                }
-
-                   
-                public String getIsInherited() {
-                    return isInherited;
-                }
-
-                   
-                public void setIsInherited(String value) {
-                    this.isInherited = value;
-                }
-
-                   
-                public String getLoadedFromOldDavLocation() {
-                    return loadedFromOldDavLocation;
-                }
-
-                   
-                public void setLoadedFromOldDavLocation(String value) {
-                    this.loadedFromOldDavLocation = value;
-                }
-
-                   
-                public String getLoading() {
-                    return loading;
-                }
-
-                   
-                public void setLoading(String value) {
-                    this.loading = value;
-                }
-
-                   
-                public String getMemberOfCurrentBC() {
-                    return memberOfCurrentBC;
-                }
-
-                   
-                public void setMemberOfCurrentBC(String value) {
-                    this.memberOfCurrentBC = value;
-                }
-
-                   
-                public UserAndGroupDO.Members getMembers() {
-                    return members;
-                }
-
-                   
-                public void setMembers(UserAndGroupDO.Members value) {
-                    this.members = value;
-                }
-
-                   
-                public String getName() {
-                    return name;
-                }
-
-                   
-                public void setName(String value) {
-                    this.name = value;
-                }
-
-                   
-                public String getNeedToPersist() {
-                    return needToPersist;
-                }
-
-                   
-                public void setNeedToPersist(String value) {
-                    this.needToPersist = value;
-                }
-
-                   
-                public String getOldVersionNumber() {
-                    return oldVersionNumber;
-                }
-
-                   
-                public void setOldVersionNumber(String value) {
-                    this.oldVersionNumber = value;
-                }
-
-                   
-                public String getPersisting() {
-                    return persisting;
-                }
-
-                   
-                public void setPersisting(String value) {
-                    this.persisting = value;
-                }
-
-                   
-                public byte getPublishState() {
-                    return publishState;
-                }
-
-                   
-                public void setPublishState(byte value) {
-                    this.publishState = value;
-                }
-
-                   
-                public String getRead() {
-                    return read;
-                }
-
-                   
-                public void setRead(String value) {
-                    this.read = value;
-                }
-
-                   
-                public float getVersionNumber() {
-                    return versionNumber;
-                }
-
-                   
-                public void setVersionNumber(float value) {
-                    this.versionNumber = value;
-                }
-
-                   
-                public String getViewInPortal() {
-                    return viewInPortal;
-                }
-
-                   
-                public void setViewInPortal(String value) {
-                    this.viewInPortal = value;
-                }
-
-                   
-                public String getConcreteClass() {
-                    return concreteClass;
-                }
-
-                   
-                public void setConcreteClass(String value) {
-                    this.concreteClass = value;
-                }
-
-                   
-                public Byte getListpos() {
-                    return listpos;
-                }
-
-                   
-                public void setListpos(Byte value) {
-                    this.listpos = value;
-                }
-
-                   
-                public Byte getObjid() {
-                    return objid;
-                }
-
-                   
-                public void setObjid(Byte value) {
-                    this.objid = value;
-                }
-
-
-                   
                 @XmlAccessorType(XmlAccessType.FIELD)
                 @XmlType(name = "", propOrder = {
                         "value"
                 })
-                public static class Members
-                        implements Serializable {
+                @Getter
+                @Setter
+                public static class Members implements Serializable {
 
                     private final static long serialVersionUID = -1L;
                     @XmlValue
@@ -2906,25 +765,6 @@ public class CampaignDO
                     @XmlAttribute(name = "EmptyList")
                     protected String emptyList;
 
-                       
-                    public String getValue() {
-                        return value;
-                    }
-
-                       
-                    public void setValue(String value) {
-                        this.value = value;
-                    }
-
-                       
-                    public String getEmptyList() {
-                        return emptyList;
-                    }
-
-                       
-                    public void setEmptyList(String value) {
-                        this.emptyList = value;
-                    }
 
                 }
 
@@ -2938,8 +778,9 @@ public class CampaignDO
         @XmlType(name = "", propOrder = {
                 "value"
         })
-        public static class AllPages
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class AllPages implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlValue
@@ -2949,36 +790,6 @@ public class CampaignDO
             @XmlAttribute(name = "ListTypes")
             protected String listTypes;
 
-               
-            public String getValue() {
-                return value;
-            }
-
-               
-            public void setValue(String value) {
-                this.value = value;
-            }
-
-               
-            public String getListDelimiter() {
-                return listDelimiter;
-            }
-
-               
-            public void setListDelimiter(String value) {
-                this.listDelimiter = value;
-            }
-
-               
-            public String getListTypes() {
-                return listTypes;
-            }
-
-               
-            public void setListTypes(String value) {
-                this.listTypes = value;
-            }
-
         }
 
 
@@ -2987,21 +798,12 @@ public class CampaignDO
         @XmlType(name = "", propOrder = {
                 "userAndGroupDOs"
         })
-        public static class Approvers
-                implements Serializable {
+        @Getter
+        public static class Approvers implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "UserAndGroupDO")
-            protected List<Approvers.UserAndGroupDO> userAndGroupDOs;
-
-               
-            public List<Approvers.UserAndGroupDO> getUserAndGroupDOs() {
-                if (userAndGroupDOs == null) {
-                    userAndGroupDOs = new ArrayList<Approvers.UserAndGroupDO>();
-                }
-                return this.userAndGroupDOs;
-            }
-
+            protected List<Approvers.UserAndGroupDO> userAndGroupDOs = new ArrayList<>();
 
                
             @XmlAccessorType(XmlAccessType.FIELD)
@@ -3030,8 +832,9 @@ public class CampaignDO
                     "versionNumber",
                     "viewInPortal"
             })
-            public static class UserAndGroupDO
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class UserAndGroupDO implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlElement(name = "Approve", required = true)
@@ -3086,275 +889,14 @@ public class CampaignDO
                 protected Byte listpos;
                 @XmlAttribute(name = "objid")
                 protected Byte objid;
-
-                   
-                public String getApprove() {
-                    return approve;
-                }
-
-                   
-                public void setApprove(String value) {
-                    this.approve = value;
-                }
-
-                   
-                public byte getArchivedPublishState() {
-                    return archivedPublishState;
-                }
-
-                   
-                public void setArchivedPublishState(byte value) {
-                    this.archivedPublishState = value;
-                }
-
-                   
-                public String getCanBeEdited() {
-                    return canBeEdited;
-                }
-
-                   
-                public void setCanBeEdited(String value) {
-                    this.canBeEdited = value;
-                }
-
-                   
-                public String getCodeChangeUnpublished() {
-                    return codeChangeUnpublished;
-                }
-
-                   
-                public void setCodeChangeUnpublished(String value) {
-                    this.codeChangeUnpublished = value;
-                }
-
-                   
-                public String getCodeEverBeenPublished() {
-                    return codeEverBeenPublished;
-                }
-
-                   
-                public void setCodeEverBeenPublished(String value) {
-                    this.codeEverBeenPublished = value;
-                }
-
-                   
-                public String getDisplayName() {
-                    return displayName;
-                }
-
-                   
-                public void setDisplayName(String value) {
-                    this.displayName = value;
-                }
-
-                   
-                public String getEdit() {
-                    return edit;
-                }
-
-                   
-                public void setEdit(String value) {
-                    this.edit = value;
-                }
-
-                   
-                public byte getFirstOccurrenceToPublish() {
-                    return firstOccurrenceToPublish;
-                }
-
-                   
-                public void setFirstOccurrenceToPublish(byte value) {
-                    this.firstOccurrenceToPublish = value;
-                }
-
-                   
-                public String getId() {
-                    return id;
-                }
-
-                   
-                public void setId(String value) {
-                    this.id = value;
-                }
-
-                   
-                public String getIsAGroup() {
-                    return isAGroup;
-                }
-
-                   
-                public void setIsAGroup(String value) {
-                    this.isAGroup = value;
-                }
-
-                   
-                public String getIsInherited() {
-                    return isInherited;
-                }
-
-                   
-                public void setIsInherited(String value) {
-                    this.isInherited = value;
-                }
-
-                   
-                public String getLoadedFromOldDavLocation() {
-                    return loadedFromOldDavLocation;
-                }
-
-                   
-                public void setLoadedFromOldDavLocation(String value) {
-                    this.loadedFromOldDavLocation = value;
-                }
-
-                   
-                public String getLoading() {
-                    return loading;
-                }
-
-                   
-                public void setLoading(String value) {
-                    this.loading = value;
-                }
-
-                   
-                public String getMemberOfCurrentBC() {
-                    return memberOfCurrentBC;
-                }
-
-                   
-                public void setMemberOfCurrentBC(String value) {
-                    this.memberOfCurrentBC = value;
-                }
-
-                   
-                public com.sas.rtdm2id.model.rtdm.CampaignDO.Definition.Approvers.UserAndGroupDO.Members getMembers() {
-                    return members;
-                }
-
-                   
-                public void setMembers(com.sas.rtdm2id.model.rtdm.CampaignDO.Definition.Approvers.UserAndGroupDO.Members value) {
-                    this.members = value;
-                }
-
-                   
-                public String getName() {
-                    return name;
-                }
-
-                   
-                public void setName(String value) {
-                    this.name = value;
-                }
-
-                   
-                public String getNeedToPersist() {
-                    return needToPersist;
-                }
-
-                   
-                public void setNeedToPersist(String value) {
-                    this.needToPersist = value;
-                }
-
-                   
-                public String getOldVersionNumber() {
-                    return oldVersionNumber;
-                }
-
-                   
-                public void setOldVersionNumber(String value) {
-                    this.oldVersionNumber = value;
-                }
-
-                   
-                public String getPersisting() {
-                    return persisting;
-                }
-
-                   
-                public void setPersisting(String value) {
-                    this.persisting = value;
-                }
-
-                   
-                public byte getPublishState() {
-                    return publishState;
-                }
-
-                   
-                public void setPublishState(byte value) {
-                    this.publishState = value;
-                }
-
-                   
-                public String getRead() {
-                    return read;
-                }
-
-                   
-                public void setRead(String value) {
-                    this.read = value;
-                }
-
-                   
-                public float getVersionNumber() {
-                    return versionNumber;
-                }
-
-                   
-                public void setVersionNumber(float value) {
-                    this.versionNumber = value;
-                }
-
-                   
-                public String getViewInPortal() {
-                    return viewInPortal;
-                }
-
-                   
-                public void setViewInPortal(String value) {
-                    this.viewInPortal = value;
-                }
-
-                   
-                public String getConcreteClass() {
-                    return concreteClass;
-                }
-
-                   
-                public void setConcreteClass(String value) {
-                    this.concreteClass = value;
-                }
-
-                   
-                public Byte getListpos() {
-                    return listpos;
-                }
-
-                   
-                public void setListpos(Byte value) {
-                    this.listpos = value;
-                }
-
-                   
-                public Byte getObjid() {
-                    return objid;
-                }
-
-                   
-                public void setObjid(Byte value) {
-                    this.objid = value;
-                }
-
-
                    
                 @XmlAccessorType(XmlAccessType.FIELD)
                 @XmlType(name = "", propOrder = {
                         "value"
                 })
-                public static class Members
-                        implements Serializable {
+                @Getter
+                @Setter
+                public static class Members implements Serializable {
 
                     private final static long serialVersionUID = -1L;
                     @XmlValue
@@ -3365,46 +907,6 @@ public class CampaignDO
                     protected String listDelimiter;
                     @XmlAttribute(name = "ListTypes")
                     protected String listTypes;
-
-                       
-                    public String getValue() {
-                        return value;
-                    }
-
-                       
-                    public void setValue(String value) {
-                        this.value = value;
-                    }
-
-                       
-                    public String getEmptyList() {
-                        return emptyList;
-                    }
-
-                       
-                    public void setEmptyList(String value) {
-                        this.emptyList = value;
-                    }
-
-                       
-                    public String getListDelimiter() {
-                        return listDelimiter;
-                    }
-
-                       
-                    public void setListDelimiter(String value) {
-                        this.listDelimiter = value;
-                    }
-
-                       
-                    public String getListTypes() {
-                        return listTypes;
-                    }
-
-                       
-                    public void setListTypes(String value) {
-                        this.listTypes = value;
-                    }
 
                 }
 
@@ -3436,8 +938,9 @@ public class CampaignDO
                 "userDefinedFields",
                 "versionNumber"
         })
-        public static class BriefData
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class BriefData implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "ArchivedPublishState")
@@ -3484,217 +987,6 @@ public class CampaignDO
             protected Byte objid;
 
                
-            public byte getArchivedPublishState() {
-                return archivedPublishState;
-            }
-
-               
-            public void setArchivedPublishState(byte value) {
-                this.archivedPublishState = value;
-            }
-
-               
-            public byte getChallengerTooSmallBehavior() {
-                return challengerTooSmallBehavior;
-            }
-
-               
-            public void setChallengerTooSmallBehavior(byte value) {
-                this.challengerTooSmallBehavior = value;
-            }
-
-               
-            public BriefData.ChampionChallengerConfigDO getChampionChallengerConfigDO() {
-                return championChallengerConfigDO;
-            }
-
-               
-            public void setChampionChallengerConfigDO(BriefData.ChampionChallengerConfigDO value) {
-                this.championChallengerConfigDO = value;
-            }
-
-               
-            public String getCodeAutoGenerated() {
-                return codeAutoGenerated;
-            }
-
-               
-            public void setCodeAutoGenerated(String value) {
-                this.codeAutoGenerated = value;
-            }
-
-               
-            public String getCodeChangeUnpublished() {
-                return codeChangeUnpublished;
-            }
-
-               
-            public void setCodeChangeUnpublished(String value) {
-                this.codeChangeUnpublished = value;
-            }
-
-               
-            public String getCodeEverBeenPublished() {
-                return codeEverBeenPublished;
-            }
-
-               
-            public void setCodeEverBeenPublished(String value) {
-                this.codeEverBeenPublished = value;
-            }
-
-               
-            public BriefData.ControlGroupConfigDO getControlGroupConfigDO() {
-                return controlGroupConfigDO;
-            }
-
-               
-            public void setControlGroupConfigDO(BriefData.ControlGroupConfigDO value) {
-                this.controlGroupConfigDO = value;
-            }
-
-               
-            public byte getControlGroupTooSmallBehavior() {
-                return controlGroupTooSmallBehavior;
-            }
-
-               
-            public void setControlGroupTooSmallBehavior(byte value) {
-                this.controlGroupTooSmallBehavior = value;
-            }
-
-               
-            public String getEditable() {
-                return editable;
-            }
-
-               
-            public void setEditable(String value) {
-                this.editable = value;
-            }
-
-               
-            public byte getFirstOccurrenceToPublish() {
-                return firstOccurrenceToPublish;
-            }
-
-               
-            public void setFirstOccurrenceToPublish(byte value) {
-                this.firstOccurrenceToPublish = value;
-            }
-
-               
-            public String getLoadedFromOldDavLocation() {
-                return loadedFromOldDavLocation;
-            }
-
-               
-            public void setLoadedFromOldDavLocation(String value) {
-                this.loadedFromOldDavLocation = value;
-            }
-
-               
-            public String getLoading() {
-                return loading;
-            }
-
-               
-            public void setLoading(String value) {
-                this.loading = value;
-            }
-
-               
-            public String getNeedToPersist() {
-                return needToPersist;
-            }
-
-               
-            public void setNeedToPersist(String value) {
-                this.needToPersist = value;
-            }
-
-               
-            public String getOldVersionNumber() {
-                return oldVersionNumber;
-            }
-
-               
-            public void setOldVersionNumber(String value) {
-                this.oldVersionNumber = value;
-            }
-
-               
-            public String getPersisting() {
-                return persisting;
-            }
-
-               
-            public void setPersisting(String value) {
-                this.persisting = value;
-            }
-
-               
-            public byte getPublishState() {
-                return publishState;
-            }
-
-               
-            public void setPublishState(byte value) {
-                this.publishState = value;
-            }
-
-               
-            public String getRequired() {
-                return required;
-            }
-
-               
-            public void setRequired(String value) {
-                this.required = value;
-            }
-
-               
-            public BriefData.UserDefinedFields getUserDefinedFields() {
-                return userDefinedFields;
-            }
-
-               
-            public void setUserDefinedFields(BriefData.UserDefinedFields value) {
-                this.userDefinedFields = value;
-            }
-
-               
-            public float getVersionNumber() {
-                return versionNumber;
-            }
-
-               
-            public void setVersionNumber(float value) {
-                this.versionNumber = value;
-            }
-
-               
-            public String getConcreteClass() {
-                return concreteClass;
-            }
-
-               
-            public void setConcreteClass(String value) {
-                this.concreteClass = value;
-            }
-
-               
-            public Byte getObjid() {
-                return objid;
-            }
-
-               
-            public void setObjid(Byte value) {
-                this.objid = value;
-            }
-
-
-               
             @XmlAccessorType(XmlAccessType.FIELD)
             @XmlType(name = "", propOrder = {
                     "archivedPublishState",
@@ -3712,8 +1004,9 @@ public class CampaignDO
                     "publishState",
                     "versionNumber"
             })
-            public static class ChampionChallengerConfigDO
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class ChampionChallengerConfigDO implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlElement(name = "ArchivedPublishState")
@@ -3749,166 +1042,6 @@ public class CampaignDO
                 @XmlAttribute(name = "objid")
                 protected Byte objid;
 
-                   
-                public byte getArchivedPublishState() {
-                    return archivedPublishState;
-                }
-
-                   
-                public void setArchivedPublishState(byte value) {
-                    this.archivedPublishState = value;
-                }
-
-                   
-                public byte getChallengerCount() {
-                    return challengerCount;
-                }
-
-                   
-                public void setChallengerCount(byte value) {
-                    this.challengerCount = value;
-                }
-
-                   
-                public float getChallengerPercentage() {
-                    return challengerPercentage;
-                }
-
-                   
-                public void setChallengerPercentage(float value) {
-                    this.challengerPercentage = value;
-                }
-
-                   
-                public byte getChallengerSizingType() {
-                    return challengerSizingType;
-                }
-
-                   
-                public void setChallengerSizingType(byte value) {
-                    this.challengerSizingType = value;
-                }
-
-                   
-                public String getCodeChangeUnpublished() {
-                    return codeChangeUnpublished;
-                }
-
-                   
-                public void setCodeChangeUnpublished(String value) {
-                    this.codeChangeUnpublished = value;
-                }
-
-                   
-                public String getCodeEverBeenPublished() {
-                    return codeEverBeenPublished;
-                }
-
-                   
-                public void setCodeEverBeenPublished(String value) {
-                    this.codeEverBeenPublished = value;
-                }
-
-                   
-                public byte getFirstOccurrenceToPublish() {
-                    return firstOccurrenceToPublish;
-                }
-
-                   
-                public void setFirstOccurrenceToPublish(byte value) {
-                    this.firstOccurrenceToPublish = value;
-                }
-
-                   
-                public String getLoadedFromOldDavLocation() {
-                    return loadedFromOldDavLocation;
-                }
-
-                   
-                public void setLoadedFromOldDavLocation(String value) {
-                    this.loadedFromOldDavLocation = value;
-                }
-
-                   
-                public String getLoading() {
-                    return loading;
-                }
-
-                   
-                public void setLoading(String value) {
-                    this.loading = value;
-                }
-
-                   
-                public String getNeedToPersist() {
-                    return needToPersist;
-                }
-
-                   
-                public void setNeedToPersist(String value) {
-                    this.needToPersist = value;
-                }
-
-                   
-                public String getOldVersionNumber() {
-                    return oldVersionNumber;
-                }
-
-                   
-                public void setOldVersionNumber(String value) {
-                    this.oldVersionNumber = value;
-                }
-
-                   
-                public String getPersisting() {
-                    return persisting;
-                }
-
-                   
-                public void setPersisting(String value) {
-                    this.persisting = value;
-                }
-
-                   
-                public byte getPublishState() {
-                    return publishState;
-                }
-
-                   
-                public void setPublishState(byte value) {
-                    this.publishState = value;
-                }
-
-                   
-                public float getVersionNumber() {
-                    return versionNumber;
-                }
-
-                   
-                public void setVersionNumber(float value) {
-                    this.versionNumber = value;
-                }
-
-                   
-                public String getConcreteClass() {
-                    return concreteClass;
-                }
-
-                   
-                public void setConcreteClass(String value) {
-                    this.concreteClass = value;
-                }
-
-                   
-                public Byte getObjid() {
-                    return objid;
-                }
-
-                   
-                public void setObjid(Byte value) {
-                    this.objid = value;
-                }
-
             }
 
 
@@ -3931,8 +1064,9 @@ public class CampaignDO
                     "sizingType",
                     "versionNumber"
             })
-            public static class ControlGroupConfigDO
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class ControlGroupConfigDO implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlElement(name = "ArchivedPublishState")
@@ -3970,176 +1104,6 @@ public class CampaignDO
                 @XmlAttribute(name = "objid")
                 protected Byte objid;
 
-                   
-                public byte getArchivedPublishState() {
-                    return archivedPublishState;
-                }
-
-                   
-                public void setArchivedPublishState(byte value) {
-                    this.archivedPublishState = value;
-                }
-
-                   
-                public String getCodeChangeUnpublished() {
-                    return codeChangeUnpublished;
-                }
-
-                   
-                public void setCodeChangeUnpublished(String value) {
-                    this.codeChangeUnpublished = value;
-                }
-
-                   
-                public String getCodeEverBeenPublished() {
-                    return codeEverBeenPublished;
-                }
-
-                   
-                public void setCodeEverBeenPublished(String value) {
-                    this.codeEverBeenPublished = value;
-                }
-
-                   
-                public byte getCount() {
-                    return count;
-                }
-
-                   
-                public void setCount(byte value) {
-                    this.count = value;
-                }
-
-                   
-                public String getEnabled() {
-                    return enabled;
-                }
-
-                   
-                public void setEnabled(String value) {
-                    this.enabled = value;
-                }
-
-                   
-                public byte getFirstOccurrenceToPublish() {
-                    return firstOccurrenceToPublish;
-                }
-
-                   
-                public void setFirstOccurrenceToPublish(byte value) {
-                    this.firstOccurrenceToPublish = value;
-                }
-
-                   
-                public String getLoadedFromOldDavLocation() {
-                    return loadedFromOldDavLocation;
-                }
-
-                   
-                public void setLoadedFromOldDavLocation(String value) {
-                    this.loadedFromOldDavLocation = value;
-                }
-
-                   
-                public String getLoading() {
-                    return loading;
-                }
-
-                   
-                public void setLoading(String value) {
-                    this.loading = value;
-                }
-
-                   
-                public String getNeedToPersist() {
-                    return needToPersist;
-                }
-
-                   
-                public void setNeedToPersist(String value) {
-                    this.needToPersist = value;
-                }
-
-                   
-                public String getOldVersionNumber() {
-                    return oldVersionNumber;
-                }
-
-                   
-                public void setOldVersionNumber(String value) {
-                    this.oldVersionNumber = value;
-                }
-
-                   
-                public float getPercentage() {
-                    return percentage;
-                }
-
-                   
-                public void setPercentage(float value) {
-                    this.percentage = value;
-                }
-
-                   
-                public String getPersisting() {
-                    return persisting;
-                }
-
-                   
-                public void setPersisting(String value) {
-                    this.persisting = value;
-                }
-
-                   
-                public byte getPublishState() {
-                    return publishState;
-                }
-
-                   
-                public void setPublishState(byte value) {
-                    this.publishState = value;
-                }
-
-                   
-                public byte getSizingType() {
-                    return sizingType;
-                }
-
-                   
-                public void setSizingType(byte value) {
-                    this.sizingType = value;
-                }
-
-                   
-                public float getVersionNumber() {
-                    return versionNumber;
-                }
-
-                   
-                public void setVersionNumber(float value) {
-                    this.versionNumber = value;
-                }
-
-                   
-                public String getConcreteClass() {
-                    return concreteClass;
-                }
-
-                   
-                public void setConcreteClass(String value) {
-                    this.concreteClass = value;
-                }
-
-                   
-                public Byte getObjid() {
-                    return objid;
-                }
-
-                   
-                public void setObjid(Byte value) {
-                    this.objid = value;
-                }
-
             }
 
 
@@ -4148,34 +1112,15 @@ public class CampaignDO
             @XmlType(name = "", propOrder = {
                     "value"
             })
-            public static class UserDefinedFields
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class UserDefinedFields implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlValue
                 protected String value;
                 @XmlAttribute(name = "EmptyList")
                 protected String emptyList;
-
-                   
-                public String getValue() {
-                    return value;
-                }
-
-                   
-                public void setValue(String value) {
-                    this.value = value;
-                }
-
-                   
-                public String getEmptyList() {
-                    return emptyList;
-                }
-
-                   
-                public void setEmptyList(String value) {
-                    this.emptyList = value;
-                }
 
             }
 
@@ -4198,8 +1143,9 @@ public class CampaignDO
                 "steps",
                 "versionNumber"
         })
-        public static class CheckList
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class CheckList implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "ArchivedPublishState")
@@ -4231,166 +1177,16 @@ public class CampaignDO
             @XmlAttribute(name = "objid")
             protected Byte objid;
 
-               
-            public byte getArchivedPublishState() {
-                return archivedPublishState;
-            }
-
-               
-            public void setArchivedPublishState(byte value) {
-                this.archivedPublishState = value;
-            }
-
-               
-            public String getCodeChangeUnpublished() {
-                return codeChangeUnpublished;
-            }
-
-               
-            public void setCodeChangeUnpublished(String value) {
-                this.codeChangeUnpublished = value;
-            }
-
-               
-            public String getCodeEverBeenPublished() {
-                return codeEverBeenPublished;
-            }
-
-               
-            public void setCodeEverBeenPublished(String value) {
-                this.codeEverBeenPublished = value;
-            }
-
-               
-            public byte getFirstOccurrenceToPublish() {
-                return firstOccurrenceToPublish;
-            }
-
-               
-            public void setFirstOccurrenceToPublish(byte value) {
-                this.firstOccurrenceToPublish = value;
-            }
-
-               
-            public String getLoadedFromOldDavLocation() {
-                return loadedFromOldDavLocation;
-            }
-
-               
-            public void setLoadedFromOldDavLocation(String value) {
-                this.loadedFromOldDavLocation = value;
-            }
-
-               
-            public String getLoading() {
-                return loading;
-            }
-
-               
-            public void setLoading(String value) {
-                this.loading = value;
-            }
-
-               
-            public String getNeedToPersist() {
-                return needToPersist;
-            }
-
-               
-            public void setNeedToPersist(String value) {
-                this.needToPersist = value;
-            }
-
-               
-            public String getOldVersionNumber() {
-                return oldVersionNumber;
-            }
-
-               
-            public void setOldVersionNumber(String value) {
-                this.oldVersionNumber = value;
-            }
-
-               
-            public String getPersisting() {
-                return persisting;
-            }
-
-               
-            public void setPersisting(String value) {
-                this.persisting = value;
-            }
-
-               
-            public byte getPublishState() {
-                return publishState;
-            }
-
-               
-            public void setPublishState(byte value) {
-                this.publishState = value;
-            }
-
-               
-            public CheckList.Steps getSteps() {
-                return steps;
-            }
-
-               
-            public void setSteps(CheckList.Steps value) {
-                this.steps = value;
-            }
-
-               
-            public float getVersionNumber() {
-                return versionNumber;
-            }
-
-               
-            public void setVersionNumber(float value) {
-                this.versionNumber = value;
-            }
-
-               
-            public String getConcreteClass() {
-                return concreteClass;
-            }
-
-               
-            public void setConcreteClass(String value) {
-                this.concreteClass = value;
-            }
-
-               
-            public Byte getObjid() {
-                return objid;
-            }
-
-               
-            public void setObjid(Byte value) {
-                this.objid = value;
-            }
-
-
-               
             @XmlAccessorType(XmlAccessType.FIELD)
             @XmlType(name = "", propOrder = {
                     "checkListStepDOs"
             })
-            public static class Steps
-                    implements Serializable {
+            @Getter
+            public static class Steps implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlElement(name = "CheckListStepDO")
-                protected List<Steps.CheckListStepDO> checkListStepDOs;
-
-                   
-                public List<Steps.CheckListStepDO> getCheckListStepDOs() {
-                    if (checkListStepDOs == null) {
-                        checkListStepDOs = new ArrayList<Steps.CheckListStepDO>();
-                    }
-                    return this.checkListStepDOs;
-                }
+                protected List<Steps.CheckListStepDO> checkListStepDOs = new ArrayList<>();
 
 
                    
@@ -4414,8 +1210,9 @@ public class CampaignDO
                         "type",
                         "versionNumber"
                 })
-                public static class CheckListStepDO
-                        implements Serializable {
+                @Getter
+                @Setter
+                public static class CheckListStepDO implements Serializable {
 
                     private final static long serialVersionUID = -1L;
                     @XmlElement(name = "ArchivedPublishState")
@@ -4459,206 +1256,6 @@ public class CampaignDO
                     @XmlAttribute(name = "objid")
                     protected Byte objid;
 
-                       
-                    public byte getArchivedPublishState() {
-                        return archivedPublishState;
-                    }
-
-                       
-                    public void setArchivedPublishState(byte value) {
-                        this.archivedPublishState = value;
-                    }
-
-                       
-                    public String getCodeChangeUnpublished() {
-                        return codeChangeUnpublished;
-                    }
-
-                       
-                    public void setCodeChangeUnpublished(String value) {
-                        this.codeChangeUnpublished = value;
-                    }
-
-                       
-                    public String getCodeEverBeenPublished() {
-                        return codeEverBeenPublished;
-                    }
-
-                       
-                    public void setCodeEverBeenPublished(String value) {
-                        this.codeEverBeenPublished = value;
-                    }
-
-                       
-                    public byte getFirstOccurrenceToPublish() {
-                        return firstOccurrenceToPublish;
-                    }
-
-                       
-                    public void setFirstOccurrenceToPublish(byte value) {
-                        this.firstOccurrenceToPublish = value;
-                    }
-
-                       
-                    public String getFollowupFlag() {
-                        return followupFlag;
-                    }
-
-                       
-                    public void setFollowupFlag(String value) {
-                        this.followupFlag = value;
-                    }
-
-                       
-                    public String getId() {
-                        return id;
-                    }
-
-                       
-                    public void setId(String value) {
-                        this.id = value;
-                    }
-
-                       
-                    public String getLoadedFromOldDavLocation() {
-                        return loadedFromOldDavLocation;
-                    }
-
-                       
-                    public void setLoadedFromOldDavLocation(String value) {
-                        this.loadedFromOldDavLocation = value;
-                    }
-
-                       
-                    public String getLoading() {
-                        return loading;
-                    }
-
-                       
-                    public void setLoading(String value) {
-                        this.loading = value;
-                    }
-
-                       
-                    public String getName() {
-                        return name;
-                    }
-
-                       
-                    public void setName(String value) {
-                        this.name = value;
-                    }
-
-                       
-                    public String getNeedToPersist() {
-                        return needToPersist;
-                    }
-
-                       
-                    public void setNeedToPersist(String value) {
-                        this.needToPersist = value;
-                    }
-
-                       
-                    public String getOldVersionNumber() {
-                        return oldVersionNumber;
-                    }
-
-                       
-                    public void setOldVersionNumber(String value) {
-                        this.oldVersionNumber = value;
-                    }
-
-                       
-                    public String getPersisting() {
-                        return persisting;
-                    }
-
-                       
-                    public void setPersisting(String value) {
-                        this.persisting = value;
-                    }
-
-                       
-                    public byte getPublishState() {
-                        return publishState;
-                    }
-
-                       
-                    public void setPublishState(byte value) {
-                        this.publishState = value;
-                    }
-
-                       
-                    public String getShowAsLink() {
-                        return showAsLink;
-                    }
-
-                       
-                    public void setShowAsLink(String value) {
-                        this.showAsLink = value;
-                    }
-
-                       
-                    public String getStatus() {
-                        return status;
-                    }
-
-                       
-                    public void setStatus(String value) {
-                        this.status = value;
-                    }
-
-                       
-                    public String getType() {
-                        return type;
-                    }
-
-                       
-                    public void setType(String value) {
-                        this.type = value;
-                    }
-
-                       
-                    public float getVersionNumber() {
-                        return versionNumber;
-                    }
-
-                       
-                    public void setVersionNumber(float value) {
-                        this.versionNumber = value;
-                    }
-
-                       
-                    public String getConcreteClass() {
-                        return concreteClass;
-                    }
-
-                       
-                    public void setConcreteClass(String value) {
-                        this.concreteClass = value;
-                    }
-
-                       
-                    public Byte getListpos() {
-                        return listpos;
-                    }
-
-                       
-                    public void setListpos(Byte value) {
-                        this.listpos = value;
-                    }
-
-                       
-                    public Byte getObjid() {
-                        return objid;
-                    }
-
-                       
-                    public void setObjid(Byte value) {
-                        this.objid = value;
-                    }
-
                 }
 
             }
@@ -4671,23 +1268,14 @@ public class CampaignDO
         @XmlType(name = "", propOrder = {
                 "checkListItemDOs"
         })
-        public static class CheckListItems
-                implements Serializable {
+        @Getter
+        public static class CheckListItems implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "CheckListItemDO")
             protected List<com.sas.rtdm2id.model.rtdm.CampaignDO.Definition.CheckListItems.CheckListItemDO> checkListItemDOs;
 
-               
-            public List<com.sas.rtdm2id.model.rtdm.CampaignDO.Definition.CheckListItems.CheckListItemDO> getCheckListItemDOs() {
-                if (checkListItemDOs == null) {
-                    checkListItemDOs = new ArrayList<com.sas.rtdm2id.model.rtdm.CampaignDO.Definition.CheckListItems.CheckListItemDO>();
-                }
-                return this.checkListItemDOs;
-            }
 
-
-               
             @XmlAccessorType(XmlAccessType.FIELD)
             @XmlType(name = "", propOrder = {
                     "archivedPublishState",
@@ -4710,8 +1298,9 @@ public class CampaignDO
                     "stepType",
                     "versionNumber"
             })
-            public static class CheckListItemDO
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class CheckListItemDO implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlElement(name = "ArchivedPublishState")
@@ -4759,226 +1348,6 @@ public class CampaignDO
                 @XmlAttribute(name = "objid")
                 protected Byte objid;
 
-                   
-                public byte getArchivedPublishState() {
-                    return archivedPublishState;
-                }
-
-                   
-                public void setArchivedPublishState(byte value) {
-                    this.archivedPublishState = value;
-                }
-
-                   
-                public String getCodeChangeUnpublished() {
-                    return codeChangeUnpublished;
-                }
-
-                   
-                public void setCodeChangeUnpublished(String value) {
-                    this.codeChangeUnpublished = value;
-                }
-
-                   
-                public String getCodeEverBeenPublished() {
-                    return codeEverBeenPublished;
-                }
-
-                   
-                public void setCodeEverBeenPublished(String value) {
-                    this.codeEverBeenPublished = value;
-                }
-
-                   
-                public byte getFirstOccurrenceToPublish() {
-                    return firstOccurrenceToPublish;
-                }
-
-                   
-                public void setFirstOccurrenceToPublish(byte value) {
-                    this.firstOccurrenceToPublish = value;
-                }
-
-                   
-                public String getFollowUpFlag() {
-                    return followUpFlag;
-                }
-
-                   
-                public void setFollowUpFlag(String value) {
-                    this.followUpFlag = value;
-                }
-
-                   
-                public String getItemType() {
-                    return itemType;
-                }
-
-                   
-                public void setItemType(String value) {
-                    this.itemType = value;
-                }
-
-                   
-                public String getLabel() {
-                    return label;
-                }
-
-                   
-                public void setLabel(String value) {
-                    this.label = value;
-                }
-
-                   
-                public String getLoadedFromOldDavLocation() {
-                    return loadedFromOldDavLocation;
-                }
-
-                   
-                public void setLoadedFromOldDavLocation(String value) {
-                    this.loadedFromOldDavLocation = value;
-                }
-
-                   
-                public String getLoading() {
-                    return loading;
-                }
-
-                   
-                public void setLoading(String value) {
-                    this.loading = value;
-                }
-
-                   
-                public String getNeedToPersist() {
-                    return needToPersist;
-                }
-
-                   
-                public void setNeedToPersist(String value) {
-                    this.needToPersist = value;
-                }
-
-                   
-                public String getOldVersionNumber() {
-                    return oldVersionNumber;
-                }
-
-                   
-                public void setOldVersionNumber(String value) {
-                    this.oldVersionNumber = value;
-                }
-
-                   
-                public String getPageId() {
-                    return pageId;
-                }
-
-                   
-                public void setPageId(String value) {
-                    this.pageId = value;
-                }
-
-                   
-                public String getPersisting() {
-                    return persisting;
-                }
-
-                   
-                public void setPersisting(String value) {
-                    this.persisting = value;
-                }
-
-                   
-                public float getPosition() {
-                    return position;
-                }
-
-                   
-                public void setPosition(float value) {
-                    this.position = value;
-                }
-
-                   
-                public byte getPublishState() {
-                    return publishState;
-                }
-
-                   
-                public void setPublishState(byte value) {
-                    this.publishState = value;
-                }
-
-                   
-                public String getRequired() {
-                    return required;
-                }
-
-                   
-                public void setRequired(String value) {
-                    this.required = value;
-                }
-
-                   
-                public String getStatus() {
-                    return status;
-                }
-
-                   
-                public void setStatus(String value) {
-                    this.status = value;
-                }
-
-                   
-                public String getStepType() {
-                    return stepType;
-                }
-
-                   
-                public void setStepType(String value) {
-                    this.stepType = value;
-                }
-
-                   
-                public float getVersionNumber() {
-                    return versionNumber;
-                }
-
-                   
-                public void setVersionNumber(float value) {
-                    this.versionNumber = value;
-                }
-
-                   
-                public String getConcreteClass() {
-                    return concreteClass;
-                }
-
-                   
-                public void setConcreteClass(String value) {
-                    this.concreteClass = value;
-                }
-
-                   
-                public Byte getListpos() {
-                    return listpos;
-                }
-
-                   
-                public void setListpos(Byte value) {
-                    this.listpos = value;
-                }
-
-                   
-                public Byte getObjid() {
-                    return objid;
-                }
-
-                   
-                public void setObjid(Byte value) {
-                    this.objid = value;
-                }
-
             }
 
         }
@@ -4989,34 +1358,15 @@ public class CampaignDO
         @XmlType(name = "", propOrder = {
                 "value"
         })
-        public static class CustomDetailPages
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class CustomDetailPages implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlValue
             protected String value;
             @XmlAttribute(name = "EmptyList")
             protected String emptyList;
-
-               
-            public String getValue() {
-                return value;
-            }
-
-               
-            public void setValue(String value) {
-                this.value = value;
-            }
-
-               
-            public String getEmptyList() {
-                return emptyList;
-            }
-
-               
-            public void setEmptyList(String value) {
-                this.emptyList = value;
-            }
 
         }
 
@@ -5040,6 +1390,8 @@ public class CampaignDO
                 "publishState",
                 "versionNumber"
         })
+        @Getter
+        @Setter
         public static class Folder
                 implements Serializable {
 
@@ -5079,180 +1431,9 @@ public class CampaignDO
             @XmlAttribute(name = "objid")
             protected Byte objid;
 
-               
-            public byte getArchivedPublishState() {
-                return archivedPublishState;
-            }
-
-               
-            public void setArchivedPublishState(byte value) {
-                this.archivedPublishState = value;
-            }
-
-               
-            public String getCodeChangeUnpublished() {
-                return codeChangeUnpublished;
-            }
-
-               
-            public void setCodeChangeUnpublished(String value) {
-                this.codeChangeUnpublished = value;
-            }
-
-               
-            public String getCodeEverBeenPublished() {
-                return codeEverBeenPublished;
-            }
-
-               
-            public void setCodeEverBeenPublished(String value) {
-                this.codeEverBeenPublished = value;
-            }
-
-               
-            public String getDateModified() {
-                return dateModified;
-            }
-
-               
-            public void setDateModified(String value) {
-                this.dateModified = value;
-            }
-
-               
-            public byte getFirstOccurrenceToPublish() {
-                return firstOccurrenceToPublish;
-            }
-
-               
-            public void setFirstOccurrenceToPublish(byte value) {
-                this.firstOccurrenceToPublish = value;
-            }
-
-               
-            public String getLoadedFromOldDavLocation() {
-                return loadedFromOldDavLocation;
-            }
-
-               
-            public void setLoadedFromOldDavLocation(String value) {
-                this.loadedFromOldDavLocation = value;
-            }
-
-               
-            public String getLoading() {
-                return loading;
-            }
-
-               
-            public void setLoading(String value) {
-                this.loading = value;
-            }
-
-               
-            public String getName() {
-                return name;
-            }
-
-               
-            public void setName(String value) {
-                this.name = value;
-            }
-
-               
-            public String getNeedToPersist() {
-                return needToPersist;
-            }
-
-               
-            public void setNeedToPersist(String value) {
-                this.needToPersist = value;
-            }
-
-               
-            public String getOldVersionNumber() {
-                return oldVersionNumber;
-            }
-
-               
-            public void setOldVersionNumber(String value) {
-                this.oldVersionNumber = value;
-            }
-
-               
-            public String getOwner() {
-                return owner;
-            }
-
-               
-            public void setOwner(String value) {
-                this.owner = value;
-            }
-
-               
-            public String getParentFolder() {
-                return parentFolder;
-            }
-
-               
-            public void setParentFolder(String value) {
-                this.parentFolder = value;
-            }
-
-               
-            public String getPersisting() {
-                return persisting;
-            }
-
-               
-            public void setPersisting(String value) {
-                this.persisting = value;
-            }
-
-               
-            public byte getPublishState() {
-                return publishState;
-            }
-
-               
-            public void setPublishState(byte value) {
-                this.publishState = value;
-            }
-
-               
-            public float getVersionNumber() {
-                return versionNumber;
-            }
-
-               
-            public void setVersionNumber(float value) {
-                this.versionNumber = value;
-            }
-
-               
-            public String getConcreteClass() {
-                return concreteClass;
-            }
-
-               
-            public void setConcreteClass(String value) {
-                this.concreteClass = value;
-            }
-
-               
-            public Byte getObjid() {
-                return objid;
-            }
-
-               
-            public void setObjid(Byte value) {
-                this.objid = value;
-            }
-
         }
 
 
-           
         @XmlAccessorType(XmlAccessType.FIELD)
         @XmlType(name = "", propOrder = {
                 "archivedPublishState",
@@ -5270,8 +1451,9 @@ public class CampaignDO
                 "publishState",
                 "versionNumber"
         })
-        public static class ImportDetails
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class ImportDetails implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "ArchivedPublishState")
@@ -5307,191 +1489,19 @@ public class CampaignDO
             @XmlAttribute(name = "objid")
             protected Byte objid;
 
-               
-            public byte getArchivedPublishState() {
-                return archivedPublishState;
-            }
-
-               
-            public void setArchivedPublishState(byte value) {
-                this.archivedPublishState = value;
-            }
-
-               
-            public byte getClientType() {
-                return clientType;
-            }
-
-               
-            public void setClientType(byte value) {
-                this.clientType = value;
-            }
-
-               
-            public String getCodeChangeUnpublished() {
-                return codeChangeUnpublished;
-            }
-
-               
-            public void setCodeChangeUnpublished(String value) {
-                this.codeChangeUnpublished = value;
-            }
-
-               
-            public String getCodeEverBeenPublished() {
-                return codeEverBeenPublished;
-            }
-
-               
-            public void setCodeEverBeenPublished(String value) {
-                this.codeEverBeenPublished = value;
-            }
-
-               
-            public String getDateImported() {
-                return dateImported;
-            }
-
-               
-            public void setDateImported(String value) {
-                this.dateImported = value;
-            }
-
-               
-            public byte getFirstOccurrenceToPublish() {
-                return firstOccurrenceToPublish;
-            }
-
-               
-            public void setFirstOccurrenceToPublish(byte value) {
-                this.firstOccurrenceToPublish = value;
-            }
-
-               
-            public String getLoadedFromOldDavLocation() {
-                return loadedFromOldDavLocation;
-            }
-
-               
-            public void setLoadedFromOldDavLocation(String value) {
-                this.loadedFromOldDavLocation = value;
-            }
-
-               
-            public String getLoading() {
-                return loading;
-            }
-
-               
-            public void setLoading(String value) {
-                this.loading = value;
-            }
-
-               
-            public String getNeedToPersist() {
-                return needToPersist;
-            }
-
-               
-            public void setNeedToPersist(String value) {
-                this.needToPersist = value;
-            }
-
-               
-            public String getOldVersionNumber() {
-                return oldVersionNumber;
-            }
-
-               
-            public void setOldVersionNumber(String value) {
-                this.oldVersionNumber = value;
-            }
-
-               
-            public String getOpenedPostMigration() {
-                return openedPostMigration;
-            }
-
-               
-            public void setOpenedPostMigration(String value) {
-                this.openedPostMigration = value;
-            }
-
-               
-            public String getPersisting() {
-                return persisting;
-            }
-
-               
-            public void setPersisting(String value) {
-                this.persisting = value;
-            }
-
-               
-            public byte getPublishState() {
-                return publishState;
-            }
-
-               
-            public void setPublishState(byte value) {
-                this.publishState = value;
-            }
-
-               
-            public float getVersionNumber() {
-                return versionNumber;
-            }
-
-               
-            public void setVersionNumber(float value) {
-                this.versionNumber = value;
-            }
-
-               
-            public String getConcreteClass() {
-                return concreteClass;
-            }
-
-               
-            public void setConcreteClass(String value) {
-                this.concreteClass = value;
-            }
-
-               
-            public Byte getObjid() {
-                return objid;
-            }
-
-               
-            public void setObjid(Byte value) {
-                this.objid = value;
-            }
-
         }
 
-
-           
         @XmlAccessorType(XmlAccessType.FIELD)
         @XmlType(name = "", propOrder = {
                 "pageConfigDOs"
         })
-        public static class PageConfigurations
-                implements Serializable {
+        @Getter
+        public static class PageConfigurations implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "PageConfigDO")
             protected List<PageConfigurations.PageConfigDO> pageConfigDOs;
 
-               
-            public List<PageConfigurations.PageConfigDO> getPageConfigDOs() {
-                if (pageConfigDOs == null) {
-                    pageConfigDOs = new ArrayList<PageConfigurations.PageConfigDO>();
-                }
-                return this.pageConfigDOs;
-            }
-
-
-               
             @XmlAccessorType(XmlAccessType.FIELD)
             @XmlType(name = "", propOrder = {
                     "archivedPublishState",
@@ -5510,8 +1520,9 @@ public class CampaignDO
                     "sameAsEditor",
                     "versionNumber"
             })
-            public static class PageConfigDO
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class PageConfigDO implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlElement(name = "ArchivedPublishState")
@@ -5552,206 +1563,16 @@ public class CampaignDO
                 protected Short objid;
 
                    
-                public byte getArchivedPublishState() {
-                    return archivedPublishState;
-                }
-
-                   
-                public void setArchivedPublishState(byte value) {
-                    this.archivedPublishState = value;
-                }
-
-                   
-                public String getCodeChangeUnpublished() {
-                    return codeChangeUnpublished;
-                }
-
-                   
-                public void setCodeChangeUnpublished(String value) {
-                    this.codeChangeUnpublished = value;
-                }
-
-                   
-                public String getCodeEverBeenPublished() {
-                    return codeEverBeenPublished;
-                }
-
-                   
-                public void setCodeEverBeenPublished(String value) {
-                    this.codeEverBeenPublished = value;
-                }
-
-                   
-                public PageConfigDO.DesignPages getDesignPages() {
-                    return designPages;
-                }
-
-                   
-                public void setDesignPages(PageConfigDO.DesignPages value) {
-                    this.designPages = value;
-                }
-
-                   
-                public byte getFirstOccurrenceToPublish() {
-                    return firstOccurrenceToPublish;
-                }
-
-                   
-                public void setFirstOccurrenceToPublish(byte value) {
-                    this.firstOccurrenceToPublish = value;
-                }
-
-                   
-                public String getLoadedFromOldDavLocation() {
-                    return loadedFromOldDavLocation;
-                }
-
-                   
-                public void setLoadedFromOldDavLocation(String value) {
-                    this.loadedFromOldDavLocation = value;
-                }
-
-                   
-                public String getLoading() {
-                    return loading;
-                }
-
-                   
-                public void setLoading(String value) {
-                    this.loading = value;
-                }
-
-                   
-                public String getNeedToPersist() {
-                    return needToPersist;
-                }
-
-                   
-                public void setNeedToPersist(String value) {
-                    this.needToPersist = value;
-                }
-
-                   
-                public String getOldVersionNumber() {
-                    return oldVersionNumber;
-                }
-
-                   
-                public void setOldVersionNumber(String value) {
-                    this.oldVersionNumber = value;
-                }
-
-                   
-                public String getPersisting() {
-                    return persisting;
-                }
-
-                   
-                public void setPersisting(String value) {
-                    this.persisting = value;
-                }
-
-                   
-                public PageConfigDO.ProcessPages getProcessPages() {
-                    return processPages;
-                }
-
-                   
-                public void setProcessPages(PageConfigDO.ProcessPages value) {
-                    this.processPages = value;
-                }
-
-                   
-                public byte getPublishState() {
-                    return publishState;
-                }
-
-                   
-                public void setPublishState(byte value) {
-                    this.publishState = value;
-                }
-
-                   
-                public String getRoleId() {
-                    return roleId;
-                }
-
-                   
-                public void setRoleId(String value) {
-                    this.roleId = value;
-                }
-
-                   
-                public String getSameAsEditor() {
-                    return sameAsEditor;
-                }
-
-                   
-                public void setSameAsEditor(String value) {
-                    this.sameAsEditor = value;
-                }
-
-                   
-                public float getVersionNumber() {
-                    return versionNumber;
-                }
-
-                   
-                public void setVersionNumber(float value) {
-                    this.versionNumber = value;
-                }
-
-                   
-                public String getConcreteClass() {
-                    return concreteClass;
-                }
-
-                   
-                public void setConcreteClass(String value) {
-                    this.concreteClass = value;
-                }
-
-                   
-                public Byte getListpos() {
-                    return listpos;
-                }
-
-                   
-                public void setListpos(Byte value) {
-                    this.listpos = value;
-                }
-
-                   
-                public Short getObjid() {
-                    return objid;
-                }
-
-                   
-                public void setObjid(Short value) {
-                    this.objid = value;
-                }
-
-
-                   
                 @XmlAccessorType(XmlAccessType.FIELD)
                 @XmlType(name = "", propOrder = {
                         "pageDOs"
                 })
-                public static class DesignPages
-                        implements Serializable {
+                @Getter
+                public static class DesignPages implements Serializable {
 
                     private final static long serialVersionUID = -1L;
                     @XmlElement(name = "PageDO")
-                    protected List<DesignPages.PageDO> pageDOs;
-
-                       
-                    public List<DesignPages.PageDO> getPageDOs() {
-                        if (pageDOs == null) {
-                            pageDOs = new ArrayList<DesignPages.PageDO>();
-                        }
-                        return this.pageDOs;
-                    }
-
+                    protected List<DesignPages.PageDO> pageDOs = new ArrayList<>();
 
                        
                     @XmlAccessorType(XmlAccessType.FIELD)
@@ -5773,8 +1594,9 @@ public class CampaignDO
                             "publishState",
                             "versionNumber"
                     })
-                    public static class PageDO
-                            implements Serializable {
+                    @Getter
+                    @Setter
+                    public static class PageDO implements Serializable {
 
                         private final static long serialVersionUID = -1L;
                         @XmlElement(name = "ArchivedPublishState")
@@ -5816,196 +1638,6 @@ public class CampaignDO
                         @XmlAttribute(name = "objid")
                         protected Short objid;
 
-                           
-                        public byte getArchivedPublishState() {
-                            return archivedPublishState;
-                        }
-
-                           
-                        public void setArchivedPublishState(byte value) {
-                            this.archivedPublishState = value;
-                        }
-
-                           
-                        public String getCodeChangeUnpublished() {
-                            return codeChangeUnpublished;
-                        }
-
-                           
-                        public void setCodeChangeUnpublished(String value) {
-                            this.codeChangeUnpublished = value;
-                        }
-
-                           
-                        public String getCodeEverBeenPublished() {
-                            return codeEverBeenPublished;
-                        }
-
-                           
-                        public void setCodeEverBeenPublished(String value) {
-                            this.codeEverBeenPublished = value;
-                        }
-
-                           
-                        public byte getFirstOccurrenceToPublish() {
-                            return firstOccurrenceToPublish;
-                        }
-
-                           
-                        public void setFirstOccurrenceToPublish(byte value) {
-                            this.firstOccurrenceToPublish = value;
-                        }
-
-                           
-                        public String getFollowupFlag() {
-                            return followupFlag;
-                        }
-
-                           
-                        public void setFollowupFlag(String value) {
-                            this.followupFlag = value;
-                        }
-
-                           
-                        public String getHiddenDefault() {
-                            return hiddenDefault;
-                        }
-
-                           
-                        public void setHiddenDefault(String value) {
-                            this.hiddenDefault = value;
-                        }
-
-                           
-                        public String getLoadedFromOldDavLocation() {
-                            return loadedFromOldDavLocation;
-                        }
-
-                           
-                        public void setLoadedFromOldDavLocation(String value) {
-                            this.loadedFromOldDavLocation = value;
-                        }
-
-                           
-                        public String getLoading() {
-                            return loading;
-                        }
-
-                           
-                        public void setLoading(String value) {
-                            this.loading = value;
-                        }
-
-                           
-                        public String getNeedToPersist() {
-                            return needToPersist;
-                        }
-
-                           
-                        public void setNeedToPersist(String value) {
-                            this.needToPersist = value;
-                        }
-
-                           
-                        public String getOldVersionNumber() {
-                            return oldVersionNumber;
-                        }
-
-                           
-                        public void setOldVersionNumber(String value) {
-                            this.oldVersionNumber = value;
-                        }
-
-                           
-                        public String getPageId() {
-                            return pageId;
-                        }
-
-                           
-                        public void setPageId(String value) {
-                            this.pageId = value;
-                        }
-
-                           
-                        public String getPageLabel() {
-                            return pageLabel;
-                        }
-
-                           
-                        public void setPageLabel(String value) {
-                            this.pageLabel = value;
-                        }
-
-                           
-                        public String getPageStatus() {
-                            return pageStatus;
-                        }
-
-                           
-                        public void setPageStatus(String value) {
-                            this.pageStatus = value;
-                        }
-
-                           
-                        public String getPersisting() {
-                            return persisting;
-                        }
-
-                           
-                        public void setPersisting(String value) {
-                            this.persisting = value;
-                        }
-
-                           
-                        public byte getPublishState() {
-                            return publishState;
-                        }
-
-                           
-                        public void setPublishState(byte value) {
-                            this.publishState = value;
-                        }
-
-                           
-                        public float getVersionNumber() {
-                            return versionNumber;
-                        }
-
-                           
-                        public void setVersionNumber(float value) {
-                            this.versionNumber = value;
-                        }
-
-                           
-                        public String getConcreteClass() {
-                            return concreteClass;
-                        }
-
-                           
-                        public void setConcreteClass(String value) {
-                            this.concreteClass = value;
-                        }
-
-                           
-                        public Byte getListpos() {
-                            return listpos;
-                        }
-
-                           
-                        public void setListpos(Byte value) {
-                            this.listpos = value;
-                        }
-
-                           
-                        public Short getObjid() {
-                            return objid;
-                        }
-
-                           
-                        public void setObjid(Short value) {
-                            this.objid = value;
-                        }
-
                     }
 
                 }
@@ -6016,21 +1648,12 @@ public class CampaignDO
                 @XmlType(name = "", propOrder = {
                         "pageDOs"
                 })
-                public static class ProcessPages
-                        implements Serializable {
+                @Getter
+                public static class ProcessPages implements Serializable {
 
                     private final static long serialVersionUID = -1L;
                     @XmlElement(name = "PageDO")
-                    protected List<ProcessPages.PageDO> pageDOs;
-
-                       
-                    public List<ProcessPages.PageDO> getPageDOs() {
-                        if (pageDOs == null) {
-                            pageDOs = new ArrayList<ProcessPages.PageDO>();
-                        }
-                        return this.pageDOs;
-                    }
-
+                    protected List<ProcessPages.PageDO> pageDOs = new ArrayList<>();
 
                        
                     @XmlAccessorType(XmlAccessType.FIELD)
@@ -6052,8 +1675,9 @@ public class CampaignDO
                             "publishState",
                             "versionNumber"
                     })
-                    public static class PageDO
-                            implements Serializable {
+                    @Getter
+                    @Setter
+                    public static class PageDO implements Serializable {
 
                         private final static long serialVersionUID = -1L;
                         @XmlElement(name = "ArchivedPublishState")
@@ -6094,196 +1718,6 @@ public class CampaignDO
                         protected Byte listpos;
                         @XmlAttribute(name = "objid")
                         protected Short objid;
-
-                           
-                        public byte getArchivedPublishState() {
-                            return archivedPublishState;
-                        }
-
-                           
-                        public void setArchivedPublishState(byte value) {
-                            this.archivedPublishState = value;
-                        }
-
-                           
-                        public String getCodeChangeUnpublished() {
-                            return codeChangeUnpublished;
-                        }
-
-                           
-                        public void setCodeChangeUnpublished(String value) {
-                            this.codeChangeUnpublished = value;
-                        }
-
-                           
-                        public String getCodeEverBeenPublished() {
-                            return codeEverBeenPublished;
-                        }
-
-                           
-                        public void setCodeEverBeenPublished(String value) {
-                            this.codeEverBeenPublished = value;
-                        }
-
-                           
-                        public byte getFirstOccurrenceToPublish() {
-                            return firstOccurrenceToPublish;
-                        }
-
-                           
-                        public void setFirstOccurrenceToPublish(byte value) {
-                            this.firstOccurrenceToPublish = value;
-                        }
-
-                           
-                        public String getFollowupFlag() {
-                            return followupFlag;
-                        }
-
-                           
-                        public void setFollowupFlag(String value) {
-                            this.followupFlag = value;
-                        }
-
-                           
-                        public String getHiddenDefault() {
-                            return hiddenDefault;
-                        }
-
-                           
-                        public void setHiddenDefault(String value) {
-                            this.hiddenDefault = value;
-                        }
-
-                           
-                        public String getLoadedFromOldDavLocation() {
-                            return loadedFromOldDavLocation;
-                        }
-
-                           
-                        public void setLoadedFromOldDavLocation(String value) {
-                            this.loadedFromOldDavLocation = value;
-                        }
-
-                           
-                        public String getLoading() {
-                            return loading;
-                        }
-
-                           
-                        public void setLoading(String value) {
-                            this.loading = value;
-                        }
-
-                           
-                        public String getNeedToPersist() {
-                            return needToPersist;
-                        }
-
-                           
-                        public void setNeedToPersist(String value) {
-                            this.needToPersist = value;
-                        }
-
-                           
-                        public String getOldVersionNumber() {
-                            return oldVersionNumber;
-                        }
-
-                           
-                        public void setOldVersionNumber(String value) {
-                            this.oldVersionNumber = value;
-                        }
-
-                           
-                        public String getPageId() {
-                            return pageId;
-                        }
-
-                           
-                        public void setPageId(String value) {
-                            this.pageId = value;
-                        }
-
-                           
-                        public String getPageLabel() {
-                            return pageLabel;
-                        }
-
-                           
-                        public void setPageLabel(String value) {
-                            this.pageLabel = value;
-                        }
-
-                           
-                        public String getPageStatus() {
-                            return pageStatus;
-                        }
-
-                           
-                        public void setPageStatus(String value) {
-                            this.pageStatus = value;
-                        }
-
-                           
-                        public String getPersisting() {
-                            return persisting;
-                        }
-
-                           
-                        public void setPersisting(String value) {
-                            this.persisting = value;
-                        }
-
-                           
-                        public byte getPublishState() {
-                            return publishState;
-                        }
-
-                           
-                        public void setPublishState(byte value) {
-                            this.publishState = value;
-                        }
-
-                           
-                        public float getVersionNumber() {
-                            return versionNumber;
-                        }
-
-                           
-                        public void setVersionNumber(float value) {
-                            this.versionNumber = value;
-                        }
-
-                           
-                        public String getConcreteClass() {
-                            return concreteClass;
-                        }
-
-                           
-                        public void setConcreteClass(String value) {
-                            this.concreteClass = value;
-                        }
-
-                           
-                        public Byte getListpos() {
-                            return listpos;
-                        }
-
-                           
-                        public void setListpos(Byte value) {
-                            this.listpos = value;
-                        }
-
-                           
-                        public Short getObjid() {
-                            return objid;
-                        }
-
-                           
-                        public void setObjid(Short value) {
-                            this.objid = value;
-                        }
 
                     }
 
@@ -6319,8 +1753,9 @@ public class CampaignDO
                 "updated",
                 "versionNumber"
         })
-        public static class Schedule
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class Schedule implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "ArchivedPublishState")
@@ -6369,238 +1804,6 @@ public class CampaignDO
             protected String concreteClass;
             @XmlAttribute(name = "objid")
             protected Short objid;
-
-               
-            public byte getArchivedPublishState() {
-                return archivedPublishState;
-            }
-
-               
-            public void setArchivedPublishState(byte value) {
-                this.archivedPublishState = value;
-            }
-
-               
-            public String getCodeChangeUnpublished() {
-                return codeChangeUnpublished;
-            }
-
-               
-            public void setCodeChangeUnpublished(String value) {
-                this.codeChangeUnpublished = value;
-            }
-
-               
-            public String getCodeEverBeenPublished() {
-                return codeEverBeenPublished;
-            }
-
-               
-            public void setCodeEverBeenPublished(String value) {
-                this.codeEverBeenPublished = value;
-            }
-
-               
-            public String getDateScheduleLastModifiedInCampaign() {
-                return dateScheduleLastModifiedInCampaign;
-            }
-
-               
-            public void setDateScheduleLastModifiedInCampaign(String value) {
-                this.dateScheduleLastModifiedInCampaign = value;
-            }
-
-               
-            public Schedule.ExecutionOffset getExecutionOffset() {
-                return executionOffset;
-            }
-
-               
-            public void setExecutionOffset(Schedule.ExecutionOffset value) {
-                this.executionOffset = value;
-            }
-
-               
-            public byte getFirstOccurrenceToPublish() {
-                return firstOccurrenceToPublish;
-            }
-
-               
-            public void setFirstOccurrenceToPublish(byte value) {
-                this.firstOccurrenceToPublish = value;
-            }
-
-               
-            public String getLoadedFromOldDavLocation() {
-                return loadedFromOldDavLocation;
-            }
-
-               
-            public void setLoadedFromOldDavLocation(String value) {
-                this.loadedFromOldDavLocation = value;
-            }
-
-               
-            public String getLoading() {
-                return loading;
-            }
-
-               
-            public void setLoading(String value) {
-                this.loading = value;
-            }
-
-               
-            public String getNeedToPersist() {
-                return needToPersist;
-            }
-
-               
-            public void setNeedToPersist(String value) {
-                this.needToPersist = value;
-            }
-
-               
-            public String getOldVersionNumber() {
-                return oldVersionNumber;
-            }
-
-               
-            public void setOldVersionNumber(String value) {
-                this.oldVersionNumber = value;
-            }
-
-               
-            public String getPersisting() {
-                return persisting;
-            }
-
-               
-            public void setPersisting(String value) {
-                this.persisting = value;
-            }
-
-               
-            public byte getPublishState() {
-                return publishState;
-            }
-
-               
-            public void setPublishState(byte value) {
-                this.publishState = value;
-            }
-
-               
-            public byte getRecurrenceEveryPeriod() {
-                return recurrenceEveryPeriod;
-            }
-
-               
-            public void setRecurrenceEveryPeriod(byte value) {
-                this.recurrenceEveryPeriod = value;
-            }
-
-               
-            public byte getRecurrenceMonthDay() {
-                return recurrenceMonthDay;
-            }
-
-               
-            public void setRecurrenceMonthDay(byte value) {
-                this.recurrenceMonthDay = value;
-            }
-
-               
-            public byte getRecurrencePeriodEndAfter() {
-                return recurrencePeriodEndAfter;
-            }
-
-               
-            public void setRecurrencePeriodEndAfter(byte value) {
-                this.recurrencePeriodEndAfter = value;
-            }
-
-               
-            public String getRecurrencePeriodType() {
-                return recurrencePeriodType;
-            }
-
-               
-            public void setRecurrencePeriodType(String value) {
-                this.recurrencePeriodType = value;
-            }
-
-               
-            public String getRecurrenceType() {
-                return recurrenceType;
-            }
-
-               
-            public void setRecurrenceType(String value) {
-                this.recurrenceType = value;
-            }
-
-               
-            public Schedule.ScheduleActionList getScheduleActionList() {
-                return scheduleActionList;
-            }
-
-               
-            public void setScheduleActionList(Schedule.ScheduleActionList value) {
-                this.scheduleActionList = value;
-            }
-
-               
-            public String getScheduleType() {
-                return scheduleType;
-            }
-
-               
-            public void setScheduleType(String value) {
-                this.scheduleType = value;
-            }
-
-               
-            public String getUpdated() {
-                return updated;
-            }
-
-               
-            public void setUpdated(String value) {
-                this.updated = value;
-            }
-
-               
-            public float getVersionNumber() {
-                return versionNumber;
-            }
-
-               
-            public void setVersionNumber(float value) {
-                this.versionNumber = value;
-            }
-
-               
-            public String getConcreteClass() {
-                return concreteClass;
-            }
-
-               
-            public void setConcreteClass(String value) {
-                this.concreteClass = value;
-            }
-
-               
-            public Short getObjid() {
-                return objid;
-            }
-
-               
-            public void setObjid(Short value) {
-                this.objid = value;
-            }
-
-
                
             @XmlAccessorType(XmlAccessType.FIELD)
             @XmlType(name = "", propOrder = {
@@ -6620,8 +1823,9 @@ public class CampaignDO
                     "units",
                     "versionNumber"
             })
-            public static class ExecutionOffset
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class ExecutionOffset implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlElement(name = "ArchivedPublishState")
@@ -6659,176 +1863,6 @@ public class CampaignDO
                 @XmlAttribute(name = "objid")
                 protected Short objid;
 
-                   
-                public byte getArchivedPublishState() {
-                    return archivedPublishState;
-                }
-
-                   
-                public void setArchivedPublishState(byte value) {
-                    this.archivedPublishState = value;
-                }
-
-                   
-                public String getCodeChangeUnpublished() {
-                    return codeChangeUnpublished;
-                }
-
-                   
-                public void setCodeChangeUnpublished(String value) {
-                    this.codeChangeUnpublished = value;
-                }
-
-                   
-                public String getCodeEverBeenPublished() {
-                    return codeEverBeenPublished;
-                }
-
-                   
-                public void setCodeEverBeenPublished(String value) {
-                    this.codeEverBeenPublished = value;
-                }
-
-                   
-                public String getDateScheduleLastModifiedInCampaign() {
-                    return dateScheduleLastModifiedInCampaign;
-                }
-
-                   
-                public void setDateScheduleLastModifiedInCampaign(String value) {
-                    this.dateScheduleLastModifiedInCampaign = value;
-                }
-
-                   
-                public byte getFirstOccurrenceToPublish() {
-                    return firstOccurrenceToPublish;
-                }
-
-                   
-                public void setFirstOccurrenceToPublish(byte value) {
-                    this.firstOccurrenceToPublish = value;
-                }
-
-                   
-                public String getLoadedFromOldDavLocation() {
-                    return loadedFromOldDavLocation;
-                }
-
-                   
-                public void setLoadedFromOldDavLocation(String value) {
-                    this.loadedFromOldDavLocation = value;
-                }
-
-                   
-                public String getLoading() {
-                    return loading;
-                }
-
-                   
-                public void setLoading(String value) {
-                    this.loading = value;
-                }
-
-                   
-                public String getNeedToPersist() {
-                    return needToPersist;
-                }
-
-                   
-                public void setNeedToPersist(String value) {
-                    this.needToPersist = value;
-                }
-
-                   
-                public byte getOffset() {
-                    return offset;
-                }
-
-                   
-                public void setOffset(byte value) {
-                    this.offset = value;
-                }
-
-                   
-                public String getOldVersionNumber() {
-                    return oldVersionNumber;
-                }
-
-                   
-                public void setOldVersionNumber(String value) {
-                    this.oldVersionNumber = value;
-                }
-
-                   
-                public String getPersisting() {
-                    return persisting;
-                }
-
-                   
-                public void setPersisting(String value) {
-                    this.persisting = value;
-                }
-
-                   
-                public byte getPublishState() {
-                    return publishState;
-                }
-
-                   
-                public void setPublishState(byte value) {
-                    this.publishState = value;
-                }
-
-                   
-                public String getScheduleType() {
-                    return scheduleType;
-                }
-
-                   
-                public void setScheduleType(String value) {
-                    this.scheduleType = value;
-                }
-
-                   
-                public String getUnits() {
-                    return units;
-                }
-
-                   
-                public void setUnits(String value) {
-                    this.units = value;
-                }
-
-                   
-                public float getVersionNumber() {
-                    return versionNumber;
-                }
-
-                   
-                public void setVersionNumber(float value) {
-                    this.versionNumber = value;
-                }
-
-                   
-                public String getConcreteClass() {
-                    return concreteClass;
-                }
-
-                   
-                public void setConcreteClass(String value) {
-                    this.concreteClass = value;
-                }
-
-                   
-                public Short getObjid() {
-                    return objid;
-                }
-
-                   
-                public void setObjid(Short value) {
-                    this.objid = value;
-                }
-
             }
 
 
@@ -6837,34 +1871,15 @@ public class CampaignDO
             @XmlType(name = "", propOrder = {
                     "value"
             })
-            public static class ScheduleActionList
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class ScheduleActionList implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlValue
                 protected String value;
                 @XmlAttribute(name = "EmptyList")
                 protected String emptyList;
-
-                   
-                public String getValue() {
-                    return value;
-                }
-
-                   
-                public void setValue(String value) {
-                    this.value = value;
-                }
-
-                   
-                public String getEmptyList() {
-                    return emptyList;
-                }
-
-                   
-                public void setEmptyList(String value) {
-                    this.emptyList = value;
-                }
 
             }
 
@@ -6876,23 +1891,13 @@ public class CampaignDO
         @XmlType(name = "", propOrder = {
                 "sharedDefinitionUseDO"
         })
-        public static class SharedIn
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class SharedIn implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "SharedDefinitionUseDO", required = true)
             protected SharedIn.SharedDefinitionUseDO sharedDefinitionUseDO;
-
-               
-            public SharedIn.SharedDefinitionUseDO getSharedDefinitionUseDO() {
-                return sharedDefinitionUseDO;
-            }
-
-               
-            public void setSharedDefinitionUseDO(SharedIn.SharedDefinitionUseDO value) {
-                this.sharedDefinitionUseDO = value;
-            }
-
 
                
             @XmlAccessorType(XmlAccessType.FIELD)
@@ -6912,8 +1917,9 @@ public class CampaignDO
                     "sharedBy",
                     "versionNumber"
             })
-            public static class SharedDefinitionUseDO
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class SharedDefinitionUseDO implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlElement(name = "ArchivedPublishState")
@@ -6951,176 +1957,6 @@ public class CampaignDO
                 @XmlAttribute(name = "objid")
                 protected Short objid;
 
-                   
-                public byte getArchivedPublishState() {
-                    return archivedPublishState;
-                }
-
-                   
-                public void setArchivedPublishState(byte value) {
-                    this.archivedPublishState = value;
-                }
-
-                   
-                public String getBusinessContextId() {
-                    return businessContextId;
-                }
-
-                   
-                public void setBusinessContextId(String value) {
-                    this.businessContextId = value;
-                }
-
-                   
-                public String getCodeChangeUnpublished() {
-                    return codeChangeUnpublished;
-                }
-
-                   
-                public void setCodeChangeUnpublished(String value) {
-                    this.codeChangeUnpublished = value;
-                }
-
-                   
-                public String getCodeEverBeenPublished() {
-                    return codeEverBeenPublished;
-                }
-
-                   
-                public void setCodeEverBeenPublished(String value) {
-                    this.codeEverBeenPublished = value;
-                }
-
-                   
-                public String getDateShared() {
-                    return dateShared;
-                }
-
-                   
-                public void setDateShared(String value) {
-                    this.dateShared = value;
-                }
-
-                   
-                public byte getFirstOccurrenceToPublish() {
-                    return firstOccurrenceToPublish;
-                }
-
-                   
-                public void setFirstOccurrenceToPublish(byte value) {
-                    this.firstOccurrenceToPublish = value;
-                }
-
-                   
-                public String getLoadedFromOldDavLocation() {
-                    return loadedFromOldDavLocation;
-                }
-
-                   
-                public void setLoadedFromOldDavLocation(String value) {
-                    this.loadedFromOldDavLocation = value;
-                }
-
-                   
-                public String getLoading() {
-                    return loading;
-                }
-
-                   
-                public void setLoading(String value) {
-                    this.loading = value;
-                }
-
-                   
-                public String getNeedToPersist() {
-                    return needToPersist;
-                }
-
-                   
-                public void setNeedToPersist(String value) {
-                    this.needToPersist = value;
-                }
-
-                   
-                public String getOldVersionNumber() {
-                    return oldVersionNumber;
-                }
-
-                   
-                public void setOldVersionNumber(String value) {
-                    this.oldVersionNumber = value;
-                }
-
-                   
-                public String getPersisting() {
-                    return persisting;
-                }
-
-                   
-                public void setPersisting(String value) {
-                    this.persisting = value;
-                }
-
-                   
-                public byte getPublishState() {
-                    return publishState;
-                }
-
-                   
-                public void setPublishState(byte value) {
-                    this.publishState = value;
-                }
-
-                   
-                public String getSharedBy() {
-                    return sharedBy;
-                }
-
-                   
-                public void setSharedBy(String value) {
-                    this.sharedBy = value;
-                }
-
-                   
-                public float getVersionNumber() {
-                    return versionNumber;
-                }
-
-                   
-                public void setVersionNumber(float value) {
-                    this.versionNumber = value;
-                }
-
-                   
-                public String getConcreteClass() {
-                    return concreteClass;
-                }
-
-                   
-                public void setConcreteClass(String value) {
-                    this.concreteClass = value;
-                }
-
-                   
-                public Byte getListpos() {
-                    return listpos;
-                }
-
-                   
-                public void setListpos(Byte value) {
-                    this.listpos = value;
-                }
-
-                   
-                public Short getObjid() {
-                    return objid;
-                }
-
-                   
-                public void setObjid(Short value) {
-                    this.objid = value;
-                }
-
             }
 
         }
@@ -7131,22 +1967,12 @@ public class CampaignDO
         @XmlType(name = "", propOrder = {
                 "statusDOs"
         })
-        public static class StatusList
-                implements Serializable {
+        @Getter
+        public static class StatusList implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "StatusDO")
-            protected List<StatusList.StatusDO> statusDOs;
-
-               
-            public List<StatusList.StatusDO> getStatusDOs() {
-                if (statusDOs == null) {
-                    statusDOs = new ArrayList<StatusList.StatusDO>();
-                }
-                return this.statusDOs;
-            }
-
-
+            protected List<StatusList.StatusDO> statusDOs = new ArrayList<>();
                
             @XmlAccessorType(XmlAccessType.FIELD)
             @XmlType(name = "", propOrder = {
@@ -7175,8 +2001,9 @@ public class CampaignDO
                     "valid",
                     "versionNumber"
             })
-            public static class StatusDO
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class StatusDO implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlElement(name = "ArchivedPublishState")
@@ -7234,276 +2061,6 @@ public class CampaignDO
                 @XmlAttribute(name = "objid")
                 protected Short objid;
 
-                   
-                public byte getArchivedPublishState() {
-                    return archivedPublishState;
-                }
-
-                   
-                public void setArchivedPublishState(byte value) {
-                    this.archivedPublishState = value;
-                }
-
-                   
-                public String getCodeChangeUnpublished() {
-                    return codeChangeUnpublished;
-                }
-
-                   
-                public void setCodeChangeUnpublished(String value) {
-                    this.codeChangeUnpublished = value;
-                }
-
-                   
-                public String getCodeEverBeenPublished() {
-                    return codeEverBeenPublished;
-                }
-
-                   
-                public void setCodeEverBeenPublished(String value) {
-                    this.codeEverBeenPublished = value;
-                }
-
-                   
-                public String getDescription() {
-                    return description;
-                }
-
-                   
-                public void setDescription(String value) {
-                    this.description = value;
-                }
-
-                   
-                public byte getFirstOccurrenceToPublish() {
-                    return firstOccurrenceToPublish;
-                }
-
-                   
-                public void setFirstOccurrenceToPublish(byte value) {
-                    this.firstOccurrenceToPublish = value;
-                }
-
-                   
-                public String getForced() {
-                    return forced;
-                }
-
-                   
-                public void setForced(String value) {
-                    this.forced = value;
-                }
-
-                   
-                public String getHidden() {
-                    return hidden;
-                }
-
-                   
-                public void setHidden(String value) {
-                    this.hidden = value;
-                }
-
-                   
-                public String getId() {
-                    return id;
-                }
-
-                   
-                public void setId(String value) {
-                    this.id = value;
-                }
-
-                   
-                public String getLoadedFromOldDavLocation() {
-                    return loadedFromOldDavLocation;
-                }
-
-                   
-                public void setLoadedFromOldDavLocation(String value) {
-                    this.loadedFromOldDavLocation = value;
-                }
-
-                   
-                public String getLoading() {
-                    return loading;
-                }
-
-                   
-                public void setLoading(String value) {
-                    this.loading = value;
-                }
-
-                   
-                public String getLockedBy() {
-                    return lockedBy;
-                }
-
-                   
-                public void setLockedBy(String value) {
-                    this.lockedBy = value;
-                }
-
-                   
-                public String getMetadataType() {
-                    return metadataType;
-                }
-
-                   
-                public void setMetadataType(String value) {
-                    this.metadataType = value;
-                }
-
-                   
-                public String getMethod() {
-                    return method;
-                }
-
-                   
-                public void setMethod(String value) {
-                    this.method = value;
-                }
-
-                   
-                public String getName() {
-                    return name;
-                }
-
-                   
-                public void setName(String value) {
-                    this.name = value;
-                }
-
-                   
-                public String getNeedToPersist() {
-                    return needToPersist;
-                }
-
-                   
-                public void setNeedToPersist(String value) {
-                    this.needToPersist = value;
-                }
-
-                   
-                public String getNoWritePermission() {
-                    return noWritePermission;
-                }
-
-                   
-                public void setNoWritePermission(String value) {
-                    this.noWritePermission = value;
-                }
-
-                   
-                public String getOldVersionNumber() {
-                    return oldVersionNumber;
-                }
-
-                   
-                public void setOldVersionNumber(String value) {
-                    this.oldVersionNumber = value;
-                }
-
-                   
-                public String getPersisting() {
-                    return persisting;
-                }
-
-                   
-                public void setPersisting(String value) {
-                    this.persisting = value;
-                }
-
-                   
-                public byte getPublishState() {
-                    return publishState;
-                }
-
-                   
-                public void setPublishState(byte value) {
-                    this.publishState = value;
-                }
-
-                   
-                public String getReadOnly() {
-                    return readOnly;
-                }
-
-                   
-                public void setReadOnly(String value) {
-                    this.readOnly = value;
-                }
-
-                   
-                public byte getType() {
-                    return type;
-                }
-
-                   
-                public void setType(byte value) {
-                    this.type = value;
-                }
-
-                   
-                public String getUserDefinedStatus44() {
-                    return userDefinedStatus44;
-                }
-
-                   
-                public void setUserDefinedStatus44(String value) {
-                    this.userDefinedStatus44 = value;
-                }
-
-                   
-                public String getValid() {
-                    return valid;
-                }
-
-                   
-                public void setValid(String value) {
-                    this.valid = value;
-                }
-
-                   
-                public float getVersionNumber() {
-                    return versionNumber;
-                }
-
-                   
-                public void setVersionNumber(float value) {
-                    this.versionNumber = value;
-                }
-
-                   
-                public String getConcreteClass() {
-                    return concreteClass;
-                }
-
-                   
-                public void setConcreteClass(String value) {
-                    this.concreteClass = value;
-                }
-
-                   
-                public Byte getListpos() {
-                    return listpos;
-                }
-
-                   
-                public void setListpos(Byte value) {
-                    this.listpos = value;
-                }
-
-                   
-                public Short getObjid() {
-                    return objid;
-                }
-
-                   
-                public void setObjid(Short value) {
-                    this.objid = value;
-                }
-
             }
 
         }
@@ -7529,8 +2086,9 @@ public class CampaignDO
             "publishState",
             "versionNumber"
     })
-    public static class Folder
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class Folder implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlElement(name = "ArchivedPublishState")
@@ -7566,165 +2124,23 @@ public class CampaignDO
         @XmlAttribute(name = "objid")
         protected Short objid;
 
-           
-        public byte getArchivedPublishState() {
-            return archivedPublishState;
-        }
+    }
 
-           
-        public void setArchivedPublishState(byte value) {
-            this.archivedPublishState = value;
-        }
 
-           
-        public String getCodeChangeUnpublished() {
-            return codeChangeUnpublished;
-        }
+       
+    @XmlAccessorType(XmlAccessType.FIELD)
+    @XmlType(name = "", propOrder = {
+            "value"
+    })
+    @Getter
+    @Setter
+    public static class ProcessingEndDate implements Serializable {
 
-           
-        public void setCodeChangeUnpublished(String value) {
-            this.codeChangeUnpublished = value;
-        }
-
-           
-        public String getCodeEverBeenPublished() {
-            return codeEverBeenPublished;
-        }
-
-           
-        public void setCodeEverBeenPublished(String value) {
-            this.codeEverBeenPublished = value;
-        }
-
-           
-        public byte getFirstOccurrenceToPublish() {
-            return firstOccurrenceToPublish;
-        }
-
-           
-        public void setFirstOccurrenceToPublish(byte value) {
-            this.firstOccurrenceToPublish = value;
-        }
-
-           
-        public String getLoadedFromOldDavLocation() {
-            return loadedFromOldDavLocation;
-        }
-
-           
-        public void setLoadedFromOldDavLocation(String value) {
-            this.loadedFromOldDavLocation = value;
-        }
-
-           
-        public String getLoading() {
-            return loading;
-        }
-
-           
-        public void setLoading(String value) {
-            this.loading = value;
-        }
-
-           
-        public String getName() {
-            return name;
-        }
-
-           
-        public void setName(String value) {
-            this.name = value;
-        }
-
-           
-        public String getNeedToPersist() {
-            return needToPersist;
-        }
-
-           
-        public void setNeedToPersist(String value) {
-            this.needToPersist = value;
-        }
-
-           
-        public String getOldVersionNumber() {
-            return oldVersionNumber;
-        }
-
-           
-        public void setOldVersionNumber(String value) {
-            this.oldVersionNumber = value;
-        }
-
-           
-        public String getOwner() {
-            return owner;
-        }
-
-           
-        public void setOwner(String value) {
-            this.owner = value;
-        }
-
-           
-        public String getParentFolder() {
-            return parentFolder;
-        }
-
-           
-        public void setParentFolder(String value) {
-            this.parentFolder = value;
-        }
-
-           
-        public String getPersisting() {
-            return persisting;
-        }
-
-           
-        public void setPersisting(String value) {
-            this.persisting = value;
-        }
-
-           
-        public byte getPublishState() {
-            return publishState;
-        }
-
-           
-        public void setPublishState(byte value) {
-            this.publishState = value;
-        }
-
-           
-        public float getVersionNumber() {
-            return versionNumber;
-        }
-
-           
-        public void setVersionNumber(float value) {
-            this.versionNumber = value;
-        }
-
-           
-        public String getConcreteClass() {
-            return concreteClass;
-        }
-
-           
-        public void setConcreteClass(String value) {
-            this.concreteClass = value;
-        }
-
-           
-        public Short getObjid() {
-            return objid;
-        }
-
-           
-        public void setObjid(Short value) {
-            this.objid = value;
-        }
+        private final static long serialVersionUID = -1L;
+        @XmlValue
+        protected String value;
+        @XmlAttribute(name = "ConcreteClass")
+        protected String concreteClass;
 
     }
 
@@ -7734,71 +2150,15 @@ public class CampaignDO
     @XmlType(name = "", propOrder = {
             "value"
     })
-    public static class ProcessingEndDate
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class ProcessingStartDate implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlValue
         protected String value;
         @XmlAttribute(name = "ConcreteClass")
         protected String concreteClass;
-
-           
-        public String getValue() {
-            return value;
-        }
-
-           
-        public void setValue(String value) {
-            this.value = value;
-        }
-
-           
-        public String getConcreteClass() {
-            return concreteClass;
-        }
-
-           
-        public void setConcreteClass(String value) {
-            this.concreteClass = value;
-        }
-
-    }
-
-
-       
-    @XmlAccessorType(XmlAccessType.FIELD)
-    @XmlType(name = "", propOrder = {
-            "value"
-    })
-    public static class ProcessingStartDate
-            implements Serializable {
-
-        private final static long serialVersionUID = -1L;
-        @XmlValue
-        protected String value;
-        @XmlAttribute(name = "ConcreteClass")
-        protected String concreteClass;
-
-           
-        public String getValue() {
-            return value;
-        }
-
-           
-        public void setValue(String value) {
-            this.value = value;
-        }
-
-           
-        public String getConcreteClass() {
-            return concreteClass;
-        }
-
-           
-        public void setConcreteClass(String value) {
-            this.concreteClass = value;
-        }
 
     }
 
@@ -7821,8 +2181,9 @@ public class CampaignDO
             "publishedOnSave",
             "versionNumber"
     })
-    public static class PublishedObjects
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class PublishedObjects implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlElement(name = "ArchivedPublishState")
@@ -7858,166 +2219,6 @@ public class CampaignDO
         @XmlAttribute(name = "objid")
         protected Short objid;
 
-           
-        public byte getArchivedPublishState() {
-            return archivedPublishState;
-        }
-
-           
-        public void setArchivedPublishState(byte value) {
-            this.archivedPublishState = value;
-        }
-
-           
-        public String getCampaignId() {
-            return campaignId;
-        }
-
-           
-        public void setCampaignId(String value) {
-            this.campaignId = value;
-        }
-
-           
-        public String getCodeChangeUnpublished() {
-            return codeChangeUnpublished;
-        }
-
-           
-        public void setCodeChangeUnpublished(String value) {
-            this.codeChangeUnpublished = value;
-        }
-
-           
-        public String getCodeEverBeenPublished() {
-            return codeEverBeenPublished;
-        }
-
-           
-        public void setCodeEverBeenPublished(String value) {
-            this.codeEverBeenPublished = value;
-        }
-
-           
-        public byte getFirstOccurrenceToPublish() {
-            return firstOccurrenceToPublish;
-        }
-
-           
-        public void setFirstOccurrenceToPublish(byte value) {
-            this.firstOccurrenceToPublish = value;
-        }
-
-           
-        public String getLoadedFromOldDavLocation() {
-            return loadedFromOldDavLocation;
-        }
-
-           
-        public void setLoadedFromOldDavLocation(String value) {
-            this.loadedFromOldDavLocation = value;
-        }
-
-           
-        public String getLoading() {
-            return loading;
-        }
-
-           
-        public void setLoading(String value) {
-            this.loading = value;
-        }
-
-           
-        public String getNeedToPersist() {
-            return needToPersist;
-        }
-
-           
-        public void setNeedToPersist(String value) {
-            this.needToPersist = value;
-        }
-
-           
-        public String getNewCampaign() {
-            return newCampaign;
-        }
-
-           
-        public void setNewCampaign(String value) {
-            this.newCampaign = value;
-        }
-
-           
-        public String getOldVersionNumber() {
-            return oldVersionNumber;
-        }
-
-           
-        public void setOldVersionNumber(String value) {
-            this.oldVersionNumber = value;
-        }
-
-           
-        public String getPersisting() {
-            return persisting;
-        }
-
-           
-        public void setPersisting(String value) {
-            this.persisting = value;
-        }
-
-           
-        public byte getPublishState() {
-            return publishState;
-        }
-
-           
-        public void setPublishState(byte value) {
-            this.publishState = value;
-        }
-
-           
-        public String getPublishedOnSave() {
-            return publishedOnSave;
-        }
-
-           
-        public void setPublishedOnSave(String value) {
-            this.publishedOnSave = value;
-        }
-
-           
-        public float getVersionNumber() {
-            return versionNumber;
-        }
-
-           
-        public void setVersionNumber(float value) {
-            this.versionNumber = value;
-        }
-
-           
-        public String getConcreteClass() {
-            return concreteClass;
-        }
-
-           
-        public void setConcreteClass(String value) {
-            this.concreteClass = value;
-        }
-
-           
-        public Short getObjid() {
-            return objid;
-        }
-
-           
-        public void setObjid(Short value) {
-            this.objid = value;
-        }
-
     }
 
 
@@ -8026,34 +2227,15 @@ public class CampaignDO
     @XmlType(name = "", propOrder = {
             "value"
     })
-    public static class UserRoles
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class UserRoles implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlValue
         protected String value;
         @XmlAttribute(name = "EmptyList")
         protected String emptyList;
-
-           
-        public String getValue() {
-            return value;
-        }
-
-           
-        public void setValue(String value) {
-            this.value = value;
-        }
-
-           
-        public String getEmptyList() {
-            return emptyList;
-        }
-
-           
-        public void setEmptyList(String value) {
-            this.emptyList = value;
-        }
 
     }
 
@@ -8079,8 +2261,9 @@ public class CampaignDO
             "versionEntries",
             "versionNumber"
     })
-    public static class VersionHistory
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class VersionHistory implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlElement(name = "ArchivedPublishState")
@@ -8122,218 +2305,15 @@ public class CampaignDO
         @XmlAttribute(name = "objid")
         protected Short objid;
 
-           
-        public byte getArchivedPublishState() {
-            return archivedPublishState;
-        }
-
-           
-        public void setArchivedPublishState(byte value) {
-            this.archivedPublishState = value;
-        }
-
-           
-        public String getCodeChangeUnpublished() {
-            return codeChangeUnpublished;
-        }
-
-           
-        public void setCodeChangeUnpublished(String value) {
-            this.codeChangeUnpublished = value;
-        }
-
-           
-        public String getCodeEverBeenPublished() {
-            return codeEverBeenPublished;
-        }
-
-           
-        public void setCodeEverBeenPublished(String value) {
-            this.codeEverBeenPublished = value;
-        }
-
-           
-        public String getExecutionPublished() {
-            return executionPublished;
-        }
-
-           
-        public void setExecutionPublished(String value) {
-            this.executionPublished = value;
-        }
-
-           
-        public byte getFirstOccurrenceToPublish() {
-            return firstOccurrenceToPublish;
-        }
-
-           
-        public void setFirstOccurrenceToPublish(byte value) {
-            this.firstOccurrenceToPublish = value;
-        }
-
-           
-        public String getFullPublished() {
-            return fullPublished;
-        }
-
-           
-        public void setFullPublished(String value) {
-            this.fullPublished = value;
-        }
-
-           
-        public String getLoadedFromOldDavLocation() {
-            return loadedFromOldDavLocation;
-        }
-
-           
-        public void setLoadedFromOldDavLocation(String value) {
-            this.loadedFromOldDavLocation = value;
-        }
-
-           
-        public String getLoading() {
-            return loading;
-        }
-
-           
-        public void setLoading(String value) {
-            this.loading = value;
-        }
-
-           
-        public byte getMarkedForDeploymentVersion() {
-            return markedForDeploymentVersion;
-        }
-
-           
-        public void setMarkedForDeploymentVersion(byte value) {
-            this.markedForDeploymentVersion = value;
-        }
-
-           
-        public String getNeedToPersist() {
-            return needToPersist;
-        }
-
-           
-        public void setNeedToPersist(String value) {
-            this.needToPersist = value;
-        }
-
-           
-        public String getOldVersionNumber() {
-            return oldVersionNumber;
-        }
-
-           
-        public void setOldVersionNumber(String value) {
-            this.oldVersionNumber = value;
-        }
-
-           
-        public String getPersisting() {
-            return persisting;
-        }
-
-           
-        public void setPersisting(String value) {
-            this.persisting = value;
-        }
-
-           
-        public byte getPublishState() {
-            return publishState;
-        }
-
-           
-        public void setPublishState(byte value) {
-            this.publishState = value;
-        }
-
-           
-        public String getPublished() {
-            return published;
-        }
-
-           
-        public void setPublished(String value) {
-            this.published = value;
-        }
-
-           
-        public String getPublishedBy() {
-            return publishedBy;
-        }
-
-           
-        public void setPublishedBy(String value) {
-            this.publishedBy = value;
-        }
-
-           
-        public VersionHistory.VersionEntries getVersionEntries() {
-            return versionEntries;
-        }
-
-           
-        public void setVersionEntries(VersionHistory.VersionEntries value) {
-            this.versionEntries = value;
-        }
-
-           
-        public float getVersionNumber() {
-            return versionNumber;
-        }
-
-           
-        public void setVersionNumber(float value) {
-            this.versionNumber = value;
-        }
-
-           
-        public String getConcreteClass() {
-            return concreteClass;
-        }
-
-           
-        public void setConcreteClass(String value) {
-            this.concreteClass = value;
-        }
-
-           
-        public Short getObjid() {
-            return objid;
-        }
-
-           
-        public void setObjid(Short value) {
-            this.objid = value;
-        }
-
-
-           
         @XmlAccessorType(XmlAccessType.FIELD)
         @XmlType(name = "", propOrder = {
                 "versionEntryDOs"
         })
-        public static class VersionEntries
-                implements Serializable {
+        public static class VersionEntries implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "VersionEntryDO")
-            protected List<VersionEntries.VersionEntryDO> versionEntryDOs;
-
-               
-            public List<VersionEntries.VersionEntryDO> getVersionEntryDOs() {
-                if (versionEntryDOs == null) {
-                    versionEntryDOs = new ArrayList<VersionEntries.VersionEntryDO>();
-                }
-                return this.versionEntryDOs;
-            }
-
-
+            protected List<VersionEntries.VersionEntryDO> versionEntryDOs = new ArrayList<>();
                
             @XmlAccessorType(XmlAccessType.FIELD)
             @XmlType(name = "", propOrder = {
@@ -8362,8 +2342,9 @@ public class CampaignDO
                     "versionIndex",
                     "versionNumber"
             })
-            public static class VersionEntryDO
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class VersionEntryDO implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlElement(name = "ActionId", required = true)
@@ -8420,276 +2401,6 @@ public class CampaignDO
                 protected Byte listpos;
                 @XmlAttribute(name = "objid")
                 protected Short objid;
-
-                   
-                public String getActionId() {
-                    return actionId;
-                }
-
-                   
-                public void setActionId(String value) {
-                    this.actionId = value;
-                }
-
-                   
-                public byte getArchivedPublishState() {
-                    return archivedPublishState;
-                }
-
-                   
-                public void setArchivedPublishState(byte value) {
-                    this.archivedPublishState = value;
-                }
-
-                   
-                public String getCodeChangeUnpublished() {
-                    return codeChangeUnpublished;
-                }
-
-                   
-                public void setCodeChangeUnpublished(String value) {
-                    this.codeChangeUnpublished = value;
-                }
-
-                   
-                public String getCodeEverBeenPublished() {
-                    return codeEverBeenPublished;
-                }
-
-                   
-                public void setCodeEverBeenPublished(String value) {
-                    this.codeEverBeenPublished = value;
-                }
-
-                   
-                public String getComment() {
-                    return comment;
-                }
-
-                   
-                public void setComment(String value) {
-                    this.comment = value;
-                }
-
-                   
-                public String getDateModified() {
-                    return dateModified;
-                }
-
-                   
-                public void setDateModified(String value) {
-                    this.dateModified = value;
-                }
-
-                   
-                public String getExecutionPublished() {
-                    return executionPublished;
-                }
-
-                   
-                public void setExecutionPublished(String value) {
-                    this.executionPublished = value;
-                }
-
-                   
-                public byte getFirstOccurrenceToPublish() {
-                    return firstOccurrenceToPublish;
-                }
-
-                   
-                public void setFirstOccurrenceToPublish(byte value) {
-                    this.firstOccurrenceToPublish = value;
-                }
-
-                   
-                public String getFullPublished() {
-                    return fullPublished;
-                }
-
-                   
-                public void setFullPublished(String value) {
-                    this.fullPublished = value;
-                }
-
-                   
-                public String getLoadedFromOldDavLocation() {
-                    return loadedFromOldDavLocation;
-                }
-
-                   
-                public void setLoadedFromOldDavLocation(String value) {
-                    this.loadedFromOldDavLocation = value;
-                }
-
-                   
-                public String getLoading() {
-                    return loading;
-                }
-
-                   
-                public void setLoading(String value) {
-                    this.loading = value;
-                }
-
-                   
-                public byte getMarkedForDeploymentVersion() {
-                    return markedForDeploymentVersion;
-                }
-
-                   
-                public void setMarkedForDeploymentVersion(byte value) {
-                    this.markedForDeploymentVersion = value;
-                }
-
-                   
-                public String getNeedToPersist() {
-                    return needToPersist;
-                }
-
-                   
-                public void setNeedToPersist(String value) {
-                    this.needToPersist = value;
-                }
-
-                   
-                public String getOldVersionNumber() {
-                    return oldVersionNumber;
-                }
-
-                   
-                public void setOldVersionNumber(String value) {
-                    this.oldVersionNumber = value;
-                }
-
-                   
-                public String getPersisting() {
-                    return persisting;
-                }
-
-                   
-                public void setPersisting(String value) {
-                    this.persisting = value;
-                }
-
-                   
-                public String getPrevStatusId() {
-                    return prevStatusId;
-                }
-
-                   
-                public void setPrevStatusId(String value) {
-                    this.prevStatusId = value;
-                }
-
-                   
-                public byte getPublishState() {
-                    return publishState;
-                }
-
-                   
-                public void setPublishState(byte value) {
-                    this.publishState = value;
-                }
-
-                   
-                public String getPublished() {
-                    return published;
-                }
-
-                   
-                public void setPublished(String value) {
-                    this.published = value;
-                }
-
-                   
-                public String getPublishedBy() {
-                    return publishedBy;
-                }
-
-                   
-                public void setPublishedBy(String value) {
-                    this.publishedBy = value;
-                }
-
-                   
-                public String getStatusComment() {
-                    return statusComment;
-                }
-
-                   
-                public void setStatusComment(String value) {
-                    this.statusComment = value;
-                }
-
-                   
-                public String getStatusId() {
-                    return statusId;
-                }
-
-                   
-                public void setStatusId(String value) {
-                    this.statusId = value;
-                }
-
-                   
-                public String getUserName() {
-                    return userName;
-                }
-
-                   
-                public void setUserName(String value) {
-                    this.userName = value;
-                }
-
-                   
-                public byte getVersionIndex() {
-                    return versionIndex;
-                }
-
-                   
-                public void setVersionIndex(byte value) {
-                    this.versionIndex = value;
-                }
-
-                   
-                public float getVersionNumber() {
-                    return versionNumber;
-                }
-
-                   
-                public void setVersionNumber(float value) {
-                    this.versionNumber = value;
-                }
-
-                   
-                public String getConcreteClass() {
-                    return concreteClass;
-                }
-
-                   
-                public void setConcreteClass(String value) {
-                    this.concreteClass = value;
-                }
-
-                   
-                public Byte getListpos() {
-                    return listpos;
-                }
-
-                   
-                public void setListpos(Byte value) {
-                    this.listpos = value;
-                }
-
-                   
-                public Short getObjid() {
-                    return objid;
-                }
-
-                   
-                public void setObjid(Short value) {
-                    this.objid = value;
-                }
 
             }
 

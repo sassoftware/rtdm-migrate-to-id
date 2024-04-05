@@ -40,6 +40,7 @@ public class SplitNodeConverter {
         } else {
             Step step = new Step();
             step.setType(Step.TypeEnum.BRANCH);
+            step.setName(splitNodeDataDO.getNodeName());
 
             SplitNodeDataDO.SplitOnNodeDataDO splitOnNodeDataDO = splitNodeDataDO.getSplitOnNodeDataDO();
 
@@ -111,6 +112,7 @@ public class SplitNodeConverter {
         Step branchstep = new Step();
         branchstep.setType(Step.TypeEnum.BRANCH);
         branchstep.setBranchType(RANGE_BRANCH_TYPE);
+        branchstep.setName(splitNodeDataDO.getNodeName());
 
         List<BranchCase> branchCases = new ArrayList<>();
         int percentCounter = 1;
@@ -157,8 +159,6 @@ public class SplitNodeConverter {
         RuleSetStep ruleSetForUpdate = randomNumberGeneratorStep.getRuleSet();
 
         final boolean pathKeyEnabled = Boolean.parseBoolean(splitNodeDataDO.getEnableSeed());
-        final String pathKey = splitNodeDataDO.getSeedVarRefDO().getVarName();
-        final String pathKeyDataType = splitNodeDataDO.getSeedVarRefDO().getType();
 
         List<Signature> signatureList = new ArrayList<>();
 
@@ -167,8 +167,13 @@ public class SplitNodeConverter {
         randomNumberSignature.setName(commonProcessing.sanitizeAndReduceVariableName(RANDOM_NUMBER_VARIABLE));
         randomNumberSignature.setDirection(OUTPUT_DIRECTION);
         signatureList.add(randomNumberSignature);
+        
+        final Action action = new Action();
 
         if (pathKeyEnabled) {
+            final String pathKey = splitNodeDataDO.getSeedVarRefDO().getVarName();
+            final String pathKeyDataType = splitNodeDataDO.getSeedVarRefDO().getType();
+            
             Signature pathKeySignature = new Signature();
             pathKeySignature.setDataType(String.valueOf(commonProcessing.getDatatypeOfVar(pathKeyDataType)));
             pathKeySignature.setName(commonProcessing.sanitizeAndReduceVariableName(pathKey));
@@ -180,6 +185,10 @@ public class SplitNodeConverter {
             pathKeyMapping.setTargetDecisionTermName(commonProcessing.sanitizeAndReduceVariableName(pathKey));
             pathKeyMapping.setDirection(Mapping.DirectionEnum.INPUT);
             commonProcessing.checkMappingForDuplicate(pathKeyMapping, randomNumberGeneratorStep);
+
+            action.setExpression(RANDOM_NUMBER_VARIABLE + " = MODZ(ABS(" + pathKey + ") * 811, 100)");
+        } else {
+            action.setExpression(RANDOM_NUMBER_VARIABLE + " = RAND('uniform') * 100");
         }
 
         SignatureTerm signatureTerm = new SignatureTerm();
@@ -200,8 +209,6 @@ public class SplitNodeConverter {
         rule.setConditional("if");
         rule.setRuleFiredTrackingEnabled(false);
 
-        final Action action = new Action();
-        action.setExpression(pathKeyEnabled ? RANDOM_NUMBER_VARIABLE + " = MODZ(ABS(" + pathKey + ") * 811, 100)" : RANDOM_NUMBER_VARIABLE + " = RAND('uniform') * 100");
         action.setStatus("valid");
         action.setType("complex");
         rule.setActions(Collections.singletonList(action));

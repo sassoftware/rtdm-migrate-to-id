@@ -103,7 +103,7 @@ public class SubDiagramNodeConverter {
         IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
 
         for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO
-                : subDiagramNodeDataDO.getSubdiagramEvent().getRequestVars().getIBVariableDOs()) {
+                : subDiagramNodeDataDO.getSubdiagramEvent().getRequestVars().getIbVariableDOs()) {
             IBVariableDO ibVariableDOInner = mapper.ibVariableDoGet(ibVariableDO);
             
             if (ibVariableDOInner.getValue()!=null) {
@@ -118,7 +118,7 @@ public class SubDiagramNodeConverter {
             }
         }
         for (ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO ibVariableDO
-                : subDiagramNodeDataDO.getSubdiagramEvent().getReplyVars().getIBVariableDOs()) {
+                : subDiagramNodeDataDO.getSubdiagramEvent().getReplyVars().getIbVariableDOs()) {
             IBVariableDO ibVariableDOInner = mapper.ibVariableDoGet(ibVariableDO);
             commonProcessing.addMapping(ibVariableDOInner, OUTPUT_DIRECTION, step, false, decision);
             commonProcessing.addNewSignatureItem(ibVariableDOInner, "none", decision, null);
@@ -154,7 +154,7 @@ public class SubDiagramNodeConverter {
         Rule rule = new Rule();
 
         RuleSetStep ruleSetForUpdate = step.getRuleSet();
-        List<ProcessNodeDataDO.Process.InputVariableList.IBVariableDO> ibVariableDOs = inputVariableList.getIBVariableDOs();
+        List<ProcessNodeDataDO.Process.InputVariableList.IBVariableDO> ibVariableDOs = inputVariableList.getIbVariableDOs();
         List<Signature> signatureList = new ArrayList<>();
         List<Action> actionList = new ArrayList<>();
 
@@ -195,7 +195,7 @@ public class SubDiagramNodeConverter {
         
         IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
 
-        for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO : subdiagramEvent.getRequestVars().getIBVariableDOs()) {
+        for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO : subdiagramEvent.getRequestVars().getIbVariableDOs()) {
             IBVariableDO ibVariableDOMapped = mapper.ibVariableDoGet(ibVariableDO);
             String varOriginalName = ibVariableDOMapped.getName();
             if (ibVariableDOMapped.getValue() != null) {

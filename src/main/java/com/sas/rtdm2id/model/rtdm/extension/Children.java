@@ -1,5 +1,8 @@
 package com.sas.rtdm2id.model.rtdm.extension;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
@@ -13,6 +16,8 @@ import java.util.List;
         "filterNodeDOs",
         "logicNodeDOs"
 })
+@Getter
+@Setter
 public class Children implements Serializable {
 
     private final static long serialVersionUID = -1L;
@@ -23,19 +28,4 @@ public class Children implements Serializable {
     @XmlElement(name = "LogicNodeDO")
     private List<LogicNodeDO> logicNodeDOs = new ArrayList<>();
 
-    public List<FilterNodeDO> getFilterNodeDOs() {
-        return filterNodeDOs;
-    }
-
-    public void setFilterNodeDO(List<FilterNodeDO> filterNodeDOs) {
-        this.filterNodeDOs = filterNodeDOs;
-    }
-
-    public List<LogicNodeDO> getLogicNodeDOs() {
-        return logicNodeDOs;
-    }
-
-    public void setLogicNodeDO(List<LogicNodeDO> logicNodeDOs) {
-        this.logicNodeDOs = logicNodeDOs;
-    }
 }

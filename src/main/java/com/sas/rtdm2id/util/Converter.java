@@ -12,6 +12,7 @@ import com.sas.rtdm2id.model.id.decision.ConditionBranch;
 import com.sas.rtdm2id.model.id.decision.ConditionDecisionStep;
 import com.sas.rtdm2id.model.id.decision.Decision;
 import com.sas.rtdm2id.model.id.decision.Mapping;
+import com.sas.rtdm2id.model.id.decision.SignatureTerm;
 import com.sas.rtdm2id.model.id.decision.Step;
 import com.sas.rtdm2id.model.rtdm.*;
 import com.sas.rtdm2id.model.rtdm.extension.SubDiagramNodeDataDO;
@@ -74,14 +75,14 @@ public class Converter {
             // Decision Campaign (DC)
             StartNodeDataDO.Event.RequestVars requestVars = batch.getLogicalUnit().getStartNodeDataDO().getEvent().getRequestVars();
             if (requestVars != null) {
-                for (StartNodeDataDO.Event.RequestVars.IBVariableDO ibVariableDO : requestVars.getIBVariableDOs()) {
+                for (StartNodeDataDO.Event.RequestVars.IBVariableDO ibVariableDO : requestVars.getIbVariableDOs()) {
                     processEventVars(decision, mapper.ibVariableDoGet(ibVariableDO), INPUT_DIRECTION, ibVariableDO.getValue());
                 }
             }
 
             StartNodeDataDO.Event.ReplyVars replyVars = batch.getLogicalUnit().getStartNodeDataDO().getEvent().getReplyVars();
             if (replyVars != null) {
-                for (StartNodeDataDO.Event.ReplyVars.IBVariableDO ibVariableDO : replyVars.getIBVariableDOs()) {
+                for (StartNodeDataDO.Event.ReplyVars.IBVariableDO ibVariableDO : replyVars.getIbVariableDOs()) {
                     processEventVars(decision, mapper.ibVariableDoGet(ibVariableDO), OUTPUT_DIRECTION, ibVariableDO.getValue());
                 }
             }
@@ -92,7 +93,7 @@ public class Converter {
             StartNodeDataDO.InputVariables inputVars = batch.getLogicalUnit().getStartNodeDataDO().getInputVariables();
             if (inputVars!=null) {
                 // We can leverage the existing IBVariableDO data structure defined for an event
-                for (StartNodeDataDO.Event.RequestVars.IBVariableDO ibVariableDO : inputVars.getIBVariableDOs()) {
+                for (StartNodeDataDO.Event.RequestVars.IBVariableDO ibVariableDO : inputVars.getIbVariableDOs()) {
                     processEventVars(decision, mapper.ibVariableDoGet(ibVariableDO), INPUT_DIRECTION, ibVariableDO.getValue());
                 }
             }
@@ -114,7 +115,40 @@ public class Converter {
         finalConnectionOfNodes(root, objIDStack);
 
         decision.setFlow(conditionDecisionStep);
+        addMissingVars(decision);
         return decision;
+    }
+
+    private void addMissingVars(Decision decision) {
+        Set<String> varNames = new HashSet<String>();
+        List<SignatureTerm> signatureTerms = decision.getSignature();
+        signatureTerms.forEach(
+                signatureTerm -> {
+                    varNames.add(signatureTerm.getName());
+                }
+        );
+        ConditionDecisionStep decisionFlow = decision.getFlow();
+        if (decisionFlow!=null && decisionFlow.getFlow()!=null){
+            decisionFlow.getFlow().forEach(
+                    step -> {
+                        if(step.getMappings()!=null){
+                            step.getMappings().forEach(
+                                mapping -> {
+                                    String decisionVarName = mapping.getTargetDecisionTermName();
+                                    if(!varNames.contains(decisionVarName)){
+                                        SignatureTerm newTerm = new SignatureTerm();
+                                        newTerm.setName(decisionVarName);
+                                        newTerm.setDirection(SignatureTerm.DirectionEnum.fromValue(mapping.getDirection().toString()));
+                                        newTerm.setDataType(SignatureTerm.DataTypeEnum.UNKNOWN);
+                                        signatureTerms.add(newTerm);
+                                        varNames.add(decisionVarName);
+                                    }
+                                }
+                        );
+                        }
+                    }
+            );
+        }
     }
 
     private void processEventVars(Decision decision

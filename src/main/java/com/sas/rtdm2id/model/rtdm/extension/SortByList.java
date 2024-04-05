@@ -4,6 +4,9 @@ SPDX-License-Identifier: Apache-2.0
 */
 package com.sas.rtdm2id.model.rtdm.extension;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.io.Serializable;
 
 import javax.xml.bind.annotation.XmlAccessType;
@@ -16,28 +19,15 @@ import javax.xml.bind.annotation.XmlValue;
 @XmlType(name = "", propOrder = {
         "value"
 })
+@Getter
+@Setter
 public class SortByList implements Serializable {
+
     private static final long serialVersionUID = -1L;
     
     @XmlValue
     protected String value;
     @XmlAttribute(name = "EmptyList")
     protected String emptyList;
-       
-    public String getValue() {
-        return value;
-    }
-       
-    public void setValue(String value) {
-        this.value = value;
-    }
-       
-    public String getEmptyList() {
-        return emptyList;
-    }
-       
-    public void setEmptyList(String value) {
-        this.emptyList = value;
-    }
 
 }

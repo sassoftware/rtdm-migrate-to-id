@@ -28,7 +28,7 @@ public class AssignmentNodeConverter {
     public List<Step> createAssignment(AssignmentNodeDataDO assignmentNodeDataDO, Decision decision, Short objId) {
         List<Step> stepList = new ArrayList<>();
         Step step = mapStorage.getRuleSetStepMap().get(commonProcessing.makeAssignmentNodeRuleSetName(assignmentNodeDataDO));
-        assignmentNodeDataDO.getAssignments().getIBVariableDOs().forEach(variable->{
+        assignmentNodeDataDO.getAssignments().getIbVariableDOs().forEach(variable->{
            String varOriginalName = variable.getName();
            if (variable.getValue() != null){
               com.sas.rtdm2id.model.rtdm.extension.ValueTypeVarInfoDO valueTypeVarInfoDO =  variable.getValue().getValueTypeVarInfoDO();
@@ -44,7 +44,7 @@ public class AssignmentNodeConverter {
     public void updateRuleSet(AssignmentNodeDataDO assignmentNodeDataDO, Step step, Decision decision) {
         RuleSet ruleSet = new RuleSet();
         RuleSetStep ruleSetForUpdate = step.getRuleSet();
-        List<com.sas.rtdm2id.model.rtdm.extension.IBVariableDO> ibVariableDOs = assignmentNodeDataDO.getAssignments().getIBVariableDOs();
+        List<com.sas.rtdm2id.model.rtdm.extension.IBVariableDO> ibVariableDOs = assignmentNodeDataDO.getAssignments().getIbVariableDOs();
         if (ibVariableDOs != null && !ibVariableDOs.isEmpty()) {
             commonProcessing.processAssignmentVariables(step, decision, ruleSet, ruleSetForUpdate, ibVariableDOs);
         }

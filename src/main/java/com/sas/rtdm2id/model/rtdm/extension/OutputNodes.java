@@ -24,20 +24,4 @@ public class OutputNodes implements Serializable {
     @XmlAttribute(name = "ListTypes")
     protected String listTypes;
 
-    public String getValue() {
-        return value;
-    }
-       
-    public void setValue(String value) {
-        this.value = value;
-    }
-       
-    public String getListTypes() {
-        return listTypes;
-    }
-       
-    public void setListTypes(String value) {
-        this.listTypes = value;
-    }
-
 }

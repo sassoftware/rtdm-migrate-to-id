@@ -4,6 +4,9 @@ SPDX-License-Identifier: Apache-2.0
 */
 package com.sas.rtdm2id.model.rtdm.extension;
 
+import lombok.Getter;
+import lombok.Setter;
+
 import java.io.Serializable;
 
 import javax.xml.bind.annotation.XmlAccessType;
@@ -35,6 +38,8 @@ import javax.xml.bind.annotation.XmlType;
         "valueTypeVarInfoDO",
         "versionNumber"
 })
+@Getter
+@Setter
 public class Value implements Serializable {
 
     private static final long serialVersionUID = -1L;
@@ -83,221 +88,5 @@ public class Value implements Serializable {
     protected String concreteClass;
     @XmlAttribute(name = "objid")
     protected Short objid;
-
-       
-    public byte getArchivedPublishState() {
-        return archivedPublishState;
-    }
-
-       
-    public void setArchivedPublishState(byte value) {
-        this.archivedPublishState = value;
-    }
-
-       
-    public String getCodeChangeUnpublished() {
-        return codeChangeUnpublished;
-    }
-
-       
-    public void setCodeChangeUnpublished(String value) {
-        this.codeChangeUnpublished = value;
-    }
-
-       
-    public String getCodeEverBeenPublished() {
-        return codeEverBeenPublished;
-    }
-
-       
-    public void setCodeEverBeenPublished(String value) {
-        this.codeEverBeenPublished = value;
-    }
-
-       
-    public byte getFirstOccurrenceToPublish() {
-        return firstOccurrenceToPublish;
-    }
-
-       
-    public void setFirstOccurrenceToPublish(byte value) {
-        this.firstOccurrenceToPublish = value;
-    }
-
-       
-    public String getLoadedFromOldDavLocation() {
-        return loadedFromOldDavLocation;
-    }
-
-       
-    public void setLoadedFromOldDavLocation(String value) {
-        this.loadedFromOldDavLocation = value;
-    }
-
-       
-    public String getLoading() {
-        return loading;
-    }
-
-       
-    public void setLoading(String value) {
-        this.loading = value;
-    }
-
-       
-    public String getNeedToPersist() {
-        return needToPersist;
-    }
-
-       
-    public void setNeedToPersist(String value) {
-        this.needToPersist = value;
-    }
-
-       
-    public String getOldVersionNumber() {
-        return oldVersionNumber;
-    }
-
-       
-    public void setOldVersionNumber(String value) {
-        this.oldVersionNumber = value;
-    }
-
-       
-    public String getPersisting() {
-        return persisting;
-    }
-
-       
-    public void setPersisting(String value) {
-        this.persisting = value;
-    }
-
-       
-    public byte getPublishState() {
-        return publishState;
-    }
-
-       
-    public void setPublishState(byte value) {
-        this.publishState = value;
-    }
-
-
-    public String getBooleanValue() {
-        return booleanValue;
-    }
-
-
-    public void setBooleanValue(String booleanValue) {
-        this.booleanValue = booleanValue;
-    }
-
-
-    public String getDateValue() {
-        return dateValue;
-    }
-
-
-    public void setDateValue(String dateValue) {
-        this.dateValue = dateValue;
-    }
-
-    public void setDateValueString(String dateValueString) {
-        this.dateValueString = dateValueString;
-    }
-
-    public String getDateValueString() {
-        return dateValueString;
-    }
-
-    public String getDoubleValue() {
-        return doubleValue;
-    }
-
-
-    public void setDoubleValue(String doubleValue) {
-        this.doubleValue = doubleValue;
-    }
-
-
-    public String getLongValue() {
-        return longValue;
-    }
-
-
-    public void setLongValue(String longValue) {
-        this.longValue = longValue;
-    }
-
-
-    public String getListValue() {
-        return listValue;
-    }
-
-
-    public void setListValue(String listValue) {
-        this.listValue = listValue;
-    }
-
-
-    public String getStringValue() {
-        return stringValue;
-    }
-
-    public void setStringValue(String stringValue) {
-        this.stringValue = stringValue;
-    }
-
-       
-    public byte getType() {
-        return type;
-    }
-
-       
-    public void setType(byte value) {
-        this.type = value;
-    }
-
-       
-    public ValueTypeVarInfoDO getValueTypeVarInfoDO() {
-        return valueTypeVarInfoDO;
-    }
-
-       
-    public void setValueTypeVarInfoDO(ValueTypeVarInfoDO value) {
-        this.valueTypeVarInfoDO = value;
-    }
-
-       
-    public float getVersionNumber() {
-        return versionNumber;
-    }
-
-       
-    public void setVersionNumber(float value) {
-        this.versionNumber = value;
-    }
-
-       
-    public String getConcreteClass() {
-        return concreteClass;
-    }
-
-       
-    public void setConcreteClass(String value) {
-        this.concreteClass = value;
-    }
-
-       
-    public Short getObjid() {
-        return objid;
-    }
-
-       
-    public void setObjid(Short value) {
-        this.objid = value;
-    }
 
 }

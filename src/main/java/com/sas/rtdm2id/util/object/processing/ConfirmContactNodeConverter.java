@@ -28,7 +28,7 @@ public class ConfirmContactNodeConverter {
         final RecordContactStep recordContactStep = new RecordContactStep();
         recordContactStep.setName(cHandRHNodeDataDO.getNodeName());
 
-        final List<AuditTerm> auditTerms = cHandRHNodeDataDO.getVariables().getIBVariableDO()
+        final List<AuditTerm> auditTerms = cHandRHNodeDataDO.getVariables().getIbVariableDO()
                 .stream()
                 .map(ibVariableDO -> new AuditTerm(commonProcessing.sanitizeVariableName(ibVariableDO.getName())))
                 .collect(Collectors.toList());
@@ -42,7 +42,7 @@ public class ConfirmContactNodeConverter {
     public Step addCustomObjectStep(CHandRHNodeDataDO cHandRHNodeDataDO, Decision decision, Short objId, String nodeName) {
         Step inputValuesStep = mapStorage.getRuleSetStepMap().get(nodeName + "_input_values");
         if (inputValuesStep != null) {
-            List<IBVariableDO> ibVariableDOs = cHandRHNodeDataDO.getVariables().getIBVariableDO();
+            List<IBVariableDO> ibVariableDOs = cHandRHNodeDataDO.getVariables().getIbVariableDO();
             if (ibVariableDOs != null && !ibVariableDOs.isEmpty()) {
                 updateRuleSet(ibVariableDOs, inputValuesStep, decision);
             }

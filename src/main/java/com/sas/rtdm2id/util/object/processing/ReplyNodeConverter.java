@@ -73,10 +73,10 @@ public class ReplyNodeConverter {
 
     private List<ReplyNodeDataDO.EventReply.ReplyVars.IBVariableDO> getIbVariableDOS(ReplyNodeDataDO replyNodeDataDO) {
         if (replyNodeDataDO.getEventReply() != null) {
-            return replyNodeDataDO.getEventReply().getReplyVars().getIBVariableDOs();
+            return replyNodeDataDO.getEventReply().getReplyVars().getIbVariableDOs();
         } else {
             if (replyNodeDataDO.getTreatmentReplyVariables()!=null) {
-                return replyNodeDataDO.getTreatmentReplyVariables().getIBVariableDOs();
+                return replyNodeDataDO.getTreatmentReplyVariables().getIbVariableDOs();
             }
         }
         return new ArrayList<>();

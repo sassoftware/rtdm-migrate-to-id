@@ -17,6 +17,8 @@ import javax.xml.bind.annotation.XmlValue;
 
 import com.sas.rtdm2id.model.rtdm.extension.DiscreteLineItemDO;
 import com.sas.rtdm2id.model.rtdm.extension.IntervalLineItemDO;
+import lombok.Getter;
+import lombok.Setter;
 
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlType(name = "", propOrder = {
@@ -74,8 +76,9 @@ import com.sas.rtdm2id.model.rtdm.extension.IntervalLineItemDO;
         "y",
         "systemExtraValues"
 })
-public class SplitNodeDataDO
-        implements Serializable {
+@Getter
+@Setter
+public class SplitNodeDataDO implements Serializable {
 
     private final static long serialVersionUID = -1L;
     @XmlElement(name = "ArchivedPublishState")
@@ -188,576 +191,19 @@ public class SplitNodeDataDO
     protected Short objid;
 
        
-    public byte getArchivedPublishState() {
-        return archivedPublishState;
-    }
-
-       
-    public void setArchivedPublishState(byte value) {
-        this.archivedPublishState = value;
-    }
-
-       
-    public String getAssignmentFunction() {
-        return assignmentFunction;
-    }
-
-       
-    public void setAssignmentFunction(String value) {
-        this.assignmentFunction = value;
-    }
-
-       
-    public String getCodeChangeUnpublished() {
-        return codeChangeUnpublished;
-    }
-
-       
-    public void setCodeChangeUnpublished(String value) {
-        this.codeChangeUnpublished = value;
-    }
-
-       
-    public String getCodeEverBeenPublished() {
-        return codeEverBeenPublished;
-    }
-
-       
-    public void setCodeEverBeenPublished(String value) {
-        this.codeEverBeenPublished = value;
-    }
-
-       
-    public String getControlGroupCreated() {
-        return controlGroupCreated;
-    }
-
-       
-    public void setControlGroupCreated(String value) {
-        this.controlGroupCreated = value;
-    }
-
-       
-    public String getControlGroupPercent() {
-        return controlGroupPercent;
-    }
-
-       
-    public void setControlGroupPercent(String value) {
-        this.controlGroupPercent = value;
-    }
-
-       
-    public int getControlKey() {
-        return controlKey;
-    }
-
-       
-    public void setControlKey(int value) {
-        this.controlKey = value;
-    }
-
-       
-    public String getDateModified() {
-        return dateModified;
-    }
-
-       
-    public void setDateModified(String value) {
-        this.dateModified = value;
-    }
-
-       
-    public byte getDroppedCount() {
-        return droppedCount;
-    }
-
-       
-    public void setDroppedCount(byte value) {
-        this.droppedCount = value;
-    }
-
-       
-    public String getEnableSeed() {
-        return enableSeed;
-    }
-
-       
-    public void setEnableSeed(String value) {
-        this.enableSeed = value;
-    }
-
-       
-    public String getExcludeFlag() {
-        return excludeFlag;
-    }
-
-       
-    public void setExcludeFlag(String value) {
-        this.excludeFlag = value;
-    }
-
-       
-    public String getExcludeIconPath() {
-        return excludeIconPath;
-    }
-
-       
-    public void setExcludeIconPath(String value) {
-        this.excludeIconPath = value;
-    }
-
-       
-    public byte getFirstOccurrenceToPublish() {
-        return firstOccurrenceToPublish;
-    }
-
-       
-    public void setFirstOccurrenceToPublish(byte value) {
-        this.firstOccurrenceToPublish = value;
-    }
-
-       
-    public String getHaveSplitCriteria() {
-        return haveSplitCriteria;
-    }
-
-       
-    public void setHaveSplitCriteria(String value) {
-        this.haveSplitCriteria = value;
-    }
-
-       
-    public String getIconPath() {
-        return iconPath;
-    }
-
-       
-    public void setIconPath(String value) {
-        this.iconPath = value;
-    }
-
-       
-    public String getInitialNodeDataUpdateDone() {
-        return initialNodeDataUpdateDone;
-    }
-
-       
-    public void setInitialNodeDataUpdateDone(String value) {
-        this.initialNodeDataUpdateDone = value;
-    }
-
-       
-    public SplitNodeDataDO.InputNodes getInputNodes() {
-        return inputNodes;
-    }
-
-       
-    public void setInputNodes(SplitNodeDataDO.InputNodes value) {
-        this.inputNodes = value;
-    }
-
-       
-    public String getLabel() {
-        return label;
-    }
-
-       
-    public void setLabel(String value) {
-        this.label = value;
-    }
-
-       
-    public String getLimitGroups() {
-        return limitGroups;
-    }
-
-       
-    public void setLimitGroups(String value) {
-        this.limitGroups = value;
-    }
-
-       
-    public SplitNodeDataDO.LineItems getLineItems() {
-        return lineItems;
-    }
-
-       
-    public void setLineItems(SplitNodeDataDO.LineItems value) {
-        this.lineItems = value;
-    }
-
-       
-    public String getLoadedFromOldDavLocation() {
-        return loadedFromOldDavLocation;
-    }
-
-       
-    public void setLoadedFromOldDavLocation(String value) {
-        this.loadedFromOldDavLocation = value;
-    }
-
-       
-    public String getLoading() {
-        return loading;
-    }
-
-       
-    public void setLoading(String value) {
-        this.loading = value;
-    }
-
-       
-    public byte getMaxGroups() {
-        return maxGroups;
-    }
-
-       
-    public void setMaxGroups(byte value) {
-        this.maxGroups = value;
-    }
-
-       
-    public String getNeedToPersist() {
-        return needToPersist;
-    }
-
-       
-    public void setNeedToPersist(String value) {
-        this.needToPersist = value;
-    }
-
-       
-    public String getNodeDescription() {
-        return nodeDescription;
-    }
-
-       
-    public void setNodeDescription(String value) {
-        this.nodeDescription = value;
-    }
-
-       
-    public String getNodeId() {
-        return nodeId;
-    }
-
-       
-    public void setNodeId(String value) {
-        this.nodeId = value;
-    }
-
-       
-    public String getNodeName() {
-        return nodeName;
-    }
-
-       
-    public void setNodeName(String value) {
-        this.nodeName = value;
-    }
-
-       
-    public byte getNodeState() {
-        return nodeState;
-    }
-
-       
-    public void setNodeState(byte value) {
-        this.nodeState = value;
-    }
-
-       
-    public SplitNodeDataDO.NodeTags getNodeTags() {
-        return nodeTags;
-    }
-
-       
-    public void setNodeTags(SplitNodeDataDO.NodeTags value) {
-        this.nodeTags = value;
-    }
-
-       
-    public byte getNodeType() {
-        return nodeType;
-    }
-
-       
-    public void setNodeType(byte value) {
-        this.nodeType = value;
-    }
-
-       
-    public byte getNumGroups() {
-        return numGroups;
-    }
-
-       
-    public void setNumGroups(byte value) {
-        this.numGroups = value;
-    }
-
-       
-    public String getOldVersionNumber() {
-        return oldVersionNumber;
-    }
-
-       
-    public void setOldVersionNumber(String value) {
-        this.oldVersionNumber = value;
-    }
-
-       
-    public String getOutputCellsAvailableForLinking() {
-        return outputCellsAvailableForLinking;
-    }
-
-       
-    public void setOutputCellsAvailableForLinking(String value) {
-        this.outputCellsAvailableForLinking = value;
-    }
-
-       
-    public SplitNodeDataDO.OutputNodes getOutputNodes() {
-        return outputNodes;
-    }
-
-       
-    public void setOutputNodes(SplitNodeDataDO.OutputNodes value) {
-        this.outputNodes = value;
-    }
-
-       
-    public String getPersisting() {
-        return persisting;
-    }
-
-       
-    public void setPersisting(String value) {
-        this.persisting = value;
-    }
-
-       
-    public byte getPublishState() {
-        return publishState;
-    }
-
-       
-    public void setPublishState(byte value) {
-        this.publishState = value;
-    }
-
-       
-    public String getReadyToUpdateCounts() {
-        return readyToUpdateCounts;
-    }
-
-       
-    public void setReadyToUpdateCounts(String value) {
-        this.readyToUpdateCounts = value;
-    }
-
-       
-    public String getRebuildCells() {
-        return rebuildCells;
-    }
-
-       
-    public void setRebuildCells(String value) {
-        this.rebuildCells = value;
-    }
-
-    public SplitOnNodeDataDO.VarRefDO getSeedVarRefDO() {
-        return seedVarRefDO;
-    }
-
-    public void setSeedVarRefDO(SplitOnNodeDataDO.VarRefDO seedVarRefDO) {
-        this.seedVarRefDO = seedVarRefDO;
-    }
-
-    public SplitNodeDataDO.SortByList getSortByList() {
-        return sortByList;
-    }
-
-       
-    public void setSortByList(SplitNodeDataDO.SortByList value) {
-        this.sortByList = value;
-    }
-
-       
-    public SplitNodeDataDO.SplitCriteriaList getSplitCriteriaList() {
-        return splitCriteriaList;
-    }
-
-       
-    public void setSplitCriteriaList(SplitNodeDataDO.SplitCriteriaList value) {
-        this.splitCriteriaList = value;
-    }
-
-       
-    public SplitNodeDataDO.SplitOnNodeDataDO getSplitOnNodeDataDO() {
-        return splitOnNodeDataDO;
-    }
-
-       
-    public void setSplitOnNodeDataDO(SplitNodeDataDO.SplitOnNodeDataDO value) {
-        this.splitOnNodeDataDO = value;
-    }
-
-       
-    public String getSplitOnNodeID() {
-        return splitOnNodeID;
-    }
-
-       
-    public void setSplitOnNodeID(String value) {
-        this.splitOnNodeID = value;
-    }
-
-       
-    public String getSplitType() {
-        return splitType;
-    }
-
-       
-    public void setSplitType(String value) {
-        this.splitType = value;
-    }
-
-       
-    public SplitNodeDataDO.Splitters getSplitters() {
-        return splitters;
-    }
-
-       
-    public void setSplitters(SplitNodeDataDO.Splitters value) {
-        this.splitters = value;
-    }
-
-       
-    public String getSubjectID() {
-        return subjectID;
-    }
-
-       
-    public void setSubjectID(String value) {
-        this.subjectID = value;
-    }
-
-       
-    public byte getTotalCount() {
-        return totalCount;
-    }
-
-       
-    public void setTotalCount(byte value) {
-        this.totalCount = value;
-    }
-
-       
-    public String getValidInputSubject() {
-        return validInputSubject;
-    }
-
-       
-    public void setValidInputSubject(String value) {
-        this.validInputSubject = value;
-    }
-
-       
-    public String getValidOutputSubject() {
-        return validOutputSubject;
-    }
-
-       
-    public void setValidOutputSubject(String value) {
-        this.validOutputSubject = value;
-    }
-
-       
-    public float getVersionNumber() {
-        return versionNumber;
-    }
-
-       
-    public void setVersionNumber(float value) {
-        this.versionNumber = value;
-    }
-
-       
-    public short getX() {
-        return x;
-    }
-
-       
-    public void setX(short value) {
-        this.x = value;
-    }
-
-       
-    public short getY() {
-        return y;
-    }
-
-       
-    public void setY(short value) {
-        this.y = value;
-    }
-
-       
-    public SplitNodeDataDO.SystemExtraValues getSystemExtraValues() {
-        return systemExtraValues;
-    }
-
-       
-    public void setSystemExtraValues(SplitNodeDataDO.SystemExtraValues value) {
-        this.systemExtraValues = value;
-    }
-
-       
-    public Short getObjid() {
-        return objid;
-    }
-
-       
-    public void setObjid(Short value) {
-        this.objid = value;
-    }
-
-
-       
     @XmlAccessorType(XmlAccessType.FIELD)
     @XmlType(name = "", propOrder = {
             "value"
     })
-    public static class InputNodes
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class InputNodes implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlValue
         protected String value;
         @XmlAttribute(name = "ListTypes")
         protected String listTypes;
-
-           
-        public String getValue() {
-            return value;
-        }
-
-           
-        public void setValue(String value) {
-            this.value = value;
-        }
-
-           
-        public String getListTypes() {
-            return listTypes;
-        }
-
-           
-        public void setListTypes(String value) {
-            this.listTypes = value;
-        }
 
     }
 
@@ -767,19 +213,12 @@ public class SplitNodeDataDO
     @XmlType(name = "", propOrder = {
             "splitNodeLineItemDOs"
     })
-    public static class LineItems
-            implements Serializable {
+    @Getter
+    public static class LineItems implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlElement(name = "SplitNodeLineItemDO")
-        protected List<LineItems.SplitNodeLineItemDO> splitNodeLineItemDOs = new ArrayList<LineItems.SplitNodeLineItemDO>();
-
-           
-        public List<LineItems.SplitNodeLineItemDO> getSplitNodeLineItemDOs() {
-            return this.splitNodeLineItemDOs;
-        }
-
-
+        protected List<LineItems.SplitNodeLineItemDO> splitNodeLineItemDOs = new ArrayList<>();
            
         @XmlAccessorType(XmlAccessType.FIELD)
         @XmlType(name = "", propOrder = {
@@ -808,8 +247,9 @@ public class SplitNodeDataDO
                 "value",
                 "versionNumber"
         })
-        public static class SplitNodeLineItemDO
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class SplitNodeLineItemDO implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "ActualCount")
@@ -866,285 +306,14 @@ public class SplitNodeDataDO
             protected Byte listpos;
             @XmlAttribute(name = "objid")
             protected Short objid;
-
-               
-            public byte getActualCount() {
-                return actualCount;
-            }
-
-               
-            public void setActualCount(byte value) {
-                this.actualCount = value;
-            }
-
-               
-            public float getActualPercent() {
-                return actualPercent;
-            }
-
-               
-            public void setActualPercent(float value) {
-                this.actualPercent = value;
-            }
-
-               
-            public byte getArchivedPublishState() {
-                return archivedPublishState;
-            }
-
-               
-            public void setArchivedPublishState(byte value) {
-                this.archivedPublishState = value;
-            }
-
-               
-            public String getCellCode() {
-                return cellCode;
-            }
-
-               
-            public void setCellCode(String value) {
-                this.cellCode = value;
-            }
-
-               
-            public String getCellId() {
-                return cellId;
-            }
-
-               
-            public void setCellId(String value) {
-                this.cellId = value;
-            }
-
-               
-            public String getCodeChangeUnpublished() {
-                return codeChangeUnpublished;
-            }
-
-               
-            public void setCodeChangeUnpublished(String value) {
-                this.codeChangeUnpublished = value;
-            }
-
-               
-            public String getCodeEverBeenPublished() {
-                return codeEverBeenPublished;
-            }
-
-               
-            public void setCodeEverBeenPublished(String value) {
-                this.codeEverBeenPublished = value;
-            }
-
-               
-            public String getControlGroup() {
-                return controlGroup;
-            }
-
-               
-            public void setControlGroup(String value) {
-                this.controlGroup = value;
-            }
-
-               
-            public byte getFirstOccurrenceToPublish() {
-                return firstOccurrenceToPublish;
-            }
-
-               
-            public void setFirstOccurrenceToPublish(byte value) {
-                this.firstOccurrenceToPublish = value;
-            }
-
-               
-            public String getGroupName() {
-                return groupName;
-            }
-
-               
-            public void setGroupName(String value) {
-                this.groupName = value;
-            }
-
-               
-            public String getLineItemId() {
-                return lineItemId;
-            }
-
-               
-            public void setLineItemId(String value) {
-                this.lineItemId = value;
-            }
-
-               
-            public String getLoadedFromOldDavLocation() {
-                return loadedFromOldDavLocation;
-            }
-
-               
-            public void setLoadedFromOldDavLocation(String value) {
-                this.loadedFromOldDavLocation = value;
-            }
-
-               
-            public String getLoading() {
-                return loading;
-            }
-
-               
-            public void setLoading(String value) {
-                this.loading = value;
-            }
-
-               
-            public String getNeedToPersist() {
-                return needToPersist;
-            }
-
-               
-            public void setNeedToPersist(String value) {
-                this.needToPersist = value;
-            }
-
-               
-            public String getOldVersionNumber() {
-                return oldVersionNumber;
-            }
-
-               
-            public void setOldVersionNumber(String value) {
-                this.oldVersionNumber = value;
-            }
-
-               
-            public String getPersisting() {
-                return persisting;
-            }
-
-               
-            public void setPersisting(String value) {
-                this.persisting = value;
-            }
-
-               
-            public byte getPriority() {
-                return priority;
-            }
-
-               
-            public void setPriority(byte value) {
-                this.priority = value;
-            }
-
-               
-            public byte getPublishState() {
-                return publishState;
-            }
-
-               
-            public void setPublishState(byte value) {
-                this.publishState = value;
-            }
-
-               
-            public String getRemainder() {
-                return remainder;
-            }
-
-               
-            public void setRemainder(String value) {
-                this.remainder = value;
-            }
-
-               
-            public SplitNodeLineItemDO.RequiredCount getRequiredCount() {
-                return requiredCount;
-            }
-
-               
-            public void setRequiredCount(SplitNodeLineItemDO.RequiredCount value) {
-                this.requiredCount = value;
-            }
-
-               
-            public SplitNodeLineItemDO.RequiredPercent getRequiredPercent() {
-                return requiredPercent;
-            }
-
-               
-            public void setRequiredPercent(SplitNodeLineItemDO.RequiredPercent value) {
-                this.requiredPercent = value;
-            }
-
-               
-            public byte getUniqueCount() {
-                return uniqueCount;
-            }
-
-               
-            public void setUniqueCount(byte value) {
-                this.uniqueCount = value;
-            }
-
-               
-            public String getValue() {
-                return value;
-            }
-
-               
-            public void setValue(String value) {
-                this.value = value;
-            }
-
-               
-            public float getVersionNumber() {
-                return versionNumber;
-            }
-
-               
-            public void setVersionNumber(float value) {
-                this.versionNumber = value;
-            }
-
-               
-            public String getConcreteClass() {
-                return concreteClass;
-            }
-
-               
-            public void setConcreteClass(String value) {
-                this.concreteClass = value;
-            }
-
-               
-            public Byte getListpos() {
-                return listpos;
-            }
-
-               
-            public void setListpos(Byte value) {
-                this.listpos = value;
-            }
-
-               
-            public Short getObjid() {
-                return objid;
-            }
-
-               
-            public void setObjid(Short value) {
-                this.objid = value;
-            }
-
-
                
             @XmlAccessorType(XmlAccessType.FIELD)
             @XmlType(name = "", propOrder = {
                     "value"
             })
-            public static class RequiredCount
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class RequiredCount implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlValue
@@ -1152,62 +321,21 @@ public class SplitNodeDataDO
                 @XmlAttribute(name = "StoredType")
                 protected String storedType;
 
-                   
-                public String getValue() {
-                    return value;
-                }
-
-                   
-                public void setValue(String value) {
-                    this.value = value;
-                }
-
-                   
-                public String getStoredType() {
-                    return storedType;
-                }
-
-                   
-                public void setStoredType(String value) {
-                    this.storedType = value;
-                }
-
             }
 
-
-               
             @XmlAccessorType(XmlAccessType.FIELD)
             @XmlType(name = "", propOrder = {
                     "value"
             })
-            public static class RequiredPercent
-                    implements Serializable {
+            @Getter
+            @Setter
+            public static class RequiredPercent implements Serializable {
 
                 private final static long serialVersionUID = -1L;
                 @XmlValue
                 protected String value;
                 @XmlAttribute(name = "StoredType")
                 protected String storedType;
-
-                   
-                public String getValue() {
-                    return value;
-                }
-
-                   
-                public void setValue(String value) {
-                    this.value = value;
-                }
-
-                   
-                public String getStoredType() {
-                    return storedType;
-                }
-
-                   
-                public void setStoredType(String value) {
-                    this.storedType = value;
-                }
 
             }
 
@@ -1221,8 +349,9 @@ public class SplitNodeDataDO
     @XmlType(name = "", propOrder = {
             "value"
     })
-    public static class NodeTags
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class NodeTags implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlValue
@@ -1230,26 +359,6 @@ public class SplitNodeDataDO
         @XmlAttribute(name = "EmptyList")
         protected String emptyList;
 
-           
-        public String getValue() {
-            return value;
-        }
-
-           
-        public void setValue(String value) {
-            this.value = value;
-        }
-
-           
-        public String getEmptyList() {
-            return emptyList;
-        }
-
-           
-        public void setEmptyList(String value) {
-            this.emptyList = value;
-        }
-
     }
 
 
@@ -1258,8 +367,9 @@ public class SplitNodeDataDO
     @XmlType(name = "", propOrder = {
             "value"
     })
-    public static class OutputNodes
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class OutputNodes implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlValue
@@ -1269,35 +379,23 @@ public class SplitNodeDataDO
         @XmlAttribute(name = "ListTypes")
         protected String listTypes;
 
-           
-        public String getValue() {
-            return value;
-        }
+    }
 
-           
-        public void setValue(String value) {
-            this.value = value;
-        }
 
-           
-        public String getListDelimiter() {
-            return listDelimiter;
-        }
+       
+    @XmlAccessorType(XmlAccessType.FIELD)
+    @XmlType(name = "", propOrder = {
+            "value"
+    })
+    @Getter
+    @Setter
+    public static class SortByList implements Serializable {
 
-           
-        public void setListDelimiter(String value) {
-            this.listDelimiter = value;
-        }
-
-           
-        public String getListTypes() {
-            return listTypes;
-        }
-
-           
-        public void setListTypes(String value) {
-            this.listTypes = value;
-        }
+        private final static long serialVersionUID = -1L;
+        @XmlValue
+        protected String value;
+        @XmlAttribute(name = "EmptyList")
+        protected String emptyList;
 
     }
 
@@ -1307,71 +405,15 @@ public class SplitNodeDataDO
     @XmlType(name = "", propOrder = {
             "value"
     })
-    public static class SortByList
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class SplitCriteriaList implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlValue
         protected String value;
         @XmlAttribute(name = "EmptyList")
         protected String emptyList;
-
-           
-        public String getValue() {
-            return value;
-        }
-
-           
-        public void setValue(String value) {
-            this.value = value;
-        }
-
-           
-        public String getEmptyList() {
-            return emptyList;
-        }
-
-           
-        public void setEmptyList(String value) {
-            this.emptyList = value;
-        }
-
-    }
-
-
-       
-    @XmlAccessorType(XmlAccessType.FIELD)
-    @XmlType(name = "", propOrder = {
-            "value"
-    })
-    public static class SplitCriteriaList
-            implements Serializable {
-
-        private final static long serialVersionUID = -1L;
-        @XmlValue
-        protected String value;
-        @XmlAttribute(name = "EmptyList")
-        protected String emptyList;
-
-           
-        public String getValue() {
-            return value;
-        }
-
-           
-        public void setValue(String value) {
-            this.value = value;
-        }
-
-           
-        public String getEmptyList() {
-            return emptyList;
-        }
-
-           
-        public void setEmptyList(String value) {
-            this.emptyList = value;
-        }
 
     }
 
@@ -1426,8 +468,9 @@ public class SplitNodeDataDO
             "x",
             "y"
     })
-    public static class SplitOnNodeDataDO
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class SplitOnNodeDataDO implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlElement(name = "ArchivedPublishState")
@@ -1528,550 +571,20 @@ public class SplitNodeDataDO
         protected Short objid;
 
            
-        public byte getArchivedPublishState() {
-            return archivedPublishState;
-        }
-
-           
-        public void setArchivedPublishState(byte value) {
-            this.archivedPublishState = value;
-        }
-
-           
-        public String getCodeChangeUnpublished() {
-            return codeChangeUnpublished;
-        }
-
-           
-        public void setCodeChangeUnpublished(String value) {
-            this.codeChangeUnpublished = value;
-        }
-
-           
-        public String getCodeEverBeenPublished() {
-            return codeEverBeenPublished;
-        }
-
-           
-        public void setCodeEverBeenPublished(String value) {
-            this.codeEverBeenPublished = value;
-        }
-
-           
-        public byte getControlKey() {
-            return controlKey;
-        }
-
-           
-        public void setControlKey(byte value) {
-            this.controlKey = value;
-        }
-
-           
-        public String getCreateMissingGroup() {
-            return createMissingGroup;
-        }
-
-           
-        public void setCreateMissingGroup(String value) {
-            this.createMissingGroup = value;
-        }
-
-           
-        public String getDateType() {
-            return dateType;
-        }
-
-           
-        public void setDateType(String value) {
-            this.dateType = value;
-        }
-
-           
-        public String getDiscreteVariable() {
-            return discreteVariable;
-        }
-
-           
-        public void setDiscreteVariable(String value) {
-            this.discreteVariable = value;
-        }
-
-           
-        public String getDistanceCriteria() {
-            return distanceCriteria;
-        }
-
-           
-        public void setDistanceCriteria(String value) {
-            this.distanceCriteria = value;
-        }
-
-           
-        public byte getDroppedCount() {
-            return droppedCount;
-        }
-
-           
-        public void setDroppedCount(byte value) {
-            this.droppedCount = value;
-        }
-
-           
-        public String getExcludeFlag() {
-            return excludeFlag;
-        }
-
-           
-        public void setExcludeFlag(String value) {
-            this.excludeFlag = value;
-        }
-
-           
-        public String getExcludeIconPath() {
-            return excludeIconPath;
-        }
-
-           
-        public void setExcludeIconPath(String value) {
-            this.excludeIconPath = value;
-        }
-
-           
-        public byte getFirstOccurrenceToPublish() {
-            return firstOccurrenceToPublish;
-        }
-
-           
-        public void setFirstOccurrenceToPublish(byte value) {
-            this.firstOccurrenceToPublish = value;
-        }
-
-           
-        public String getHasNoMetaData() {
-            return hasNoMetaData;
-        }
-
-           
-        public void setHasNoMetaData(String value) {
-            this.hasNoMetaData = value;
-        }
-
-           
-        public String getIconPath() {
-            return iconPath;
-        }
-
-           
-        public void setIconPath(String value) {
-            this.iconPath = value;
-        }
-
-           
-        public String getLabel() {
-            return label;
-        }
-
-           
-        public void setLabel(String value) {
-            this.label = value;
-        }
-
-           
-        public SplitOnNodeDataDO.LineItems getLineItems() {
-            return lineItems;
-        }
-
-           
-        public void setLineItems(SplitOnNodeDataDO.LineItems value) {
-            this.lineItems = value;
-        }
-
-           
-        public String getLoadedFromOldDavLocation() {
-            return loadedFromOldDavLocation;
-        }
-
-           
-        public void setLoadedFromOldDavLocation(String value) {
-            this.loadedFromOldDavLocation = value;
-        }
-
-           
-        public String getLoading() {
-            return loading;
-        }
-
-           
-        public void setLoading(String value) {
-            this.loading = value;
-        }
-
-           
-        public String getNeedToPersist() {
-            return needToPersist;
-        }
-
-           
-        public void setNeedToPersist(String value) {
-            this.needToPersist = value;
-        }
-
-           
-        public String getNeedToSaveLineItems() {
-            return needToSaveLineItems;
-        }
-
-           
-        public void setNeedToSaveLineItems(String value) {
-            this.needToSaveLineItems = value;
-        }
-
-           
-        public String getNodeId() {
-            return nodeId;
-        }
-
-           
-        public void setNodeId(String value) {
-            this.nodeId = value;
-        }
-
-           
-        public String getNodeName() {
-            return nodeName;
-        }
-
-           
-        public void setNodeName(String value) {
-            this.nodeName = value;
-        }
-
-           
-        public byte getNodeState() {
-            return nodeState;
-        }
-
-           
-        public void setNodeState(byte value) {
-            this.nodeState = value;
-        }
-
-           
-        public SplitOnNodeDataDO.NodeTags getNodeTags() {
-            return nodeTags;
-        }
-
-           
-        public void setNodeTags(SplitOnNodeDataDO.NodeTags value) {
-            this.nodeTags = value;
-        }
-
-           
-        public byte getNodeType() {
-            return nodeType;
-        }
-
-           
-        public void setNodeType(byte value) {
-            this.nodeType = value;
-        }
-
-           
-        public byte getNumberOfGroups() {
-            return numberOfGroups;
-        }
-
-           
-        public void setNumberOfGroups(byte value) {
-            this.numberOfGroups = value;
-        }
-
-           
-        public String getOldVersionNumber() {
-            return oldVersionNumber;
-        }
-
-           
-        public void setOldVersionNumber(String value) {
-            this.oldVersionNumber = value;
-        }
-
-           
-        public String getOutOfSynch() {
-            return outOfSynch;
-        }
-
-           
-        public void setOutOfSynch(String value) {
-            this.outOfSynch = value;
-        }
-
-           
-        public String getPattern() {
-            return pattern;
-        }
-
-           
-        public void setPattern(String value) {
-            this.pattern = value;
-        }
-
-           
-        public String getPersisting() {
-            return persisting;
-        }
-
-           
-        public void setPersisting(String value) {
-            this.persisting = value;
-        }
-
-           
-        public byte getPublishState() {
-            return publishState;
-        }
-
-           
-        public void setPublishState(byte value) {
-            this.publishState = value;
-        }
-
-           
-        public SplitOnNodeDataDO.SelectedItemsCache getSelectedItemsCache() {
-            return selectedItemsCache;
-        }
-
-           
-        public void setSelectedItemsCache(SplitOnNodeDataDO.SelectedItemsCache value) {
-            this.selectedItemsCache = value;
-        }
-
-           
-        public String getSelectedRule() {
-            return selectedRule;
-        }
-
-           
-        public void setSelectedRule(String value) {
-            this.selectedRule = value;
-        }
-
-           
-        public String getSelectionMethod() {
-            return selectionMethod;
-        }
-
-           
-        public void setSelectionMethod(String value) {
-            this.selectionMethod = value;
-        }
-
-           
-        public SplitOnNodeDataDO.SortByList getSortByList() {
-            return sortByList;
-        }
-
-           
-        public void setSortByList(SplitOnNodeDataDO.SortByList value) {
-            this.sortByList = value;
-        }
-
-           
-        public SplitOnNodeDataDO.Splitters getSplitters() {
-            return splitters;
-        }
-
-           
-        public void setSplitters(SplitOnNodeDataDO.Splitters value) {
-            this.splitters = value;
-        }
-
-           
-        public String getSubjectID() {
-            return subjectID;
-        }
-
-           
-        public void setSubjectID(String value) {
-            this.subjectID = value;
-        }
-
-           
-        public byte getTotalCount() {
-            return totalCount;
-        }
-
-           
-        public void setTotalCount(byte value) {
-            this.totalCount = value;
-        }
-
-           
-        public String getValidInputSubject() {
-            return validInputSubject;
-        }
-
-           
-        public void setValidInputSubject(String value) {
-            this.validInputSubject = value;
-        }
-
-           
-        public String getValidOutputSubject() {
-            return validOutputSubject;
-        }
-
-           
-        public void setValidOutputSubject(String value) {
-            this.validOutputSubject = value;
-        }
-
-           
-        public String getVarInfoId() {
-            return varInfoId;
-        }
-
-           
-        public void setVarInfoId(String value) {
-            this.varInfoId = value;
-        }
-
-           
-        public SplitOnNodeDataDO.VarRefDO getVarRefDO() {
-            return varRefDO;
-        }
-
-           
-        public void setVarRefDO(SplitOnNodeDataDO.VarRefDO value) {
-            this.varRefDO = value;
-        }
-
-           
-        public float getVersionNumber() {
-            return versionNumber;
-        }
-
-           
-        public void setVersionNumber(float value) {
-            this.versionNumber = value;
-        }
-
-           
-        public String getWildCardUseAvailable() {
-            return wildCardUseAvailable;
-        }
-
-           
-        public void setWildCardUseAvailable(String value) {
-            this.wildCardUseAvailable = value;
-        }
-
-           
-        public byte getX() {
-            return x;
-        }
-
-           
-        public void setX(byte value) {
-            this.x = value;
-        }
-
-           
-        public byte getY() {
-            return y;
-        }
-
-           
-        public void setY(byte value) {
-            this.y = value;
-        }
-
-           
-        public String getConcreteClass() {
-            return concreteClass;
-        }
-
-           
-        public void setConcreteClass(String value) {
-            this.concreteClass = value;
-        }
-
-           
-        public Short getObjid() {
-            return objid;
-        }
-
-           
-        public void setObjid(Short value) {
-            this.objid = value;
-        }
-
-
-           
         @XmlAccessorType(XmlAccessType.FIELD)
         @XmlType(name = "", propOrder = {
                 "intervalLineItemDOs",
                 "discreteLineItemDOs"
         })
-        public static class LineItems
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class LineItems implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "IntervalLineItemDO")
-            protected List<IntervalLineItemDO> intervalLineItemDOs;
+            protected List<IntervalLineItemDO> intervalLineItemDOs = new ArrayList<>();
             @XmlElement(name = "DiscreteLineItemDO")
-            protected List<DiscreteLineItemDO> discreteLineItemDOs;
-
-            public List<IntervalLineItemDO> getIntervalLineItemDOs() {
-                if (intervalLineItemDOs == null) {
-                    intervalLineItemDOs = new ArrayList<>();
-                }
-                return this.intervalLineItemDOs;
-            }
-
-            public List<DiscreteLineItemDO> getDiscreteLineItemDOs() {
-                if (discreteLineItemDOs == null) {
-                    discreteLineItemDOs = new ArrayList<>();
-                }
-                return this.discreteLineItemDOs;
-            }
-        }
-
-
-           
-        @XmlAccessorType(XmlAccessType.FIELD)
-        @XmlType(name = "", propOrder = {
-                "value"
-        })
-        public static class NodeTags
-                implements Serializable {
-
-            private final static long serialVersionUID = -1L;
-            @XmlValue
-            protected String value;
-            @XmlAttribute(name = "EmptyList")
-            protected String emptyList;
-
-               
-            public String getValue() {
-                return value;
-            }
-
-               
-            public void setValue(String value) {
-                this.value = value;
-            }
-
-               
-            public String getEmptyList() {
-                return emptyList;
-            }
-
-               
-            public void setEmptyList(String value) {
-                this.emptyList = value;
-            }
+            protected List<DiscreteLineItemDO> discreteLineItemDOs = new ArrayList<>();
 
         }
 
@@ -2081,34 +594,15 @@ public class SplitNodeDataDO
         @XmlType(name = "", propOrder = {
                 "value"
         })
-        public static class SelectedItemsCache
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class NodeTags implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlValue
             protected String value;
             @XmlAttribute(name = "EmptyList")
             protected String emptyList;
-
-               
-            public String getValue() {
-                return value;
-            }
-
-               
-            public void setValue(String value) {
-                this.value = value;
-            }
-
-               
-            public String getEmptyList() {
-                return emptyList;
-            }
-
-               
-            public void setEmptyList(String value) {
-                this.emptyList = value;
-            }
 
         }
 
@@ -2118,34 +612,15 @@ public class SplitNodeDataDO
         @XmlType(name = "", propOrder = {
                 "value"
         })
-        public static class SortByList
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class SelectedItemsCache implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlValue
             protected String value;
             @XmlAttribute(name = "EmptyList")
             protected String emptyList;
-
-               
-            public String getValue() {
-                return value;
-            }
-
-               
-            public void setValue(String value) {
-                this.value = value;
-            }
-
-               
-            public String getEmptyList() {
-                return emptyList;
-            }
-
-               
-            public void setEmptyList(String value) {
-                this.emptyList = value;
-            }
 
         }
 
@@ -2155,8 +630,9 @@ public class SplitNodeDataDO
         @XmlType(name = "", propOrder = {
                 "value"
         })
-        public static class Splitters
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class SortByList implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlValue
@@ -2164,25 +640,23 @@ public class SplitNodeDataDO
             @XmlAttribute(name = "EmptyList")
             protected String emptyList;
 
-               
-            public String getValue() {
-                return value;
-            }
+        }
 
-               
-            public void setValue(String value) {
-                this.value = value;
-            }
 
-               
-            public String getEmptyList() {
-                return emptyList;
-            }
+           
+        @XmlAccessorType(XmlAccessType.FIELD)
+        @XmlType(name = "", propOrder = {
+                "value"
+        })
+        @Getter
+        @Setter
+        public static class Splitters implements Serializable {
 
-               
-            public void setEmptyList(String value) {
-                this.emptyList = value;
-            }
+            private final static long serialVersionUID = -1L;
+            @XmlValue
+            protected String value;
+            @XmlAttribute(name = "EmptyList")
+            protected String emptyList;
 
         }
 
@@ -2210,8 +684,9 @@ public class SplitNodeDataDO
                 "varName",
                 "versionNumber"
         })
-        public static class VarRefDO
-                implements Serializable {
+        @Getter
+        @Setter
+        public static class VarRefDO implements Serializable {
 
             private final static long serialVersionUID = -1L;
             @XmlElement(name = "ArchivedPublishState")
@@ -2257,254 +732,23 @@ public class SplitNodeDataDO
             @XmlAttribute(name = "objid")
             protected Short objid;
 
-               
-            public byte getArchivedPublishState() {
-                return archivedPublishState;
-            }
-
-               
-            public void setArchivedPublishState(byte value) {
-                this.archivedPublishState = value;
-            }
-
-               
-            public String getCodeChangeUnpublished() {
-                return codeChangeUnpublished;
-            }
-
-               
-            public void setCodeChangeUnpublished(String value) {
-                this.codeChangeUnpublished = value;
-            }
-
-               
-            public String getCodeEverBeenPublished() {
-                return codeEverBeenPublished;
-            }
-
-               
-            public void setCodeEverBeenPublished(String value) {
-                this.codeEverBeenPublished = value;
-            }
-
-               
-            public String getDiscrete() {
-                return discrete;
-            }
-
-               
-            public void setDiscrete(String value) {
-                this.discrete = value;
-            }
-
-               
-            public byte getFirstOccurrenceToPublish() {
-                return firstOccurrenceToPublish;
-            }
-
-               
-            public void setFirstOccurrenceToPublish(byte value) {
-                this.firstOccurrenceToPublish = value;
-            }
-
-               
-            public String getLoadedFromOldDavLocation() {
-                return loadedFromOldDavLocation;
-            }
-
-               
-            public void setLoadedFromOldDavLocation(String value) {
-                this.loadedFromOldDavLocation = value;
-            }
-
-               
-            public String getLoading() {
-                return loading;
-            }
-
-               
-            public void setLoading(String value) {
-                this.loading = value;
-            }
-
-               
-            public String getNeedToPersist() {
-                return needToPersist;
-            }
-
-               
-            public void setNeedToPersist(String value) {
-                this.needToPersist = value;
-            }
-
-               
-            public String getNoMetadata() {
-                return noMetadata;
-            }
-
-               
-            public void setNoMetadata(String value) {
-                this.noMetadata = value;
-            }
-
-               
-            public String getOldVersionNumber() {
-                return oldVersionNumber;
-            }
-
-               
-            public void setOldVersionNumber(String value) {
-                this.oldVersionNumber = value;
-            }
-
-               
-            public String getPersisting() {
-                return persisting;
-            }
-
-               
-            public void setPersisting(String value) {
-                this.persisting = value;
-            }
-
-               
-            public byte getPublishState() {
-                return publishState;
-            }
-
-               
-            public void setPublishState(byte value) {
-                this.publishState = value;
-            }
-
-               
-            public String getSasFormat() {
-                return sasFormat;
-            }
-
-               
-            public void setSasFormat(String value) {
-                this.sasFormat = value;
-            }
-
-               
-            public String getSubType() {
-                return subType;
-            }
-
-               
-            public void setSubType(String value) {
-                this.subType = value;
-            }
-
-               
-            public String getType() {
-                return type;
-            }
-
-               
-            public void setType(String value) {
-                this.type = value;
-            }
-
-               
-            public String getValid() {
-                return valid;
-            }
-
-               
-            public void setValid(String value) {
-                this.valid = value;
-            }
-
-               
-            public String getVarInfoId() {
-                return varInfoId;
-            }
-
-               
-            public void setVarInfoId(String value) {
-                this.varInfoId = value;
-            }
-
-               
-            public String getVarName() {
-                return varName;
-            }
-
-               
-            public void setVarName(String value) {
-                this.varName = value;
-            }
-
-               
-            public float getVersionNumber() {
-                return versionNumber;
-            }
-
-               
-            public void setVersionNumber(float value) {
-                this.versionNumber = value;
-            }
-
-               
-            public String getConcreteClass() {
-                return concreteClass;
-            }
-
-               
-            public void setConcreteClass(String value) {
-                this.concreteClass = value;
-            }
-
-               
-            public Short getObjid() {
-                return objid;
-            }
-
-               
-            public void setObjid(Short value) {
-                this.objid = value;
-            }
-
         }
 
     }
 
-
-       
     @XmlAccessorType(XmlAccessType.FIELD)
     @XmlType(name = "", propOrder = {
             "value"
     })
-    public static class Splitters
-            implements Serializable {
+    @Getter
+    @Setter
+    public static class Splitters implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlValue
         protected String value;
         @XmlAttribute(name = "EmptyList")
         protected String emptyList;
-
-           
-        public String getValue() {
-            return value;
-        }
-
-           
-        public void setValue(String value) {
-            this.value = value;
-        }
-
-           
-        public String getEmptyList() {
-            return emptyList;
-        }
-
-           
-        public void setEmptyList(String value) {
-            this.emptyList = value;
-        }
 
     }
 
@@ -2514,20 +758,12 @@ public class SplitNodeDataDO
     @XmlType(name = "", propOrder = {
             "outputNodeNames"
     })
-    public static class SystemExtraValues
-            implements Serializable {
+    @Getter
+    public static class SystemExtraValues implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlElement(name = "OutputNodeName")
-        protected List<String> outputNodeNames;
-
-           
-        public List<String> getOutputNodeNames() {
-            if (outputNodeNames == null) {
-                outputNodeNames = new ArrayList<String>();
-            }
-            return this.outputNodeNames;
-        }
+        protected List<String> outputNodeNames = new ArrayList<>();
 
     }
 
