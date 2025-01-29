@@ -1,0 +1,11 @@
+# Next Pipeline ADR 9: Individual collaborators are not allowed.
+#   Dean-Taplin_sasinst -- Role: Maintain
+# See: https://rndconfluence.sas.com/display/RNDDEVOPS/Next+Pipeline+-+ADR+9+-+GitHub+Repository+Access+Control
+#
+teams:
+  - name: all
+    role: Read
+  - name: intelligent-decisioning-contributors
+    role: Maintain
+  - name: intelligent-decisioning-maintainers
+    role: Maintain
