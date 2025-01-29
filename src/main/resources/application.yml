@@ -1,0 +1,14 @@
+# I18NOK:FileNotLocalizable
+spring:
+  application:
+    name: {{{{ .data.ContextName }}}}
+  # enables the consul k/v store watch for auto updates of the spring environment
+  config:
+    import:
+      - "classpath:application-platform.yml"
+      - "optional:consul:"
+  cloud:
+    consul:
+      config:
+        watch:
+          enabled: true

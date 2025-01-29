@@ -1,0 +1,42 @@
+plugins {
+    id 'com.sas.cdp-release-management'
+    id 'com.sas.pangea'
+    id 'com.sas.viya.service'
+    id 'groovy'
+}
+
+wrapper {
+    gradleVersion = '7.6.1'
+}
+
+// Declare the Java compatibility version
+sourceCompatibility = 17
+targetCompatibility = 17
+
+dependencies {
+
+    // The following dependencies are generally expected to be needed by all projects.
+    // Additional implementation, runtimeOnly, testImplementation, testRuntimeOnly, etc. dependencies should be added here.
+
+
+    annotationProcessor 'org.springframework.boot:spring-boot-configuration-processor'
+    annotationProcessor 'org.springframework.boot:spring-boot-autoconfigure-processor'
+
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.cloud:spring-cloud-starter-consul-config'
+
+    runtimeOnly 'com.sas.commons:commons-rest-boot'
+    runtimeOnly 'com.sas.commons:event-backend-arke'
+    runtimeOnly 'com.sas.security:oauth2-bootstrap'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter-api'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+}
+
+test {
+    useJUnitPlatform()
+}

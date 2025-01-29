@@ -1,0 +1,22 @@
+---
+name: java-gradle
+on:
+  push:
+    branches:
+      - main
+      - release-*
+  pull_request:
+    branches:
+      - main
+      - release-*
+jobs:
+  gradle:
+    uses: sas-institute-rnd-internal/workflows-gradle/.github/workflows/product-java-gradle6.yaml@v2
+    with:
+      pipeline: test
+      debug: false
+      info: true
+      cadence-version: latest
+      java-version: 17
+      artifactory-stack: {{{{ index (.data.ArtifactoryTeam | strings.Split "-") 0 }}}}
+      release-strategy: release-commit

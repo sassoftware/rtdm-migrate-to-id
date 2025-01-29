@@ -1,0 +1,18 @@
+plugins {
+    id 'com.sas.cdp-team-repositories'
+    id 'com.sas.onepm'
+    id 'com.sas.viya.package'
+}
+
+dependencies {
+    onepmdata 'kubernetes-sigs.kustomize:kustomize-gobin:4.5.7'
+}
+ 
+onepm {
+    source {
+        dependency "${group}:${rootProject.name}:${version}@jar"
+        destination 'libexec/'
+        isService true
+        includedIn 'du+docker'
+    }
+}

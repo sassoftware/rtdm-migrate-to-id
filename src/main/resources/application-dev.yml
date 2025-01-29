@@ -1,0 +1,8 @@
+# I18NOK:FileNotLocalizable
+# export SPRING_PROFILES_ACTIVE=dev
+
+####  This property provides the consul connection info
+#     when running along side the dev-image (but not in it).
+sas:
+  url:
+    httpd: http://localhost

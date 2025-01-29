@@ -1,0 +1,28 @@
+pluginManagement {
+    plugins {
+        id 'com.sas.cdp-release-management' version '11.0.+'
+        id 'com.sas.pangea' version '11.0.+'
+        id 'com.sas.maven-publish' version '11.0.+'
+        id 'com.sas.cdp-team-repositories' version '11.0.+'
+ 
+        id 'com.sas.viya.service' version '5.0.+'
+        id 'com.sas.viya.package' version '5.0.+'
+ 
+        id 'com.sas.onepm' version '9.1.+'
+    }
+    repositories {
+        maven {
+            credentials {
+                username cdpUser
+                password cdpPassword
+            }
+            url "$repository_contextUrl/$team-maven-vrel"
+        }
+    }
+}
+
+rootProject.name = '{{{{ .data.DU }}}}'
+
+include 'saspackage'
+
+project(':saspackage').name="${rootProject.name}-saspackage"
