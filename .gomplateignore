@@ -1,8 +1,0 @@
-.git
-.DS_Store
-.gomplate.yaml
-.gomplateignore
-out
-template.sh
-template-data.yaml
-.github/workflows/template-testing.yaml

@@ -1,17 +1,12 @@
-# DOS line endings
+# Use Unix line endings
+*.sh text eol=lf
 *.bat text eol=crlf
-
-# Unix line endings
-*.sh       text eol=lf
-*.json     text eol=lf
-*.md       text eol=lf
-gradlew    text eol=lf
 Dockerfile text eol=lf
-
-*.md text
+*.html text
+*.js text
+*.css text
 *.txt text
-
-*.gif binary
+*.md text
 *.jar binary
+*.war binary
 *.png binary
-*.tgz

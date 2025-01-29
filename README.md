@@ -1,88 +1,111 @@
-# Java Service Template
+# RTDM to ID Migration
 
-This template is used to create a Java service project that uses Gradle to build
-an image containing the service. Because this template has multiple value
-substitutions needed for generated project content, additional tools are required.
+- [RTDM to ID Migration](#rtdm-to-id-migration)
+  - [Overview](#overview)
+    - [Prerequisites](#prerequisites)
+    - [Installation](#installation)
+  - [Getting Started](#getting-started)
+  - [Running](#running)
+    - [Examples](#examples)
+    - [Capabilities](#capabilities)
+  - [Support](#support)
+    - [SAS Communities](#sas-communities)
+    - [SAS Documentation](#sas-documentation)
+    - [GitHub Issues](#github-issues)
+  - [Contributing](#contributing)
+  - [License](#license)
 
-## Substitution Requirements
+## Overview
+Tool to migrate campaigns from SAS Real-Time Decision Manager (RTDM) to SAS Intelligent Decisioning (ID).
 
-The [gomplate](https://docs.gomplate.ca/installing/) CLI can be installed and made
-available on your `PATH`.
+### Prerequisites
+Campaigns from RTDM need to be extracted using SAS Customer Intelligence Integration Utilities.
+This step must be performed before running the migration tool.
 
-Alternatively, a docker image is available which also provides the gomplate CLI.
+[SAS Customer Intelligence Integration Utilities documentation](https://documentation.sas.com/?activeCdc=cicmncdc&cdcId=cicdc&cdcVersion=6.6&docsetId=ciintutilug&docsetTarget=titlepage.htm)
 
-### Install locally
 
-Precompiled binaries of gomplate are available from its [GitHub releases page](https://github.com/hairyhenderson/gomplate/releases).
+### Installation
+Download this project and build using provided Maven pom.xml file.
 
-Verify gomplate is successfully installed, executable, and available on your `PATH`:
+```shell script
+mvn clean install
+```
+This will generate a jar file under the \target folder.
 
-```bash
-$ gomplate --version
-gomplate version 0.0.0
+## Getting Started
+Migrating campaigns from RTDM to ID is a 3-step process.
+* Extract campaigns from RTDM using SAS Customer Intelligence Integration Utilities. This creates an extract XML file.
+* Start rtdm-migrate-to-id tool
+* Issue REST requests to rtdm-migrate-to-id tool using the extract XML file as input.
+
+## Running
+Run the migration tool from a command/shell window.
+
+```shell script
+java -jar rtdm-migrate-to-id-0.14.0.jar
+
+or
+# if port 8080 already in use
+java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.14.0.jar
 ```
 
-### Use the docker image
+This row inside command/shell will tell you that service successfully started
+![img.png](readmeimages/startUp.png)
 
-The **Usage** section below indicates how to run using the image instead of a locally installed CLI.
-Run the following command to make sure the latest version is pulled and available:
+RTDM Subdiagrams must be migrated before migrating parent diagram.
 
-```bash
-docker pull pulp.unx.sas.com/cdp-release-x64_oci_linux_2-docker-latest/pipeline-templatization:latest
+### Examples
+Authenticate with SAS Viya to get an authorization token.
+* https://developer.sas.com/apis/rest/#authentication-to-sas-viya
+* https://github.com/sassoftware/devsascom-rest-api-samples/blob/master/CoreServices/sasLogon.md
+
+Once authenticated user can POST requests.
+
+```shell script
+POST: localhost:8080/api/rtdm2id/create-diagram?baseIp={{ID environment}}&login={username}&password={password}&protocol={protocol}&parentFolderUri={parentFolderUri}&useCrossBranchLinks={useCrossBranchLinks}
+Authorization: Bearer {{token}}
+Content-Type: application/xml
+Body: Extract XML generated from SAS Customer Intelligence Integration Utilities
+
+Example Body: extract/extracted_campaign.xml
 ```
+The parameter protocol is optional. The default value is "http" if not provided. If the target environment is using HTTPS for secure online transactions then protocol must be provided with a value of "https".
 
-## Usage
+The parameter parentFolderUri is optional. The default value is /folders/folders/@myFolder if not provided.
 
-1. Create a new repository in GitHub and select this template as the "Repository template".
+The parameter useCrossBranchLinks is optional. The default value is "true".
+The use of cross-branch link nodes in the migration tool is an experimental feature. This feature is enabled by default. Cross-branch links will be created in the migrated Decision if the RTDM campaign contains a node with multiple input nodes. If the migration tool generates an error related to cross-branch links then set this parameter to "false".
 
-2. After creating the new repository, clone it locally.
+### Capabilities
 
-3. From the local repository root folder, create and switch to a new branch, for example `pr-init-template`:
+* Creation of DS2 Node process in ID from RTDM DS2 Process
+* Creation of SQL Node process in ID from RTDM Data Process
+* Creation of Decision input/output variables in ID from RTDM event variables
+* Creation of Assignment Rule Set in ID from RTDM Reply Node
+* Creation of Assignment Rule Set in ID from RTDM calculated variables
+* RTDM Subdiagrams must be migrated before migrating parent diagram
+  ![img.png](readmeimages/img.png)
 
-   ```bash
-   git switch -c pr-init-template
-   ```
+## Support
 
-4. Modify the included `template-data.yaml` input data file with the appropriate substitution
-   values for the provided properties for your new project.
+### SAS Communities
+Ask questions on the [Decisioning Community Web Site](https://communities.sas.com/t5/Decisioning/bd-p/decisioning).
 
-5. Run the provided `template.sh` script which performs the substitution using gomplate,
-   git stashes the input data file just in case, and replaces the contents of the static template files
-   with the templatized folders and files. After the scripts runs, stage all changes for commit.
+### SAS Documentation
 
-   - If gomplate is installed locally:
+[SAS Customer Intelligence Integration Utilities](https://documentation.sas.com/?activeCdc=cicmncdc&cdcId=cicdc&cdcVersion=6.6&docsetId=ciintutilug&docsetTarget=titlepage.htm)
 
-     ```bash
-     ./template.sh
-     ```
+[Authentication to SAS Viya](https://developer.sas.com/apis/rest/#authentication-to-sas-viya)
 
-   - If using the docker image:
+[SAS Logon API](https://github.com/sassoftware/devsascom-rest-api-samples/blob/master/CoreServices/sasLogon.md)
 
-     ```bash
-     docker run --rm -it -u $(id -u):$(id -g) -v $(pwd):/src \
-         pulp.unx.sas.com/cdp-release-x64_oci_linux_2-docker-latest/pipeline-templatization:latest \
-         ./template.sh
-     ```
+### GitHub Issues
 
-   - If you need to start the templatization process over, reset the git index to origin/main.
+See the [SUPPORT.md](SUPPORT.md) file for information on how to open an issue against this repository.
 
-     **NOTE**: Backup files if necessary first, this will delete **all** local changes.
+## Contributing
+> We welcome your contributions! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on how to submit contributions to this project.
 
-     ```bash
-     git reset --hard origin/main && git clean -dfx
-     ```
-
-     The input data file can then be recovered from the stash to start over with.
-
-     ```bash
-     git stash apply
-     ```
-
-6. When satisified with the results, commit, push, and create the first Pull Request!
-
-   ```bash
-   git add -A
-   git status
-   git commit -m "ci: initial templatization"
-   git push -u origin pr-init-template
-   ```
+## License
+> This project is licensed under the [Apache 2.0 License](LICENSE).
