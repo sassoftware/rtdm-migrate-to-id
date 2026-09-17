@@ -91,6 +91,10 @@ public class CrossTableNodeConverter {
             ds2Code.append("Output Variable: ").append(NEW_LINE_STRING);
             ds2Code.append("    Name:      ").append(outputVariable.getName()).append(NEW_LINE_STRING);
             ds2Code.append("    Type:      ").append(outputVariable.getType()).append(NEW_LINE_STRING);
+            ds2Code.append("    Level:     ").append(outputVariable.getLevel()).append(NEW_LINE_STRING);
+                ds2Code.append("    Default Value Is Missing: ")
+                    .append(outputVariable.getDefaultValueIsMissing()).append(NEW_LINE_STRING);
+            appendIdentifier(ds2Code, outputVariable);
             outputVariable.getPossibleValuesList().getPossibleValues().forEach(value -> {
                 Stream.of(value.getBooleanValue(), value.getDateValue(),
                         value.getDoubleValue(), value.getLongValue(),
@@ -98,6 +102,16 @@ public class CrossTableNodeConverter {
                         .filter(Objects::nonNull)
                         .forEach(v -> appendPossibleValue(ds2Code, v));
             });
+        }
+    }
+
+    private void appendIdentifier(StringBuilder ds2Code, OutputVariable outputVariable) {
+        if (outputVariable.getIdentifier() != null) {
+            String identifierName = outputVariable.getIdentifier().getName();
+            if (identifierName == null || identifierName.isEmpty()) {
+                identifierName = outputVariable.getIdentifier().getId();
+            }
+            ds2Code.append("    Identifier: ").append(identifierName).append(NEW_LINE_STRING);
         }
     }
 
@@ -118,6 +132,7 @@ public class CrossTableNodeConverter {
                 ds2Code.append("    VarInfoId: ").append(varRefDO.getVarInfoId()).append(NEW_LINE_STRING);
             }
             ds2Code.append("Column Criteria: ").append(NEW_LINE_STRING);
+            ds2Code.append("    Like:      ").append(columnCriteria.isLike()).append(NEW_LINE_STRING);
             columnCriteria.getLineItems().getCrossTableLineItemDOs().forEach(lineItem -> {
                 appendValues(ds2Code, lineItem);
             });
@@ -135,6 +150,7 @@ public class CrossTableNodeConverter {
                 ds2Code.append("    VarInfoId: ").append(varRefDO.getVarInfoId()).append(NEW_LINE_STRING);
             }
             ds2Code.append("Row Criteria: ").append(NEW_LINE_STRING);
+            ds2Code.append("    Like:      ").append(rowCriteria.isLike()).append(NEW_LINE_STRING);
             rowCriteria.getLineItems().getCrossTableLineItemDOs().forEach(lineItem -> {
                 appendValues(ds2Code, lineItem);
             });

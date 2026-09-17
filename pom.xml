@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.sas</groupId>
     <artifactId>rtdm-migrate-to-id</artifactId>
-    <version>0.14.0</version>
+    <version>0.14.1</version>
     <name>rtdm-migrate-to-id</name>
     <description>Project for migrating campaigns from SAS Real-Time Decision Manager to SAS Intelligent Decisioning</description>
 
@@ -60,7 +60,7 @@
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
-            <version>1.18.26</version>
+            <version>1.18.30</version>
             <optional>true</optional>
         </dependency>
         <dependency>

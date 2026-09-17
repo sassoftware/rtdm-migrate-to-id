@@ -43,11 +43,11 @@ Migrating campaigns from RTDM to ID is a 3-step process.
 Run the migration tool from a command/shell window.
 
 ```shell script
-java -jar rtdm-migrate-to-id-0.14.0.jar
+java -jar rtdm-migrate-to-id-0.14.1.jar
 
 or
 # if port 8080 already in use
-java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.14.0.jar
+java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.14.1.jar
 ```
 
 This row inside command/shell will tell you that service successfully started

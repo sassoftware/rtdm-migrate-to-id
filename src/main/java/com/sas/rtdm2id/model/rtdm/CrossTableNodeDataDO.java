@@ -20,6 +20,7 @@ import javax.xml.bind.annotation.XmlValue;
 
 import com.sas.rtdm2id.model.rtdm.SplitNodeDataDO.SplitOnNodeDataDO.VarRefDO;
 import com.sas.rtdm2id.model.rtdm.extension.InputNodes;
+import com.sas.rtdm2id.model.rtdm.extension.IBVariableDO;
 import com.sas.rtdm2id.model.rtdm.extension.NodeTags;
 import com.sas.rtdm2id.model.rtdm.extension.OutputNodes;
 import com.sas.rtdm2id.model.rtdm.extension.SortByList;
@@ -163,6 +164,7 @@ public class CrossTableNodeDataDO implements Serializable {
 
     @XmlAccessorType(XmlAccessType.FIELD)
     @XmlType(name = "", propOrder = {
+            "like",
             "lineItems",
             "varRefDO"
     })
@@ -170,6 +172,9 @@ public class CrossTableNodeDataDO implements Serializable {
     @Setter
     public static class ColumnCriteria implements Serializable {
         private final static long serialVersionUID = -1L;
+
+        @XmlElement(name = "Like", required = true)
+        protected boolean like;
 
         @XmlElement(name = "LineItems", required = true)
         protected LineItems lineItems;
@@ -180,6 +185,7 @@ public class CrossTableNodeDataDO implements Serializable {
 
     @XmlAccessorType(XmlAccessType.FIELD)
     @XmlType(name = "", propOrder = {
+            "like",
             "lineItems",
             "varRefDO"
     })
@@ -187,6 +193,9 @@ public class CrossTableNodeDataDO implements Serializable {
     @Setter
     public static class RowCriteria implements Serializable {
         private final static long serialVersionUID = -1L;
+
+        @XmlElement(name = "Like", required = true)
+        protected boolean like;
 
         @XmlElement(name = "LineItems", required = true)
         protected LineItems lineItems;
@@ -293,6 +302,7 @@ public class CrossTableNodeDataDO implements Serializable {
             "hideVariable",
             "id",
             "identifiersRemoved",
+            "identifier",
             "level",
             "loadedFromOldDavLocation",
             "loading",
@@ -367,6 +377,9 @@ public class CrossTableNodeDataDO implements Serializable {
 
         @XmlElement(name = "IdentifiersRemoved")
         protected String identifiersRemoved;
+
+        @XmlElement(name = "Identifier")
+        protected IBVariableDO.Identifier identifier;
 
         @XmlElement(name = "Level", required = true)
         protected String level;
