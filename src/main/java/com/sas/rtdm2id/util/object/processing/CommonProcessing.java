@@ -449,6 +449,20 @@ public class CommonProcessing {
         return true;
     }
 
+    public String createGlobalVariableForDataPicker(String varInfoId, String globalVariableName, String type, Decision decision) {
+        String sanitizedGlobalVariableName = sanitizeVariableName(globalVariableName);
+        GlobalVariable globalVariable = createGlobalVariable(sanitizedGlobalVariableName, type, false);
+        if (globalVariable != null) {
+            addNewSignatureItemGlobalVariable(sanitizedGlobalVariableName, NONE_DIRECTION, decision);
+        }
+
+        if (varInfoId != null && !varInfoId.isEmpty()) {
+            mapStorage.getVarInfoIdToVariableNameMap().put(varInfoId, sanitizedGlobalVariableName);
+        }
+
+        return sanitizedGlobalVariableName;
+    }
+
     public GlobalVariable checkForGlobalVariableRuleSet(ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO) {
         if (ibVariableDO!=null) {
             if (ibVariableDO.getValue()!=null) {
@@ -638,6 +652,10 @@ public class CommonProcessing {
     }
 
     private GlobalVariable createGlobalVariable(String globalVariableName, String type) {
+        return createGlobalVariable(globalVariableName, type, true);
+    }
+
+    private GlobalVariable createGlobalVariable(String globalVariableName, String type, boolean activate) {
         try {
             CodeFileCollection codeFileCollection
                     = getCodeFileCollection(mapStorage.getBaseIp(), globalVariableName, mapStorage.getAccessToken(), "/referenceData/globalVariables");
@@ -652,6 +670,15 @@ public class CommonProcessing {
                             ViyaApi.createUri(mapStorage.getBaseIp(), "/referenceData/globalVariables", mapStorage.getProtocol()),
                             ViyaApi.createGlobalVariables(globalVariable, mapStorage.getAccessToken()), CodeFile.class);
                     if (response.getStatusCode().value() == 201) {
+                        CodeFile codeFile = response.getBody();
+                        if (codeFile == null || codeFile.getId() == null) {
+                            return null;
+                        }
+                        globalVariable.setId(codeFile.getId());
+                        if (!activate) {
+                            mapStorage.getGlobalVariableMap().put(globalVariableName, globalVariable);
+                            return globalVariable;
+                        }
                         globalVariable = activateGlobalVariable(globalVariableName, globalVariable, response);
                         if (globalVariable != null) return globalVariable;
                     }
@@ -876,17 +903,21 @@ public class CommonProcessing {
     }
 
     public ConditionBranch createConditionBranch(String nodeId, boolean needToGetNextNode) {
-        String nextNodeIdForCell = getNextNodeIdForCell(nodeId);
+        List<Step> nodeSteps = mapStorage.getNodeIdStepMap().get(nodeId);
+        String nodeIdToProcess = nodeId;
+        if (needToGetNextNode && (nodeSteps == null || nodeSteps.isEmpty())) {
+            nodeIdToProcess = getNextNodeIdForCell(nodeId);
+        }
 
         ConditionBranch conditionBranch = new ConditionBranch();
-        List<Step> innerStep = mapStorage.getNodeIdStepMap().get(needToGetNextNode ? nextNodeIdForCell : nodeId);
+        List<Step> innerStep = mapStorage.getNodeIdStepMap().get(nodeIdToProcess);
         if (innerStep == null) {
             conditionBranch.setSteps(Collections.emptyList());
         } else {
-            mapStorage.getExistingNodeIds().add(getNextNodeIdForCell(nodeId));
+            mapStorage.getExistingNodeIds().add(nodeIdToProcess);
 
             // If more than one branch case shares the same downstream node then use cross-branch links
-            String linkLabel = mapStorage.getNodeIdLinkLabelMap().get(nextNodeIdForCell);
+            String linkLabel = mapStorage.getNodeIdLinkLabelMap().get(nodeIdToProcess);
             if (mapStorage.isUseCrossBranchLinks() && linkLabel!=null) {
                 // The downstream RTDM node contains a link label which means it has multiple input nodes
 

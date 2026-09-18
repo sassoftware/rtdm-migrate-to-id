@@ -116,7 +116,7 @@ public class Converter {
 
         GenericTreeNode<Short> root = tree.getRoot();
         walkTree(root, decision);
-        connectConditionsInsideMap();
+        connectConditionsInsideMap(root);
         ConditionDecisionStep conditionDecisionStep = new ConditionDecisionStep();
         fillConditionDecisionStep(root.getChildren().get(0).getData(), conditionDecisionStep);
         Deque<Short> objIDStack = new ArrayDeque<>();
@@ -279,34 +279,65 @@ public class Converter {
         }
     }
 
-    private void connectConditionsInsideMap() {
-        Map<String, List<Step>> nodeIdStepMap = mapStorage.getNodeIdStepMap();
-        for (Map.Entry<String, List<Step>> entry : nodeIdStepMap.entrySet()) {
-            List<Step> stepList = entry.getValue();
-            Short objId = treeUtil.getNodeIdObjIdMap().get(entry.getKey());
-            List<String> nodes = Arrays.asList(treeUtil.getObjIdOutputNodesMap().get(objId).split(REGEXP));
-            if (stepList != null && !stepList.isEmpty()) {
-                Step step = stepList.get(stepList.size() - 1);
-                if (step != null) {
-                    if (Step.TypeEnum.CONDITION.equals(step.getType())) {
-                        fillConditionStepWithInnerSteps(step, entry.getKey(), nodes);
-                    } else if (Step.TypeEnum.BRANCH.equals(step.getType())) {
-                        fillBranchStepWithInnerSteps(step, entry.getKey());
-                    }
+    private void connectConditionsInsideMap(GenericTreeNode<Short> root) {
+        connectConditionsInsideMap(root, new HashSet<String>());
+    }
+
+    private void connectConditionsInsideMap(GenericTreeNode<Short> node, Set<String> connectedNodeIds) {
+        for (GenericTreeNode<Short> child : node.getChildren()) {
+            String nodeId = treeUtil.getObjIdToNodeIdMap().get(child.getData());
+            if (connectedNodeIds.add(nodeId)) {
+                connectConditionNode(nodeId);
+            }
+            connectConditionsInsideMap(child, connectedNodeIds);
+        }
+    }
+
+    private void connectConditionNode(String nodeId) {
+        List<Step> stepList = mapStorage.getNodeIdStepMap().get(nodeId);
+        Short objId = treeUtil.getNodeIdObjIdMap().get(nodeId);
+        List<String> nodes = Arrays.asList(treeUtil.getObjIdOutputNodesMap().get(objId).split(REGEXP));
+        if (stepList != null && !stepList.isEmpty()) {
+            Step step = stepList.get(stepList.size() - 1);
+            if (step != null) {
+                if (Step.TypeEnum.CONDITION.equals(step.getType())) {
+                    fillConditionStepWithInnerSteps(step, nodeId, nodes);
+                } else if (Step.TypeEnum.BRANCH.equals(step.getType())) {
+                    fillBranchStepWithInnerSteps(step, nodeId);
                 }
             }
         }
     }
 
     private void finalConnectionOfNodes(GenericTreeNode<Short> node, Deque<Short> objIDStack) {
+        if (hasConnectedBranches(node)) {
+            return;
+        }
+
         for (GenericTreeNode<Short> innerNode : node.getChildren()) {
             Short objId = innerNode.getData();
             addStep(objId, objIDStack);
-            if (node.getNumberOfChildren() > 1) {
+            boolean branchNode = node.getNumberOfChildren() > 1;
+            if (branchNode) {
                 objIDStack.push(objId);
             }
             finalConnectionOfNodes(innerNode, objIDStack);
+            if (branchNode) {
+                objIDStack.pop();
+            }
         }
+    }
+
+    private boolean hasConnectedBranches(GenericTreeNode<Short> node) {
+        String nodeId = treeUtil.getObjIdToNodeIdMap().get(node.getData());
+        List<Step> steps = mapStorage.getNodeIdStepMap().get(nodeId);
+        if (steps == null || steps.isEmpty()) {
+            return false;
+        }
+
+        Step lastStep = steps.get(steps.size() - 1);
+        return Step.TypeEnum.CONDITION.equals(lastStep.getType())
+                || Step.TypeEnum.BRANCH.equals(lastStep.getType());
     }
 
     private void addStep(Short objId, Deque<Short> objIDStack) {
