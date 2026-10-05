@@ -33,6 +33,7 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -54,6 +55,7 @@ public class ProcessNodeConverter {
     private final RestTemplate restTemplate;
     private final CommonProcessing commonProcessing;
     private final MapStorage mapStorage;
+    private final SegmentationTreeService segmentationTreeService;
 
     private static final String PACKAGE_NAME_REGEX = "(\n\\s*package\\s+)([^\\s/;]+)(.*)";//"(?<!dcl\\s{1,1000}|declare\\s{1,1000}|returns\\s{1,1000}|in_out\\s{1,1000}|end|[,\\(]\\s{0,10000})package\\s+[^\\s/;]+";
     private static final Pattern packageNamePattern = Pattern.compile(PACKAGE_NAME_REGEX,Pattern.CASE_INSENSITIVE);
@@ -84,10 +86,18 @@ public class ProcessNodeConverter {
 
     public static final String FALSE_STRING = "false";
 
-    public ProcessNodeConverter(RestTemplate restTemplate, CommonProcessing commonProcessing, MapStorage mapStorage) {
+    @Autowired
+    public ProcessNodeConverter(RestTemplate restTemplate, CommonProcessing commonProcessing, MapStorage mapStorage,
+            SegmentationTreeService segmentationTreeService) {
         this.restTemplate = restTemplate;
         this.commonProcessing = commonProcessing;
         this.mapStorage = mapStorage;
+        this.segmentationTreeService = segmentationTreeService;
+    }
+
+    public ProcessNodeConverter(RestTemplate restTemplate, CommonProcessing commonProcessing, MapStorage mapStorage) {
+        this(restTemplate, commonProcessing, mapStorage,
+                new SegmentationTreeService(restTemplate, mapStorage, new SegmentationTreeConverter(commonProcessing)));
     }
 
     public List<Step> addCustomObjectStep(ProcessNodeDataDO processNodeDataDO, Decision decision, Short objId, String nodeName) {
@@ -320,26 +330,7 @@ public class ProcessNodeConverter {
                 }
             }
 
-            for (CrossTableNodeDataDO crossTableNodeDataDO : batch.getLogicalUnit().getCrossTableNodeDataDOs()) {
-                CustomObjectStep codeStep = new CustomObjectStep();
-                CodeFileCollection codeFileCollection = commonProcessing.getCodeFileCollectionByDescription(baseIp,
-                        crossTableNodeDataDO.getNodeId(), accessToken, "/decisions/codeFiles");
-                if (codeFileCollection != null) {
-                    if (codeFileCollection.getCount() == 0) {
-                        CrossTableNodeConverter crossTableNodeConverter = new CrossTableNodeConverter(mapStorage,
-                                commonProcessing);
-                        ProcessNodeDataDO process = crossTableNodeConverter
-                                .createCrossTablePlaceholderNode(crossTableNodeDataDO);
-                        createNewCodeFile(baseIp, accessToken, process, codeStep);
-                    } else {
-                        CodeFile codeFile = codeFileCollection.getItems().get(0);
-                        codeStep.setUri("/decisions/codeFiles/" + codeFile.getId());
-                        codeStep.setName(codeFile.getName());
-                        codeStep.setType(codeFile.getType().getValue());
-                        mapStorage.getCustomObjectStepHashMap().put(crossTableNodeDataDO.getObjid(), codeStep);
-                    }
-                }
-            }
+            segmentationTreeService.createOrReuse(batch.getLogicalUnit().getCrossTableNodeDataDOs());
 
         } catch (URISyntaxException e) {
             e.printStackTrace();

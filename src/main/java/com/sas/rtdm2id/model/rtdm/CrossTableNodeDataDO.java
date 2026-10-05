@@ -164,6 +164,7 @@ public class CrossTableNodeDataDO implements Serializable {
 
     @XmlAccessorType(XmlAccessType.FIELD)
     @XmlType(name = "", propOrder = {
+            "dateType",
             "like",
             "lineItems",
             "varRefDO"
@@ -172,6 +173,9 @@ public class CrossTableNodeDataDO implements Serializable {
     @Setter
     public static class ColumnCriteria implements Serializable {
         private final static long serialVersionUID = -1L;
+
+        @XmlElement(name = "DateType")
+        protected String dateType;
 
         @XmlElement(name = "Like", required = true)
         protected boolean like;
@@ -185,6 +189,7 @@ public class CrossTableNodeDataDO implements Serializable {
 
     @XmlAccessorType(XmlAccessType.FIELD)
     @XmlType(name = "", propOrder = {
+            "dateType",
             "like",
             "lineItems",
             "varRefDO"
@@ -193,6 +198,9 @@ public class CrossTableNodeDataDO implements Serializable {
     @Setter
     public static class RowCriteria implements Serializable {
         private final static long serialVersionUID = -1L;
+
+        @XmlElement(name = "DateType")
+        protected String dateType;
 
         @XmlElement(name = "Like", required = true)
         protected boolean like;
@@ -293,6 +301,7 @@ public class CrossTableNodeDataDO implements Serializable {
             "codeChangeUnpublished",
             "codeEverBeenPublished",
             "containsAllPossibleValues",
+            "defaultValue",
             "defaultValueIsMissing",
             "description",
             "firstOccurrenceToPublish",
@@ -350,6 +359,9 @@ public class CrossTableNodeDataDO implements Serializable {
 
         @XmlElement(name = "ContainsAllPossibleValues", required = true)
         protected String containsAllPossibleValues;
+
+        @XmlElement(name = "DefaultValue")
+        protected IBVariableValueDO defaultValue;
 
         @XmlElement(name = "DefaultValueIsMissing", required = true)
         protected String defaultValueIsMissing;
@@ -485,6 +497,7 @@ public class CrossTableNodeDataDO implements Serializable {
     @XmlAccessorType(XmlAccessType.FIELD)
     @XmlType(name = "", propOrder = {
             "archivedPublishState",
+            "actualValue",
             "codeChangeUnpublished",
             "codeEverBeenPublished",
             "discrete",
@@ -510,6 +523,9 @@ public class CrossTableNodeDataDO implements Serializable {
     public static class CrossTableLineItemDO implements Serializable {
 
         private final static long serialVersionUID = -1L;
+
+        @XmlElement(name = "ActualValue")
+        protected ActualValue actualValue;
 
         @XmlElement(name = "ArchivedPublishState")
         protected byte archivedPublishState;
@@ -604,6 +620,22 @@ public class CrossTableNodeDataDO implements Serializable {
     @Getter
     @Setter
     public static class MaxValue implements Serializable {
+
+        private final static long serialVersionUID = -1L;
+        @XmlValue
+        protected String value;
+        @XmlAttribute(name = "StoredType")
+        protected String storedType;
+
+    }
+
+    @XmlAccessorType(XmlAccessType.FIELD)
+    @XmlType(name = "", propOrder = {
+            "value"
+    })
+    @Getter
+    @Setter
+    public static class ActualValue implements Serializable {
 
         private final static long serialVersionUID = -1L;
         @XmlValue

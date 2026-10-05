@@ -10,6 +10,7 @@ import com.sas.rtdm2id.model.id.files.File;
 import com.sas.rtdm2id.model.id.globals.GlobalVariable;
 import com.sas.rtdm2id.model.id.rules.Rule;
 import com.sas.rtdm2id.model.id.rules.RuleSet;
+import com.sas.rtdm2id.model.id.segmentation.SegmentationTree;
 import com.sas.rtdm2id.model.rtdm.ProcessNodeDataDO;
 
 import org.springframework.http.HttpEntity;
@@ -31,6 +32,8 @@ import static com.sas.rtdm2id.util.model.RTDM2IDConstants.SCALAR_CONSTANT;
 @Component
 public class ViyaApi {
     private static final String BEARER_START = "Bearer ";
+    private static final String SEGMENTATION_TREE_MEDIA_TYPE =
+            "application/vnd.sas.decision.segmentation.tree+json";
 
     private ViyaApi() {
     }
@@ -160,6 +163,22 @@ public class ViyaApi {
         headers.set(HttpHeaders.CONTENT_TYPE, "application/vnd.sas.collection+json");
         headers.set(HttpHeaders.AUTHORIZATION, BEARER_START + accessToken);
         return new HttpEntity<>(headers);
+    }
+
+    public static HttpEntity<Object> createGetSegmentationTrees(String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set(HttpHeaders.ACCEPT, "application/vnd.sas.collection+json");
+        headers.set("Accept-Item", SEGMENTATION_TREE_MEDIA_TYPE);
+        headers.set(HttpHeaders.AUTHORIZATION, BEARER_START + accessToken);
+        return new HttpEntity<>(headers);
+    }
+
+    public static HttpEntity<SegmentationTree> createSegmentationTree(SegmentationTree tree, String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(SEGMENTATION_TREE_MEDIA_TYPE));
+        headers.set(HttpHeaders.ACCEPT, SEGMENTATION_TREE_MEDIA_TYPE);
+        headers.set(HttpHeaders.AUTHORIZATION, BEARER_START + accessToken);
+        return new HttpEntity<>(tree, headers);
     }
 
     public static HttpEntity<Object> createGetDecisionCollectionOrGlobalVariableRevision(String accessToken) {

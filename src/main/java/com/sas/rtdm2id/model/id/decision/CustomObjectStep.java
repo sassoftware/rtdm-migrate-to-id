@@ -22,6 +22,9 @@ public class CustomObjectStep {
   @JsonProperty("type")
   private String type = null;
 
+  @JsonProperty("isRestDNT")
+  private Boolean restDNT = null;
+
   public CustomObjectStep name(String name) {
     this.name = name;
     return this;
@@ -76,6 +79,19 @@ public class CustomObjectStep {
     this.type = type;
   }
 
+  public CustomObjectStep restDNT(Boolean restDNT) {
+    this.restDNT = restDNT;
+    return this;
+  }
+
+  public Boolean getRestDNT() {
+    return restDNT;
+  }
+
+  public void setRestDNT(Boolean restDNT) {
+    this.restDNT = restDNT;
+  }
+
 
   @Override
   public boolean equals(Object o) {
@@ -88,12 +104,13 @@ public class CustomObjectStep {
     CustomObjectStep customObjectStep = (CustomObjectStep) o;
     return Objects.equals(this.name, customObjectStep.name) &&
 //            Objects.equals(this.uri, customObjectStep.uri) &&
-            Objects.equals(this.type, customObjectStep.type);
+        Objects.equals(this.type, customObjectStep.type) &&
+        Objects.equals(this.restDNT, customObjectStep.restDNT);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(name, uri, type);
+    return Objects.hash(name, type, restDNT);
   }
 
 
@@ -105,6 +122,7 @@ public class CustomObjectStep {
     sb.append("    name: ").append(toIndentedString(name)).append("\n");
     sb.append("    uri: ").append(toIndentedString(uri)).append("\n");
     sb.append("    type: ").append(toIndentedString(type)).append("\n");
+    sb.append("    isRestDNT: ").append(toIndentedString(restDNT)).append("\n");
     sb.append("}");
     return sb.toString();
   }

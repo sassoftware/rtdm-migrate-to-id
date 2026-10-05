@@ -128,34 +128,49 @@ public class Converter {
     }
 
     private void addMissingVars(Decision decision) {
-        Set<String> varNames = new HashSet<String>();
         List<SignatureTerm> signatureTerms = decision.getSignature();
-        signatureTerms.forEach(
-                signatureTerm -> {
-                    varNames.add(signatureTerm.getName());
-                }
-        );
+        Map<String, SignatureTerm> signatureTermsByName = new HashMap<>();
+        for (SignatureTerm signatureTerm : signatureTerms) {
+            if (signatureTerm.getName() != null) {
+                signatureTermsByName.put(signatureTerm.getName().toLowerCase(Locale.ROOT), signatureTerm);
+            }
+        }
         ConditionDecisionStep decisionFlow = decision.getFlow();
         if (decisionFlow!=null && decisionFlow.getFlow()!=null){
-            decisionFlow.getFlow().forEach(
-                    step -> {
-                        if(step.getMappings()!=null){
-                            step.getMappings().forEach(
-                                mapping -> {
-                                    String decisionVarName = mapping.getTargetDecisionTermName();
-                                    if(varNames.stream().noneMatch(name -> name.equalsIgnoreCase(decisionVarName))) {
-                                        SignatureTerm newTerm = new SignatureTerm();
-                                        newTerm.setName(decisionVarName);
-                                        newTerm.setDirection(SignatureTerm.DirectionEnum.fromValue(mapping.getDirection().toString()));
-                                        newTerm.setDataType(SignatureTerm.DataTypeEnum.UNKNOWN);
-                                        signatureTerms.add(newTerm);
-                                        varNames.add(decisionVarName);
-                                    }
-                                }
-                        );
-                        }
+            for (Step step : decisionFlow.getFlow()) {
+                if (step.getMappings() == null) {
+                    continue;
+                }
+                for (Mapping mapping : step.getMappings()) {
+                    String decisionVarName = mapping.getTargetDecisionTermName();
+                    if (decisionVarName == null || mapping.getDirection() == null) {
+                        continue;
                     }
-            );
+                    String variableKey = decisionVarName.toLowerCase(Locale.ROOT);
+                    SignatureTerm signatureTerm = signatureTermsByName.get(variableKey);
+                    SignatureTerm.DirectionEnum mappingDirection = SignatureTerm.DirectionEnum
+                            .fromValue(mapping.getDirection().toString());
+                    if (signatureTerm == null) {
+                        signatureTerm = new SignatureTerm();
+                        signatureTerm.setName(decisionVarName);
+                        signatureTerm.setDataType(SignatureTerm.DataTypeEnum.UNKNOWN);
+                        signatureTerms.add(signatureTerm);
+                        signatureTermsByName.put(variableKey, signatureTerm);
+                    }
+                    updateSignatureDirection(signatureTerm, mappingDirection);
+                }
+            }
+        }
+    }
+
+    private void updateSignatureDirection(SignatureTerm signatureTerm,
+            SignatureTerm.DirectionEnum mappingDirection) {
+        SignatureTerm.DirectionEnum existingDirection = signatureTerm.getDirection();
+        if (existingDirection == null || SignatureTerm.DirectionEnum.NONE.equals(existingDirection)) {
+            signatureTerm.setDirection(mappingDirection);
+        } else if (!SignatureTerm.DirectionEnum.INOUT.equals(existingDirection)
+                && !existingDirection.equals(mappingDirection)) {
+            signatureTerm.setDirection(SignatureTerm.DirectionEnum.INOUT);
         }
     }
 
@@ -238,7 +253,7 @@ public class Converter {
                         commonProcessing.makeRemoveStagedTreatmentName(removeStagedTreatmentsNodeDataDO));
             case "crossTable":
                 CrossTableNodeDataDO crossTableNodeDataDO = (CrossTableNodeDataDO) rtdmObject.getObject();
-                stepList = crossTableNodeConverter.addCustomObjectStep(null, decision, objId,
+                stepList = crossTableNodeConverter.addSegmentationTreeStep(crossTableNodeDataDO, decision, objId,
                         commonProcessing.makeCrossTableNodeName(crossTableNodeDataDO));
                 break;
             default:

@@ -2,6 +2,11 @@ package com.sas.rtdm2id.util.object.processing;
 
 import com.sas.rtdm2id.dao.MapStorage;
 import com.sas.rtdm2id.model.id.decision.*;
+import com.sas.rtdm2id.model.id.segmentation.SegmentationTree;
+import com.sas.rtdm2id.model.id.rules.Action;
+import com.sas.rtdm2id.model.id.rules.Rule;
+import com.sas.rtdm2id.model.id.rules.RuleSet;
+import com.sas.rtdm2id.model.id.rules.Signature;
 import com.sas.rtdm2id.model.rtdm.CrossTableNodeDataDO;
 import com.sas.rtdm2id.model.rtdm.CrossTableNodeDataDO.ColumnCriteria;
 import com.sas.rtdm2id.model.rtdm.CrossTableNodeDataDO.CrossTable;
@@ -22,6 +27,9 @@ import static com.sas.rtdm2id.util.model.RTDM2IDConstants.NEW_LINE_STRING;
 import static com.sas.rtdm2id.util.model.RTDM2IDConstants.REMAINDER_VALUE;
 
 import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -44,6 +52,11 @@ public class CrossTableNodeConverter {
 
     public List<Step> addCustomObjectStep(ProcessNodeDataDO.Process process, Decision decision, Short objId,
             String nodeName) {
+        return addSegmentationTreeStep(null, decision, objId, nodeName);
+        }
+
+        public List<Step> addSegmentationTreeStep(CrossTableNodeDataDO source, Decision decision, Short objId,
+            String nodeName) {
         List<Step> stepList = new LinkedList<>();
         Step step = new Step();
         step.setType(Step.TypeEnum.CUSTOM_OBJECT);
@@ -53,8 +66,151 @@ public class CrossTableNodeConverter {
         }
 
         step.setCustomObject(mapStorage.getCustomObjectStepHashMap().get(objId));
+        addSegmentationTreeMappings(decision, objId, step, source);
+        List<SegmentationTree.SignatureTerm> signature = mapStorage.getSegmentationTreeSignatureMap().get(objId);
+        if (signature.stream().anyMatch(term -> term.getDerivationExpression() != null)) {
+            stepList.add(createDerivedInputStep(signature, decision, nodeName));
+        }
         stepList.add(step);
         return stepList;
+    }
+
+    private Step createDerivedInputStep(List<SegmentationTree.SignatureTerm> signature, Decision decision,
+            String nodeName) {
+        String ruleSetName = commonProcessing.sanitizeAndReduceVariableName(nodeName + "_date_values");
+        commonProcessing.findOrAddRuleSet(ruleSetName, "Date-function inputs for " + nodeName);
+        Step step = mapStorage.getRuleSetStepMap().get(ruleSetName);
+        if (step == null || step.getRuleSet() == null) {
+            throw new IllegalStateException("Date-function input RuleSet is unavailable for " + nodeName);
+        }
+        Map<String, Signature> ruleSignature = new LinkedHashMap<>();
+        List<Action> actions = new ArrayList<>();
+        for (SegmentationTree.SignatureTerm term : signature) {
+            if (term.getDerivationExpression() == null) {
+                continue;
+            }
+            String inputName = commonProcessing.sanitizeAndReduceVariableName(term.getSourceVariableName());
+            String outputName = commonProcessing.sanitizeAndReduceVariableName(term.getName());
+            for (boolean input : new boolean[] {true, false}) {
+                String name = input ? inputName : outputName;
+                Signature ruleTerm = new Signature();
+                ruleTerm.setName(name);
+                ruleTerm.setDataType(input ? term.getSourceDataType() : term.getDataType());
+                ruleTerm.setDirection(input ? "input" : "output");
+                ruleSignature.put(name, ruleTerm);
+                Mapping mapping = new Mapping();
+                mapping.setStepTermName(name);
+                mapping.setTargetDecisionTermName(input ? term.getSourceVariableName() : term.getName());
+                mapping.setDirection(input ? Mapping.DirectionEnum.INPUT : Mapping.DirectionEnum.OUTPUT);
+                commonProcessing.checkMappingForDuplicate(mapping, step);
+            }
+            SegmentationTree.SignatureTerm sourceTerm = new SegmentationTree.SignatureTerm();
+            sourceTerm.setName(term.getSourceVariableName());
+            sourceTerm.setDataType(term.getSourceDataType());
+            addDecisionSignatureTerm(decision, sourceTerm, sourceTerm.getName(),
+                    SignatureTerm.DataTypeEnum.fromValue(sourceTerm.getDataType()), SignatureTerm.DirectionEnum.INPUT);
+            Action action = new Action();
+            action.setType("complex");
+            action.setExpression(outputName + " = " + term.getDerivationExpression()
+                    .replace("(" + term.getSourceVariableName() + ")", "(" + inputName + ")"));
+            actions.add(action);
+        }
+        RuleSet ruleSet = new RuleSet();
+        ruleSet.setName(ruleSetName);
+        ruleSet.setSignature(new ArrayList<>(ruleSignature.values()));
+        if (!Boolean.TRUE.equals(mapStorage.getRuleSetIsUpdated().get(ruleSetName))) {
+            commonProcessing.callPutRuleSet(step.getRuleSet(), ruleSet);
+        }
+        if (!Boolean.TRUE.equals(mapStorage.getRuleSetIsActionUpdated().get(ruleSetName))) {
+            Rule rule = new Rule();
+            rule.setName("derive_date_inputs");
+            rule.setConditional("if");
+            rule.setRuleFiredTrackingEnabled(false);
+            rule.setActions(actions);
+            commonProcessing.addActionToRuleSet(step.getRuleSet(), rule);
+        }
+        return step;
+    }
+
+    private void addSegmentationTreeMappings(Decision decision, Short objId, Step step, CrossTableNodeDataDO source) {
+        List<SegmentationTree.SignatureTerm> treeSignature = mapStorage.getSegmentationTreeSignatureMap().get(objId);
+        if (treeSignature == null || treeSignature.isEmpty()) {
+            throw new IllegalStateException("Segmentation Tree signature is unavailable for Cross-Table node " + objId);
+        }
+
+        for (SegmentationTree.SignatureTerm treeTerm : treeSignature) {
+            Mapping.DirectionEnum mappingDirection = Mapping.DirectionEnum.fromValue(treeTerm.getDirection());
+            SignatureTerm.DataTypeEnum dataType = SignatureTerm.DataTypeEnum.fromValue(treeTerm.getDataType());
+            if (treeTerm.getName() == null || mappingDirection == null || dataType == null) {
+                throw new IllegalStateException("Invalid Segmentation Tree signature term for Cross-Table node " + objId);
+            }
+
+                String targetDecisionTermName;
+                if (source != null && mappingDirection == Mapping.DirectionEnum.OUTPUT) {
+                    String outputName = source.getOutputVariable() == null ? null : source.getOutputVariable().getName();
+                    if (outputName == null || outputName.isEmpty()) {
+                        outputName = treeTerm.getName();
+                    }
+                targetDecisionTermName = commonProcessing.sanitizeVariableName(commonProcessing.changeVariableNameToFormat(
+                            source.getNodeName() + "." + outputName));
+                } else {
+                targetDecisionTermName = resolveTargetDecisionTermName(decision, treeTerm,
+                    mappingDirection, dataType, objId);
+                }
+            Mapping mapping = new Mapping();
+            mapping.setStepTermName(treeTerm.getName());
+            mapping.setTargetDecisionTermName(targetDecisionTermName);
+            mapping.setDirection(mappingDirection);
+            step.addMappingsItem(mapping);
+
+                addDecisionSignatureTerm(decision, treeTerm, targetDecisionTermName, dataType,
+                    treeTerm.getDerivationExpression() == null
+                            ? SignatureTerm.DirectionEnum.fromValue(mappingDirection.getValue())
+                            : SignatureTerm.DirectionEnum.NONE);
+        }
+    }
+
+    private String resolveTargetDecisionTermName(Decision decision, SegmentationTree.SignatureTerm treeTerm,
+            Mapping.DirectionEnum mappingDirection, SignatureTerm.DataTypeEnum dataType, Short objId) {
+        String termName = treeTerm.getName();
+        SignatureTerm existingTerm = findDecisionSignatureTerm(decision, termName);
+        if (mappingDirection != Mapping.DirectionEnum.OUTPUT
+                || existingTerm == null || existingTerm.getDataType() == dataType) {
+            return termName;
+        }
+
+        String uniqueTermName = commonProcessing.sanitizeAndReduceVariableName(termName + "_" + objId);
+        int suffix = 2;
+        while (findDecisionSignatureTerm(decision, uniqueTermName) != null) {
+            uniqueTermName = commonProcessing.sanitizeAndReduceVariableName(
+                    termName + "_" + objId + "_" + suffix++);
+        }
+        return uniqueTermName;
+    }
+
+    private void addDecisionSignatureTerm(Decision decision, SegmentationTree.SignatureTerm treeTerm,
+            String decisionTermName, SignatureTerm.DataTypeEnum dataType, SignatureTerm.DirectionEnum direction) {
+        SignatureTerm decisionTerm = findDecisionSignatureTerm(decision, decisionTermName);
+        if (decisionTerm == null) {
+            decisionTerm = new SignatureTerm();
+            decisionTerm.setName(decisionTermName);
+            decisionTerm.setDataType(dataType);
+            decisionTerm.setLength(treeTerm.getLength());
+            decisionTerm.setDirection(direction);
+            decision.addSignatureItem(decisionTerm);
+        } else if (decisionTerm.getDataType() != dataType) {
+            decisionTerm.setDataType(SignatureTerm.DataTypeEnum.UNKNOWN);
+            decisionTerm.setLength(null);
+        } else if (dataType == SignatureTerm.DataTypeEnum.STRING) {
+            decisionTerm.setLength(treeTerm.getLength());
+        }
+    }
+
+    private SignatureTerm findDecisionSignatureTerm(Decision decision, String termName) {
+        return decision.getSignature().stream()
+                .filter(term -> term.getName() != null && term.getName().equalsIgnoreCase(termName))
+                .findFirst()
+                .orElse(null);
     }
 
     public ProcessNodeDataDO createCrossTablePlaceholderNode(CrossTableNodeDataDO crossTableNodeDataDO) {

@@ -8,6 +8,7 @@ import com.sas.rtdm2id.model.id.decision.ConditionBranch;
 import com.sas.rtdm2id.model.id.decision.CustomObjectStep;
 import com.sas.rtdm2id.model.id.decision.Step;
 import com.sas.rtdm2id.model.id.globals.GlobalVariable;
+import com.sas.rtdm2id.model.id.segmentation.SegmentationTree;
 import lombok.Getter;
 import lombok.Setter;
 import org.springframework.stereotype.Component;
@@ -36,6 +37,7 @@ public class MapStorage {
     private final Map<String, List<Step>> nodeIdStepMap = new HashMap<>();
     private final Map<String, ConditionBranch> branchNodeIdConditionBranchMap = new HashMap<>();
     private final Map<Short, CustomObjectStep> customObjectStepHashMap = new HashMap<>();
+    private final Map<Short, List<SegmentationTree.SignatureTerm>> segmentationTreeSignatureMap = new HashMap<>();
     private final Map<String, String> calculatedVariableMap = new HashMap<>();
     private final Set<Step> calculatedVariableRulesetNodes = new HashSet<>();
     private final Map<String, String> varInfoIdToVariableNameMap = new HashMap<>();
@@ -51,6 +53,7 @@ public class MapStorage {
         nodeIdStepMap.clear();
         branchNodeIdConditionBranchMap.clear();
         customObjectStepHashMap.clear();
+        segmentationTreeSignatureMap.clear();
         existingNodeIds.clear();
         calculatedVariableMap.clear();
         calculatedVariableRulesetNodes.clear();

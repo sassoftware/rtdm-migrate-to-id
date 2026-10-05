@@ -2,6 +2,10 @@ package com.sas.rtdm2id.util;
 
 import com.sas.rtdm2id.dao.MapStorage;
 import com.sas.rtdm2id.model.id.decision.ConditionBranch;
+import com.sas.rtdm2id.model.id.decision.ConditionDecisionStep;
+import com.sas.rtdm2id.model.id.decision.Decision;
+import com.sas.rtdm2id.model.id.decision.Mapping;
+import com.sas.rtdm2id.model.id.decision.SignatureTerm;
 import com.sas.rtdm2id.model.id.decision.Step;
 import com.sas.rtdm2id.util.object.processing.AssignmentNodeConverter;
 import com.sas.rtdm2id.util.object.processing.CommonProcessing;
@@ -31,6 +35,35 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 class ConverterTest {
+
+    @Test
+    void alignsExistingSignatureDirectionsWithStepMappings() throws Exception {
+        Converter converter = createConverter(new TreeUtil(), new MapStorage());
+        Decision decision = new Decision();
+
+        SignatureTerm inputTerm = signatureTerm("BooleanInput");
+        SignatureTerm outputTerm = signatureTerm("OutputBoolean");
+        SignatureTerm inOutTerm = signatureTerm("SharedValue");
+        decision.getSignature().add(inputTerm);
+        decision.getSignature().add(outputTerm);
+        decision.getSignature().add(inOutTerm);
+
+        ConditionDecisionStep flow = new ConditionDecisionStep();
+        flow.setFlow(new ArrayList<>());
+        flow.addFlowItem(mappedStep("BooleanInput", Mapping.DirectionEnum.INPUT));
+        flow.addFlowItem(mappedStep("OutputBoolean", Mapping.DirectionEnum.OUTPUT));
+        flow.addFlowItem(mappedStep("SharedValue", Mapping.DirectionEnum.INPUT));
+        flow.addFlowItem(mappedStep("SharedValue", Mapping.DirectionEnum.OUTPUT));
+        decision.setFlow(flow);
+
+        Method addMissingVars = Converter.class.getDeclaredMethod("addMissingVars", Decision.class);
+        addMissingVars.setAccessible(true);
+        addMissingVars.invoke(converter, decision);
+
+        assertEquals(SignatureTerm.DirectionEnum.INPUT, inputTerm.getDirection());
+        assertEquals(SignatureTerm.DirectionEnum.OUTPUT, outputTerm.getDirection());
+        assertEquals(SignatureTerm.DirectionEnum.INOUT, inOutTerm.getDirection());
+    }
 
     @Test
     void restoresParentBranchBeforeProcessingSibling() throws Exception {
@@ -145,5 +178,22 @@ class ConverterTest {
                 "finalConnectionOfNodes", GenericTreeNode.class, Deque.class);
         finalConnectionOfNodes.setAccessible(true);
         finalConnectionOfNodes.invoke(converter, node, branchStack);
+    }
+
+    private SignatureTerm signatureTerm(String name) {
+        SignatureTerm signatureTerm = new SignatureTerm();
+        signatureTerm.setName(name);
+        signatureTerm.setDataType(SignatureTerm.DataTypeEnum.BOOLEAN);
+        signatureTerm.setDirection(SignatureTerm.DirectionEnum.NONE);
+        return signatureTerm;
+    }
+
+    private Step mappedStep(String targetName, Mapping.DirectionEnum direction) {
+        Mapping mapping = new Mapping();
+        mapping.setTargetDecisionTermName(targetName);
+        mapping.setDirection(direction);
+        Step step = new Step();
+        step.addMappingsItem(mapping);
+        return step;
     }
 }

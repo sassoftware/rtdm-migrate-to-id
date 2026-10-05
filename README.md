@@ -43,11 +43,11 @@ Migrating campaigns from RTDM to ID is a 3-step process.
 Run the migration tool from a command/shell window.
 
 ```shell script
-java -jar rtdm-migrate-to-id-0.14.2.jar
+java -jar rtdm-migrate-to-id-0.14.3.jar
 
 or
 # if port 8080 already in use
-java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.14.2.jar
+java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.14.3.jar
 ```
 
 This row inside command/shell will tell you that service successfully started
@@ -84,6 +84,7 @@ The use of cross-branch link nodes in the migration tool is an experimental feat
 * Creation of Decision input/output variables in ID from RTDM event variables
 * Creation of Assignment Rule Set in ID from RTDM Reply Node
 * Creation of Assignment Rule Set in ID from RTDM calculated variables
+* Conversion of RTDM Cross-Table nodes to ID segmentation trees with matrices and local value lists for discrete values, numeric ranges, whole-date ranges, and day/time criteria. Day/time criteria use a preceding RuleSet to derive calendar-day numbers and seconds since midnight from datetime inputs; these internal values feed numeric matrix ranges. Missing values and character `LIKE` patterns use boolean operators; remaining cells use matrices.
 * RTDM Subdiagrams must be migrated before migrating parent diagram
   ![img.png](readmeimages/img.png)
 

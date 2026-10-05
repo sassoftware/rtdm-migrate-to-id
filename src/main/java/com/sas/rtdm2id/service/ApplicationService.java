@@ -108,7 +108,8 @@ public class ApplicationService {
         }
 
         try {
-            if (!commonProcessing.findDecision(batch.getLogicalUnit().getCampaignDO().getName())) {
+            String decisionName = batch.getLogicalUnit().getCampaignDO().getName();
+            if (!commonProcessing.findDecision(decisionName)) {
                 GenericTree<Short> tree = treeUtil.createTree(batch.getLogicalUnit());
                 String accessToken = oAuthTokenResponse.getAccessToken();
                 processNodeConverter.createCustomNodes(batch);
@@ -136,7 +137,7 @@ public class ApplicationService {
                     return decision.getName() + " failed to migrate";
                 }
             } else {
-                return "Decision already exists, existing decision was not overwritten";
+                return "Decision '" + decisionName + "' already exists, existing decision was not overwritten";
             }
 
         } catch (Exception e) {
