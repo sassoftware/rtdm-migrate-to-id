@@ -23,6 +23,8 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Date;
 import java.util.Locale;
 import java.util.TimeZone;
@@ -53,7 +55,7 @@ public class ViyaApi {
             protocolPrefix = "https://";
         }
         String baseUrl = protocolPrefix + baseIp + contextPath;
-        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(baseUrl)
+        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(baseUrl)
                 .queryParam("filter", "eq(" + parameter + ",'" + filter + "')");
         return new URI(builder.toUriString());
     }
@@ -99,11 +101,26 @@ public class ViyaApi {
         return new HttpEntity<>(headers);
     }
 
-    public static HttpEntity<GlobalVariable> createGlobalVariables(GlobalVariable globalVariable, String accessToken) {
+    public static HttpEntity<Map<String, Object>> createGlobalVariables(GlobalVariable globalVariable, String accessToken) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set(HttpHeaders.AUTHORIZATION, BEARER_START + accessToken);
-        return new HttpEntity<>(globalVariable, headers);
+        Map<String, Object> request = new LinkedHashMap<>();
+        request.put("name", globalVariable.getName());
+        request.put("dataType", globalVariable.getDataType());
+        request.put("defaultValue", globalVariable.getDefaultValue());
+        return new HttpEntity<>(request, headers);
+    }
+
+    public static HttpEntity<Map<String, Object>> createGlobalVariableRevision(GlobalVariable globalVariable, String accessToken) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set(HttpHeaders.AUTHORIZATION, BEARER_START + accessToken);
+        Map<String, Object> revision = new LinkedHashMap<>();
+        revision.put("name", globalVariable.getName());
+        revision.put("dataType", globalVariable.getDataType());
+        revision.put("defaultValue", globalVariable.getDefaultValue());
+        return new HttpEntity<>(revision, headers);
     }
 
     public static HttpEntity<File> createPutFilesFiles(String etag, String accessToken, ProcessNodeDataDO.Process process) {

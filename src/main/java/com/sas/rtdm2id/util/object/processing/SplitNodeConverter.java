@@ -18,6 +18,7 @@ import com.sas.rtdm2id.util.model.RTDM2IDConstants;
 
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.util.*;
 
 import static com.sas.rtdm2id.util.model.RTDM2IDConstants.*;
@@ -60,13 +61,17 @@ public class SplitNodeConverter {
                     = splitNodeDataDO.getLineItems().getSplitNodeLineItemDOs();
             List<IntervalLineItemDO> intervalLineItemDOs = splitOnNodeDataDO.getLineItems().getIntervalLineItemDOs();
             List<DiscreteLineItemDO> discreteLineItemDOs = splitOnNodeDataDO.getLineItems().getDiscreteLineItemDOs();
+            String dataType = mapStorage.getCalculatedVariableDataTypeMap().getOrDefault(
+                varRefDO.getVarInfoId(), varRefDO.getType());
+            String intervalBranchType = intervalLineItemDOs.stream()
+                .allMatch(interval -> Boolean.parseBoolean(interval.getMissingGroup()) || isSingleValueInterval(interval, dataType))
+                ? EQUALS_BRANCH_TYPE : RANGE_BRANCH_TYPE;
 
-        String dataType = splitNodeDataDO.getSplitOnNodeDataDO().getVarRefDO().getType();
         for (int i = 0; i < splitNodeLineItemDOs.size(); i++) {
             if (RTDM2IDConstants.REMAINDER_VALUE.equals(splitNodeLineItemDOs.get(i).getValue())) {
                 step.setDefaultCase(commonProcessing.createConditionBranch(splitNodeLineItemDOs.get(i).getCellId(), true));
                 if (!intervalLineItemDOs.isEmpty()) {
-                    step.setBranchType(RANGE_BRANCH_TYPE);
+                    step.setBranchType(intervalBranchType);
                 } else if (!discreteLineItemDOs.isEmpty()) {
                     step.setBranchType(EQUALS_BRANCH_TYPE);
                 }
@@ -76,25 +81,41 @@ public class SplitNodeConverter {
                 BranchCase branchCase = new BranchCase();
                 branchCase.setLabel(splitNodeLineItemDOs.get(i).getCellId());
                 if (!intervalLineItemDOs.isEmpty()) {
-                    if (i > 0) {
-                        // ID does not support < or > operators so always make sure lower and upper bound is inclusive
-                        intervalLineItemDOs.get(i).setLowerBoundInclusive("true");
-                        intervalLineItemDOs.get(i).setUpperBoundInclusive("true");
+                    IntervalLineItemDO interval = intervalLineItemDOs.get(i);
+                    if (Boolean.parseBoolean(interval.getMissingGroup())) {
+                        branchCase.setSimpleCondition(createMissingBranchCondition(variableName, dataType));
+                    } else if (isSingleValueInterval(interval, dataType)) {
+                        Term2 lhsTerm = new Term2();
+                        lhsTerm.setName(commonProcessing.sanitizeVariableName(variableName));
+                        branchCase.setSimpleCondition(createSimpleBranchCondition(lhsTerm,
+                            interval.getLowerBoundObject().getText(), "false", "=", dataType));
+                    } else {
+                        if (i > 0) {
+                            // ID does not support < or > operators so always make sure lower and upper bound is inclusive
+                            interval.setLowerBoundInclusive("true");
+                            interval.setUpperBoundInclusive("true");
+                        }
+                        branchCase.setCompoundCondition(createCompoundBranchCondition(interval, variableName, dataType));
                     }
-                    branchCase.setCompoundCondition(createCompoundBranchCondition(intervalLineItemDOs.get(i), variableName, dataType));
-                    step.setBranchType(RANGE_BRANCH_TYPE);
+                    step.setBranchType(intervalBranchType);
                 } else if (!discreteLineItemDOs.isEmpty()) {
                     Term2 lhsTerm = new Term2();
                     String textValue;
                     if (discreteLineItemDOs.get(i).getValue()!=null) {
                         textValue = discreteLineItemDOs.get(i).getValue().getText();
+                        if (BOOLEAN_CONSTANT.equalsIgnoreCase(discreteLineItemDOs.get(i).getValue().getStoredType())
+                                && !SignatureTerm.DataTypeEnum.BOOLEAN.equals(commonProcessing.getDatatypeOfVar(dataType))) {
+                            if ("true".equalsIgnoreCase(textValue)) {
+                                textValue = "1";
+                            } else if ("false".equalsIgnoreCase(textValue)) {
+                                textValue = "0";
+                            }
+                        }
+                        lhsTerm.setName(commonProcessing.sanitizeVariableName(variableName));
+                        branchCase.setSimpleCondition(createSimpleBranchCondition(lhsTerm, textValue, "false", "=", dataType));
                     } else {
-                        // (Missing) values in RTDM
-                        textValue = MISSING_CONSTANT;
-                        dataType = MISSING_CONSTANT;
+                        branchCase.setSimpleCondition(createMissingBranchCondition(variableName, dataType));
                     }
-                    lhsTerm.setName(commonProcessing.sanitizeVariableName(variableName));
-                    branchCase.setSimpleCondition(createSimpleBranchCondition(lhsTerm, textValue, "false", "=", dataType));
                     step.setBranchType(EQUALS_BRANCH_TYPE);
                 }
                 branchCases.add(branchCase);
@@ -227,6 +248,19 @@ public class SplitNodeConverter {
     }
 
 
+    private boolean isSingleValueInterval(IntervalLineItemDO interval, String dataType) {
+        if (!Boolean.parseBoolean(interval.getLowerBoundInclusive()) || !Boolean.parseBoolean(interval.getUpperBoundInclusive())) {
+            return false;
+        }
+        String lower = interval.getLowerBoundObject().getText();
+        String upper = interval.getUpperBoundObject().getText();
+        SignatureTerm.DataTypeEnum type = commonProcessing.getDatatypeOfVar(dataType);
+        if (type == SignatureTerm.DataTypeEnum.DECIMAL || type == SignatureTerm.DataTypeEnum.INTEGER) {
+            return new BigDecimal(lower).compareTo(new BigDecimal(upper)) == 0;
+        }
+        return Objects.equals(lower, upper);
+    }
+
     private CompoundBranchCondition createCompoundBranchCondition(IntervalLineItemDO intervalLineItemDO
             , String varName, String dataType) {
         CompoundBranchCondition compoundBranchCondition = new CompoundBranchCondition();
@@ -243,6 +277,20 @@ public class SplitNodeConverter {
                 , upperBoundInclusive, "<", dataType));
 
         return compoundBranchCondition;
+    }
+
+    private SimpleBranchCondition createMissingBranchCondition(String variableName, String dataType) {
+        String name = commonProcessing.sanitizeVariableName(variableName);
+        if (SignatureTerm.DataTypeEnum.STRING.equals(commonProcessing.getDatatypeOfVar(dataType))) {
+            Term2 lhsTerm = new Term2();
+            lhsTerm.setName(name);
+            return createSimpleBranchCondition(lhsTerm, "''", "false", "=", MISSING_CONSTANT);
+        }
+        return new SimpleBranchCondition()
+            .lhsConditionExpression("missing(" + name + ")")
+            .lhsConditionExpressionType(SignatureTerm.DataTypeEnum.DECIMAL.getValue())
+            .operator("=")
+            .rhsConstant("1");
     }
 
     private SimpleBranchCondition createSimpleBranchCondition(Term2 lhsTerm, String rhsConstant, String inclusive, String operator
@@ -267,6 +315,15 @@ public class SplitNodeConverter {
             case INTEGER_CONSTANT:
                 int round = (int) Math.round(Double.parseDouble(rhsConstant));
                 rhsConstantModified = Integer.toString(round);
+                break;
+            case BOOLEAN_CONSTANT:
+                if ("true".equalsIgnoreCase(rhsConstant) || "1".equals(rhsConstant)) {
+                    rhsConstantModified = "True";
+                } else if ("false".equalsIgnoreCase(rhsConstant) || "0".equals(rhsConstant)) {
+                    rhsConstantModified = "False";
+                } else {
+                    rhsConstantModified = rhsConstant;
+                }
                 break;
             case MISSING_CONSTANT:
                 rhsConstantModified = rhsConstant;

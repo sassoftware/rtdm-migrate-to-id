@@ -39,6 +39,7 @@ public class MapStorage {
     private final Map<Short, CustomObjectStep> customObjectStepHashMap = new HashMap<>();
     private final Map<Short, List<SegmentationTree.SignatureTerm>> segmentationTreeSignatureMap = new HashMap<>();
     private final Map<String, String> calculatedVariableMap = new HashMap<>();
+    private final Map<String, String> calculatedVariableDataTypeMap = new HashMap<>();
     private final Set<Step> calculatedVariableRulesetNodes = new HashSet<>();
     private final Map<String, String> varInfoIdToVariableNameMap = new HashMap<>();
     private final Map<String, String> nodeIdLinkLabelMap = new HashMap<>();
@@ -56,6 +57,7 @@ public class MapStorage {
         segmentationTreeSignatureMap.clear();
         existingNodeIds.clear();
         calculatedVariableMap.clear();
+        calculatedVariableDataTypeMap.clear();
         calculatedVariableRulesetNodes.clear();
         varInfoIdToVariableNameMap.clear();
         nodeIdLinkLabelMap.clear();

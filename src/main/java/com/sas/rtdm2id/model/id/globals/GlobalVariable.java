@@ -20,4 +20,7 @@ public class GlobalVariable {
     private String dataType;
     @JsonProperty("defaultValue")
     private Object defaultValue;
+    private String activeVersionId;
+    private String status;
+    private boolean locked;
 }

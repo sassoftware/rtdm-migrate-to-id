@@ -33,6 +33,7 @@ import java.io.File;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -48,8 +49,8 @@ public class ApplicationService {
     private final CommonProcessing commonProcessing;
     private final TreeUtil treeUtil;
     private final MapStorage mapStorage;
-    Map<String, OAuthTokenResponse> oAuthTokenResponseMap = new HashMap<>();
-    Map<String, Instant> expirationTimeMap = new HashMap<>();
+    Map<List<String>, OAuthTokenResponse> oAuthTokenResponseMap = new HashMap<>();
+    Map<List<String>, Instant> expirationTimeMap = new HashMap<>();
 
     public ApplicationService(RestTemplate restTemplate, MarshallerWrapper marshallerWrapper, Converter converter, ProcessNodeConverter processNodeConverter, SubDiagramNodeConverter subDiagramNodeConverter, CommonProcessing commonProcessing, TreeUtil treeUtil, MapStorage mapStorage) {
         this.restTemplate = restTemplate;
@@ -63,31 +64,42 @@ public class ApplicationService {
     }
 
     public OAuthTokenResponse getAccessToken(String baseIp, String login, String password, String protocol) {
-        if (oAuthTokenResponseMap.get(baseIp) != null && Instant.now().isBefore(expirationTimeMap.get(baseIp))) {
-            return oAuthTokenResponseMap.get(baseIp);
-        }
-        try {
-            ResponseEntity<OAuthTokenResponse> response = restTemplate.postForEntity(ViyaApi.createUri(baseIp, "/SASLogon/oauth/token", protocol),
-                    ViyaApi.createGetAccessTokenHTTPEntity(login, password),
-                    OAuthTokenResponse.class);
-            if (response.getStatusCode().value() != 200) {
+        String effectiveProtocol = "https".equalsIgnoreCase(protocol) ? "https" : "http";
+        List<String> cacheKey = Arrays.asList(baseIp, effectiveProtocol, login);
+        OAuthTokenResponse oAuthTokenResponse = oAuthTokenResponseMap.get(cacheKey);
+        Instant expirationTime = expirationTimeMap.get(cacheKey);
+        if (oAuthTokenResponse == null || expirationTime == null || !Instant.now().isBefore(expirationTime)) {
+            try {
+                ResponseEntity<OAuthTokenResponse> response = restTemplate.postForEntity(ViyaApi.createUri(baseIp, "/SASLogon/oauth/token", effectiveProtocol),
+                        ViyaApi.createGetAccessTokenHTTPEntity(login, password),
+                        OAuthTokenResponse.class);
+                if (response.getStatusCode().value() != 200) {
+                    throw new OAuthTokenException("Could not get OAuth token: invalid user");
+                }
+                oAuthTokenResponse = response.getBody();
+                expirationTime = Instant.now().plusSeconds(oAuthTokenResponse.getExpiresIn());
+                oAuthTokenResponseMap.put(cacheKey, oAuthTokenResponse);
+                expirationTimeMap.put(cacheKey, expirationTime);
+            } catch (URISyntaxException | HttpClientErrorException e) {
                 throw new OAuthTokenException("Could not get OAuth token: invalid user");
             }
-            OAuthTokenResponse oAuthTokenResponse = response.getBody();
-            oAuthTokenResponseMap.put(baseIp, oAuthTokenResponse);
-
-            Instant expirationTime = Instant.now().plusSeconds(oAuthTokenResponse.getExpiresIn());
-            expirationTimeMap.put(baseIp, expirationTime);
-            mapStorage.setBaseIp(baseIp);
-            mapStorage.setAccessToken(oAuthTokenResponse.getAccessToken());
-            mapStorage.setProtocol(protocol);
-            return oAuthTokenResponse;
-        } catch (URISyntaxException | HttpClientErrorException e) {
-            throw new OAuthTokenException("Could not get OAuth token: invalid user");
         }
+        mapStorage.setBaseIp(baseIp);
+        mapStorage.setAccessToken(oAuthTokenResponse.getAccessToken());
+        mapStorage.setProtocol(effectiveProtocol);
+        return oAuthTokenResponse;
     }
 
     public String createDiagram(String baseIp, Batch batch, String login, String password, String protocol, String parentFolderUri, String useCrossBranchLinks) {
+        try {
+            return migrateDiagram(baseIp, batch, login, password, protocol, parentFolderUri, useCrossBranchLinks);
+        } finally {
+            treeUtil.clearMaps();
+            mapStorage.clearListsAndMaps();
+        }
+    }
+
+    private String migrateDiagram(String baseIp, Batch batch, String login, String password, String protocol, String parentFolderUri, String useCrossBranchLinks) {
         OAuthTokenResponse oAuthTokenResponse = getAccessToken(baseIp, login, password, protocol);
         if (oAuthTokenResponse == null) {
             return "Could not get access token for ip = " + baseIp + " try to get access token again!";
@@ -98,7 +110,7 @@ public class ApplicationService {
         String decisionJson = null;
 
         mapStorage.setParentFolderUri(parentFolderUri);
-        mapStorage.setUseCrossBranchLinks(new Boolean(useCrossBranchLinks));
+        mapStorage.setUseCrossBranchLinks(Boolean.parseBoolean(useCrossBranchLinks));
 
         List<String> subDiagramsThatDoNotExist = commonProcessing.getSubDiagramNodeNames(batch);
 
@@ -118,7 +130,7 @@ public class ApplicationService {
                 decision = converter.createDecision(batch, tree);
                 
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+                objectMapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
                 decisionJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(decision);
 
                 // TODO: Remove later, useful for debugging very large json files too big for console
@@ -156,10 +168,6 @@ public class ApplicationService {
             e.printStackTrace();
 
             return e.getMessage();
-        }
-        finally {
-            treeUtil.clearMaps();
-            mapStorage.clearListsAndMaps();
         }
     }
 

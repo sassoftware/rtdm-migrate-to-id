@@ -18,6 +18,12 @@ public class SimpleBranchCondition {
   @JsonProperty("lhsTerm")
   private Term2 lhsTerm = null;
 
+  @JsonProperty("lhsConditionExpression")
+  private String lhsConditionExpression = null;
+
+  @JsonProperty("lhsConditionExpressionType")
+  private String lhsConditionExpressionType = null;
+
   @JsonProperty("rhsTerm")
   private Term2 rhsTerm = null;
 
@@ -61,6 +67,32 @@ public class SimpleBranchCondition {
 
   public void setLhsTerm(Term2 lhsTerm) {
     this.lhsTerm = lhsTerm;
+  }
+
+  public SimpleBranchCondition lhsConditionExpression(String lhsConditionExpression) {
+    this.lhsConditionExpression = lhsConditionExpression;
+    return this;
+  }
+
+  public String getLhsConditionExpression() {
+    return lhsConditionExpression;
+  }
+
+  public void setLhsConditionExpression(String lhsConditionExpression) {
+    this.lhsConditionExpression = lhsConditionExpression;
+  }
+
+  public SimpleBranchCondition lhsConditionExpressionType(String lhsConditionExpressionType) {
+    this.lhsConditionExpressionType = lhsConditionExpressionType;
+    return this;
+  }
+
+  public String getLhsConditionExpressionType() {
+    return lhsConditionExpressionType;
+  }
+
+  public void setLhsConditionExpressionType(String lhsConditionExpressionType) {
+    this.lhsConditionExpressionType = lhsConditionExpressionType;
   }
 
   public SimpleBranchCondition rhsTerm(Term2 rhsTerm) {
@@ -129,6 +161,8 @@ public class SimpleBranchCondition {
     SimpleBranchCondition simpleBranchCondition = (SimpleBranchCondition) o;
     return Objects.equals(this.id, simpleBranchCondition.id) &&
             Objects.equals(this.lhsTerm, simpleBranchCondition.lhsTerm) &&
+          Objects.equals(this.lhsConditionExpression, simpleBranchCondition.lhsConditionExpression) &&
+          Objects.equals(this.lhsConditionExpressionType, simpleBranchCondition.lhsConditionExpressionType) &&
             Objects.equals(this.rhsTerm, simpleBranchCondition.rhsTerm) &&
             Objects.equals(this.rhsConstant, simpleBranchCondition.rhsConstant) &&
             Objects.equals(this.operator, simpleBranchCondition.operator);
@@ -136,7 +170,7 @@ public class SimpleBranchCondition {
 
   @Override
   public int hashCode() {
-    return Objects.hash(id, lhsTerm, rhsTerm, rhsConstant, operator);
+    return Objects.hash(id, lhsTerm, lhsConditionExpression, lhsConditionExpressionType, rhsTerm, rhsConstant, operator);
   }
 
 
@@ -147,6 +181,8 @@ public class SimpleBranchCondition {
 
     sb.append("    id: ").append(toIndentedString(id)).append("\n");
     sb.append("    lhsTerm: ").append(toIndentedString(lhsTerm)).append("\n");
+    sb.append("    lhsConditionExpression: ").append(toIndentedString(lhsConditionExpression)).append("\n");
+    sb.append("    lhsConditionExpressionType: ").append(toIndentedString(lhsConditionExpressionType)).append("\n");
     sb.append("    rhsTerm: ").append(toIndentedString(rhsTerm)).append("\n");
     sb.append("    rhsConstant: ").append(toIndentedString(rhsConstant)).append("\n");
     sb.append("    operator: ").append(toIndentedString(operator)).append("\n");

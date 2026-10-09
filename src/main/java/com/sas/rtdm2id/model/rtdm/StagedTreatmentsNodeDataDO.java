@@ -4,7 +4,7 @@ import com.sas.rtdm2id.model.rtdm.extension.*;
 import lombok.Getter;
 import lombok.Setter;
 
-import javax.xml.bind.annotation.*;
+import jakarta.xml.bind.annotation.*;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;

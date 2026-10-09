@@ -38,8 +38,8 @@ import com.sas.rtdm2id.util.tree.impl.TreeUtil;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
@@ -77,8 +77,49 @@ public class CommonProcessing {
         // unique ruleset for each node.
         List<CalculatedItemDO> calculatedItemDOs = batch.getLogicalUnit().getFlowDO().getCalculatedDataItemList().getCalculatedItemDOs();
         if (!calculatedItemDOs.isEmpty()) {
+            Map<String, String> requestDataTypes = new HashMap<>();
+            StartNodeDataDO start = batch.getLogicalUnit().getStartNodeDataDO();
+            if (start != null) {
+                List<StartNodeDataDO.Event.RequestVars.IBVariableDO> requestVars = Collections.emptyList();
+                if (start.getEvent() != null && start.getEvent().getRequestVars() != null) {
+                    requestVars = start.getEvent().getRequestVars().getIbVariableDOs();
+                } else if (start.getEvent() == null && start.getInputVariables() != null) {
+                    requestVars = start.getInputVariables().getIbVariableDOs();
+                }
+                for (StartNodeDataDO.Event.RequestVars.IBVariableDO requestVar : requestVars) {
+                    String name = requestVar.getName() != null && !requestVar.getName().isEmpty()
+                        ? requestVar.getName() : requestVar.getPhysicalName();
+                    requestDataTypes.put(sanitizeVariableName(SOURCE_EVENT + "." + name).toLowerCase(Locale.ROOT),
+                        getDatatypeOfVar(requestVar.getTypeDescription()).getValue());
+                }
+            }
+            IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
+            for (ProcessNodeDataDO processNode : batch.getLogicalUnit().getProcessNodeDataDOs()) {
+                if (processNode.getProcess() != null && processNode.getProcess().getInputVariableList() != null) {
+                    for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO variable
+                            : processNode.getProcess().getInputVariableList().getIbVariableDOs()) {
+                        addGlobalReferenceType(mapper.ibVariableDoGet(variable), requestDataTypes);
+                    }
+                }
+            }
+            for (ReplyNodeDataDO replyNode : batch.getLogicalUnit().getReplyNodeDataDOs()) {
+                List<ReplyNodeDataDO.EventReply.ReplyVars.IBVariableDO> variables = Collections.emptyList();
+                if (replyNode.getEventReply() != null && replyNode.getEventReply().getReplyVars() != null) {
+                    variables = replyNode.getEventReply().getReplyVars().getIbVariableDOs();
+                } else if (replyNode.getTreatmentReplyVariables() != null) {
+                    variables = replyNode.getTreatmentReplyVariables().getIbVariableDOs();
+                }
+                for (ReplyNodeDataDO.EventReply.ReplyVars.IBVariableDO variable : variables) {
+                    addGlobalReferenceType(mapper.ibVariableDoGet(variable), requestDataTypes);
+                }
+            }
             for (CalculatedItemDO calculatedItemDO : calculatedItemDOs) {
-                addRulesetForCalculatedItem(calculatedItemDO);
+                requestDataTypes.put(sanitizeVariableName(SOURCE_CALCULATED_DATA_ITEM + "."
+                    + calculatedItemDO.getName()).toLowerCase(Locale.ROOT),
+                    getCalculatedItemDataType(calculatedItemDO.getCalculatedItemType()));
+            }
+            for (CalculatedItemDO calculatedItemDO : calculatedItemDOs) {
+                addRulesetForCalculatedItem(calculatedItemDO, requestDataTypes);
             }
         }
         List<SplitNodeDataDO> splitNodeDataDOS = batch.getLogicalUnit().getSplitNodeDataDOs();
@@ -97,7 +138,9 @@ public class CommonProcessing {
             for (ProcessNodeDataDO processNodeDataDO : processNodeDataDOs) {
                 ProcessNodeDataDO.Process process = processNodeDataDO.getProcess();
                 if (process != null) {
-                    findOrAddRuleSet(makeProcessNodeRuleSetName(processNodeDataDO) + "_input_values", processNodeDataDO.getNodeDescription());
+                    if (process.getInputVariableList() != null && !process.getInputVariableList().getIbVariableDOs().isEmpty()) {
+                        findOrAddRuleSet(makeProcessNodeRuleSetName(processNodeDataDO) + "_input_values", processNodeDataDO.getNodeDescription());
+                    }
                     if (!isProcessNotDataProcess(process.getProcessTypeDescription()) && Boolean.parseBoolean(process.getReturnDatagridFlag())) {
                         findOrAddRuleSet(makeProcessNodeRuleSetName(processNodeDataDO) + "_extract_values", process.getDescription());
                     }
@@ -177,7 +220,7 @@ public class CommonProcessing {
             try {
                 // Log ruleset json to help with debugging
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+                objectMapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
                 ruleSetJson = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(ruleSet);
 
                 log.error("Exception occurred creating RuleSet");
@@ -385,7 +428,9 @@ public class CommonProcessing {
 
                 Step step = mapStorage.getRuleSetStepMap().get(calculatedVariableName+"_"+mapStorage.getCalculatedVariableMap().get(calculatedVariableName));
                 if (step != null) {
-                    addMapping(variableName, varName, originStep, true);
+                    if (originStep != null) {
+                        addMapping(variableName, varName, originStep, true);
+                    }
                     if (!mapStorage.getCalculatedVariableRulesetNodes().contains(step)){
                         updateRuleSet(variableName, type, step);
                         addStep(stepList, step, nodeId);
@@ -451,7 +496,7 @@ public class CommonProcessing {
 
     public String createGlobalVariableForDataPicker(String varInfoId, String globalVariableName, String type, Decision decision) {
         String sanitizedGlobalVariableName = sanitizeVariableName(globalVariableName);
-        GlobalVariable globalVariable = createGlobalVariable(sanitizedGlobalVariableName, type, false);
+        GlobalVariable globalVariable = createGlobalVariable(sanitizedGlobalVariableName, type);
         if (globalVariable != null) {
             addNewSignatureItemGlobalVariable(sanitizedGlobalVariableName, NONE_DIRECTION, decision);
         }
@@ -501,13 +546,13 @@ public class CommonProcessing {
         calculatedVariableName = changeVariableNameToFormat(calculatedVariableName);
         RuleSet ruleSet = new RuleSet();
         RuleSetStep ruleSetForUpdate = step.getRuleSet();
-        if (Boolean.FALSE.equals(mapStorage.getRuleSetIsUpdated().get(ruleSetForUpdate.getName()))) {
-            Mapping mapping = new Mapping();
-            mapping.setStepTermName(sanitizeAndReduceVariableName(calculatedVariableName));
-            mapping.setTargetDecisionTermName(sanitizeVariableName(calculatedVariableName));
-            mapping.setDirection(Mapping.DirectionEnum.OUTPUT);
-            checkMappingForDuplicate(mapping, step);
+        Mapping mapping = new Mapping();
+        mapping.setStepTermName(sanitizeAndReduceVariableName(calculatedVariableName));
+        mapping.setTargetDecisionTermName(sanitizeVariableName(calculatedVariableName));
+        mapping.setDirection(Mapping.DirectionEnum.OUTPUT);
+        checkMappingForDuplicate(mapping, step);
 
+        if (Boolean.FALSE.equals(mapStorage.getRuleSetIsUpdated().get(ruleSetForUpdate.getName()))) {
             ruleSet.setName(ruleSetForUpdate.getName());
             Signature signature = new Signature();
             signature.setDataType(getDatatypeOfVar(type).getValue());
@@ -546,7 +591,7 @@ public class CommonProcessing {
             try {
                 // Log ruleset json to help with debugging
                 ObjectMapper objectMapper = new ObjectMapper();
-                objectMapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+                objectMapper.setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
 
                 log.info("\n*** Exception occurred creating RuleSet ***\n");
 
@@ -617,7 +662,14 @@ public class CommonProcessing {
                 } else {
                     value = sanitizeAndReduceVariableName(buildVariableName(ibVariableDO.getValue().getValueTypeVarInfoDO()));
                     Signature signature = new Signature();
-                    signature.setDataType(getDatatypeOfVar(ibVariableDO.getTypeDescription()).getValue());
+                    ValueTypeVarInfoDO reference = ibVariableDO.getValue().getValueTypeVarInfoDO();
+                    String sourceType = ibVariableDO.getTypeDescription();
+                    if (reference.getVarInfoId().startsWith(GLOBALS_FOLDER + ".") && reference.getType() != null) {
+                        GlobalVariable global = mapStorage.getGlobalVariableMap().get(sanitizeVariableName(buildVariableName(reference)));
+                        sourceType = global != null ? global.getDataType() : reference.getType();
+                    }
+                    signature.setDataType(mapStorage.getCalculatedVariableDataTypeMap().getOrDefault(
+                        reference.getVarInfoId(), getDatatypeOfVar(sourceType).getValue()));
                     signature.setName(value);
                     signature.setDirection(INPUT_DIRECTION);
 
@@ -652,10 +704,6 @@ public class CommonProcessing {
     }
 
     private GlobalVariable createGlobalVariable(String globalVariableName, String type) {
-        return createGlobalVariable(globalVariableName, type, true);
-    }
-
-    private GlobalVariable createGlobalVariable(String globalVariableName, String type, boolean activate) {
         try {
             CodeFileCollection codeFileCollection
                     = getCodeFileCollection(mapStorage.getBaseIp(), globalVariableName, mapStorage.getAccessToken(), "/referenceData/globalVariables");
@@ -675,20 +723,29 @@ public class CommonProcessing {
                             return null;
                         }
                         globalVariable.setId(codeFile.getId());
-                        if (!activate) {
-                            mapStorage.getGlobalVariableMap().put(globalVariableName, globalVariable);
-                            return globalVariable;
-                        }
-                        globalVariable = activateGlobalVariable(globalVariableName, globalVariable, response);
-                        if (globalVariable != null) return globalVariable;
+                        return activateGlobalVariable(globalVariableName, globalVariable,
+                                response.getHeaders().getFirst(HttpHeaders.ETAG));
                     }
                 } else {
                     CodeFile codeFile = codeFileCollection.getItems().get(0);
-                    GlobalVariable globalVariable = new GlobalVariable(codeFile.getId(), sanitizeVariableName(globalVariableName)
-                            , codeFile.getDatatype(), codeFile.getDefaultValue());
-                    mapStorage.getGlobalVariableMap().put(globalVariableName
-                            , globalVariable);
-                    return globalVariable;
+                    ResponseEntity<GlobalVariable> response = restTemplate.exchange(
+                            ViyaApi.createUri(mapStorage.getBaseIp(), "/referenceData/globalVariables/" + codeFile.getId(), mapStorage.getProtocol()),
+                            HttpMethod.GET,
+                            ViyaApi.createGetDecisionCollectionOrGlobalVariableRevision(mapStorage.getAccessToken()),
+                            GlobalVariable.class);
+                    GlobalVariable globalVariable = response.getBody();
+                    if (response.getStatusCode().value() == 200 && globalVariable != null) {
+                        if (globalVariable.getActiveVersionId() != null && !globalVariable.getActiveVersionId().isEmpty()
+                                && "developing".equalsIgnoreCase(globalVariable.getStatus()) && !globalVariable.isLocked()) {
+                            mapStorage.getGlobalVariableMap().put(globalVariableName, globalVariable);
+                            return globalVariable;
+                        }
+                        if (globalVariable.getActiveVersionId() == null || globalVariable.getActiveVersionId().isEmpty()) {
+                            return activateGlobalVariable(globalVariableName, globalVariable,
+                                    response.getHeaders().getFirst(HttpHeaders.ETAG));
+                        }
+                        return createDevelopingRevision(globalVariableName, globalVariable);
+                    }
                 }
             }
         } catch (Exception exception) {
@@ -697,31 +754,50 @@ public class CommonProcessing {
         return null;
     }
 
-    private GlobalVariable activateGlobalVariable(String globalVariableName, GlobalVariable globalVariable, ResponseEntity<CodeFile> response) throws URISyntaxException {
-        HttpHeaders httpHeaders = response.getHeaders();
-        String etag = httpHeaders.getFirst(HttpHeaders.ETAG);
-        CodeFile codeFile = response.getBody();
-        assert codeFile != null;
-        globalVariable.setId(codeFile.getId());
-        ResponseEntity<GlobalVariableCollection> responseEntityForGlobals =
-                restTemplate.exchange(
-                        ViyaApi.createUri(mapStorage.getBaseIp(), "/referenceData/globalVariables/" + codeFile.getId() + "/revisions", mapStorage.getProtocol())
-                        , HttpMethod.GET,
-                        ViyaApi.createGetDecisionCollectionOrGlobalVariableRevision(mapStorage.getAccessToken()), GlobalVariableCollection.class);
-        if (responseEntityForGlobals.getStatusCode().value() == 200) {
-            GlobalVariableCollection globalVariableCollection = responseEntityForGlobals.getBody();
-            if (globalVariableCollection != null) {
-                Item item = globalVariableCollection.getItems().get(0);
-                ResponseEntity<String> putResp
-                        = restTemplate.exchange(ViyaApi.createUri(mapStorage.getBaseIp(), "/referenceData/globalVariables/" + codeFile.getId() + "/active", mapStorage.getProtocol())
-                        , HttpMethod.PUT,
-                        ViyaApi.activateGlobalVariable(mapStorage.getAccessToken(), etag, item.getId()), String.class);
-                if (putResp.getStatusCode().value() == 200) {
-                    mapStorage.getGlobalVariableMap().put(globalVariableName
-                            , globalVariable);
-                    return globalVariable;
-                }
-            }
+    private GlobalVariable activateGlobalVariable(String globalVariableName, GlobalVariable globalVariable, String etag)
+            throws URISyntaxException {
+        if (globalVariable.getId() == null || etag == null) {
+            return null;
+        }
+
+        ResponseEntity<GlobalVariableCollection> revisionsResponse = restTemplate.exchange(
+                ViyaApi.createUri(mapStorage.getBaseIp(), "/referenceData/globalVariables/" + globalVariable.getId() + "/revisions", mapStorage.getProtocol()),
+                HttpMethod.GET,
+                ViyaApi.createGetDecisionCollectionOrGlobalVariableRevision(mapStorage.getAccessToken()),
+                GlobalVariableCollection.class);
+        GlobalVariableCollection revisions = revisionsResponse.getBody();
+        if (!revisionsResponse.getStatusCode().is2xxSuccessful()
+                || revisions == null || revisions.getItems() == null || revisions.getItems().isEmpty()) {
+            return null;
+        }
+
+        Item currentRevision = revisions.getItems().get(0);
+        if (currentRevision.getId() == null) {
+            return null;
+        }
+        ResponseEntity<String> activationResponse = restTemplate.exchange(
+                ViyaApi.createUri(mapStorage.getBaseIp(), "/referenceData/globalVariables/" + globalVariable.getId() + "/active", mapStorage.getProtocol()),
+                HttpMethod.PUT,
+                ViyaApi.activateGlobalVariable(mapStorage.getAccessToken(), etag, currentRevision.getId()),
+                String.class);
+        if (activationResponse.getStatusCode().is2xxSuccessful()) {
+            globalVariable.setActiveVersionId(currentRevision.getId());
+            return createDevelopingRevision(globalVariableName, globalVariable);
+        }
+        return null;
+    }
+
+    private GlobalVariable createDevelopingRevision(String globalVariableName, GlobalVariable globalVariable)
+            throws URISyntaxException {
+        ResponseEntity<GlobalVariable> revisionResponse = restTemplate.postForEntity(
+                ViyaApi.createUri(mapStorage.getBaseIp(), "/referenceData/globalVariables/" + globalVariable.getId() + "/revisions", mapStorage.getProtocol()),
+                ViyaApi.createGlobalVariableRevision(globalVariable, mapStorage.getAccessToken()),
+                GlobalVariable.class);
+        if (revisionResponse.getStatusCode().value() == 201) {
+            globalVariable.setStatus("developing");
+            globalVariable.setLocked(false);
+            mapStorage.getGlobalVariableMap().put(globalVariableName, globalVariable);
+            return globalVariable;
         }
         return null;
     }
@@ -745,7 +821,11 @@ public class CommonProcessing {
             signatureItem.setDataGridExtension(new ArrayList<>());
         }
         signatureItem.setName(sanitizeVariableName(changeVariableNameToFormat(ibVariableDO.getName())));
-        checkSignatureTermForDuplicate(direction, decision, signatureItem);
+        boolean conflictingType = decision.getSignature().stream().anyMatch(term ->
+            signatureItem.getName().equalsIgnoreCase(term.getName()) && !signatureItem.getDataType().equals(term.getDataType()));
+        if (!conflictingType) {
+            checkSignatureTermForDuplicate(direction, decision, signatureItem);
+        }
     }
 
     public void addNewSignatureItem(IBVariableDO ibVariableDO, String direction, Decision decision, String varInfoSource) {
@@ -821,6 +901,8 @@ public class CommonProcessing {
     private void setDefaultValueByDataType(GlobalVariable globalVariable, String dataType) {
         if (INTEGER_CONSTANT.equals(dataType) || DECIMAL_CONSTANT.equals(dataType)) {
             globalVariable.setDefaultValue(0);
+        } else if (STRING_CONSTANT.equals(dataType)) {
+            globalVariable.setDefaultValue("");
         } else {
             globalVariable.setDefaultValue("''");
         }
@@ -868,10 +950,14 @@ public class CommonProcessing {
 
         mapping.setTargetDecisionTermName(changeVariableNameToFormat(targetDecisionTermName));
         mapping.setStepTermName(sanitizeAndReduceVariableName(ibVariableDO.getName()));
-        if (!isReplyVar) {
-            mapping.setTargetDecisionTermName(targetDecisionTermName);
-        }
         checkMappingForDuplicate(mapping, step);
+
+        if (ibVariableDO.getTypeDescription() != null) {
+            SignatureTerm signatureItem = new SignatureTerm();
+            signatureItem.setName(mapping.getTargetDecisionTermName());
+            signatureItem.setDataType(getDatatypeOfVar(ibVariableDO.getTypeDescription()));
+            checkSignatureTermForDuplicate(NONE_DIRECTION, decision, signatureItem);
+        }
     }
 
     public void addMapping(String targetDecisionTermName, String stepTermName, Step step, boolean isRuleSet) {
@@ -927,6 +1013,7 @@ public class CommonProcessing {
 
                     // All subsequent input nodes will use a cross-branch link step
                     mapStorage.getCrossBranchLinksAdded().add(linkLabel);
+                    mapStorage.getDecisionNodeLinkMap().add(linkLabel);
                     return conditionBranch;
                 } else {
                     // Create a new set of inner steps that cross-branch link to the step containing the link label
@@ -1075,6 +1162,21 @@ public class CommonProcessing {
     }
 
     public void addRulesetForCalculatedItem(CalculatedItemDO calculatedItemDO) {
+        addRulesetForCalculatedItem(calculatedItemDO, Collections.emptyMap());
+    }
+
+    private void addGlobalReferenceType(IBVariableDO variable, Map<String, String> inputDataTypes) {
+        ValueTypeVarInfoDO reference = variable.getValue() == null ? null : variable.getValue().getValueTypeVarInfoDO();
+        String prefix = GLOBALS_FOLDER + ".";
+        if (reference != null && reference.getVarInfoId() != null && reference.getVarInfoId().startsWith(prefix)
+                && reference.getType() != null) {
+            String targetName = SOURCE_GLOBAL + "." + reference.getVarInfoId().substring(prefix.length());
+            inputDataTypes.put(sanitizeVariableName(targetName).toLowerCase(Locale.ROOT),
+                getDatatypeOfVar(reference.getType()).getValue());
+        }
+    }
+
+    private void addRulesetForCalculatedItem(CalculatedItemDO calculatedItemDO, Map<String, String> requestDataTypes) {
         try {
             String ruleSetName = makeCalculatedDataItemRuleSetName(calculatedItemDO);
 
@@ -1095,7 +1197,9 @@ public class CommonProcessing {
             action.setType("complex");
             String value = "";
             String dataType = getCalculatedItemDataType(calculatedItemDO.getCalculatedItemType());
-            Set<String> varsInExpresion = new HashSet<String>(); 
+            mapStorage.getCalculatedVariableDataTypeMap().put(
+                CALCULATED_DATA_ITEMS_FOLDER + "." + calculatedItemDO.getName(), dataType);
+            Map<String, String> varsInExpresion = new LinkedHashMap<>();
             if ("Missing".equals(expression)){
                 value = getMissingValue(dataType);
             }else{
@@ -1116,21 +1220,25 @@ public class CommonProcessing {
             signature.setDirection(OUTPUT_DIRECTION);
             signatureList.add(signature);
             ruleSet.setSignature(signatureList);
+                Mapping outputMapping = new Mapping();
+                outputMapping.setStepTermName(signature.getName());
+                outputMapping.setTargetDecisionTermName(sanitizeVariableName(
+                    SOURCE_CALCULATED_DATA_ITEM + "." + calculatedItemDO.getName()));
+                outputMapping.setDirection(Mapping.DirectionEnum.OUTPUT);
+                checkMappingForDuplicate(outputMapping, step);
 
-            // We do not know the variable data types used in expression so set to "any".
-            // These will appear with a Data Type of "Unknown" in ID UI.
-            // For example:
-            // Calculated Variable Type: Numeric (Nominal)
-            // Calculated Variable Expression: TABLEUTILS.GETFLOAT(<<events.Grid Input>>,<<events.CustomerID>>,1)
-            //
-            // We know the GETFLOAT will return a Double (that's the calculated item data type) but we don't know the
-            // data type of events.CustomerID
-            varsInExpresion.forEach(item->{
+            varsInExpresion.forEach((item, targetName)->{
                 Signature _signature = new Signature();
                 _signature.setName(sanitizeAndReduceVariableName(changeVariableNameToFormat(item)));
-                _signature.setDataType("any");
+                _signature.setDataType(requestDataTypes.getOrDefault(
+                    sanitizeVariableName(targetName).toLowerCase(Locale.ROOT), "any"));
                 _signature.setDirection(INPUT_DIRECTION);
                 checkSignatureTermForDuplicate(INPUT_DIRECTION, signatureList, _signature);
+                Mapping inputMapping = new Mapping();
+                inputMapping.setStepTermName(_signature.getName());
+                inputMapping.setTargetDecisionTermName(sanitizeVariableName(targetName));
+                inputMapping.setDirection(Mapping.DirectionEnum.INPUT);
+                checkMappingForDuplicate(inputMapping, step);
             });
             ruleSet.setSignature(signatureList);
             ruleSet.setDescription(calculatedItemDO.getDescription());
@@ -1163,13 +1271,15 @@ public class CommonProcessing {
         return missingValue;
     }
 
-    private String transferInSIDFormat(String expression,Set<String> varSet) {
-        String pattern = "<<.*?\\.(.*?)>>";
+    private String transferInSIDFormat(String expression, Map<String, String> variableTargets) {
+        String pattern = "<<(.*?)\\.(.*?)>>";
         Pattern regex = Pattern.compile(pattern);
         Matcher matcher = regex.matcher(expression);
         StringBuffer outputBuffer = new StringBuffer();
         while (matcher.find()) {
-            String matchedVar = matcher.group(1);
+            String source = matcher.group(1);
+            String referencedName = matcher.group(2);
+            String matchedVar = referencedName;
 
             if (matchedVar.length() > 32) {
                 // Variables referenced inside a RTDM calculated variable expression can exceed 32 characters.
@@ -1208,7 +1318,22 @@ public class CommonProcessing {
             }
 
             String modifiedVar  = changeVariableNameToFormat(matchedVar); 
-            varSet.add(modifiedVar);
+            String targetName = modifiedVar;
+            switch (source) {
+                case "inputVariables":
+                case EVENTS_FOLDER:
+                    targetName = SOURCE_EVENT + "." + referencedName;
+                    break;
+                case CALCULATED_DATA_ITEMS_FOLDER:
+                    targetName = SOURCE_CALCULATED_DATA_ITEM + "." + referencedName;
+                    break;
+                case GLOBALS_FOLDER:
+                    targetName = SOURCE_GLOBAL + "." + referencedName;
+                    break;
+                default:
+                    break;
+            }
+            variableTargets.put(modifiedVar, targetName);
             matcher.appendReplacement(outputBuffer, modifiedVar);
         }
         matcher.appendTail(outputBuffer);

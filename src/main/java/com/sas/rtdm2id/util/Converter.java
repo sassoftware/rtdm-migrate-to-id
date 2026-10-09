@@ -15,6 +15,7 @@ import com.sas.rtdm2id.model.id.decision.Mapping;
 import com.sas.rtdm2id.model.id.decision.SignatureTerm;
 import com.sas.rtdm2id.model.id.decision.Step;
 import com.sas.rtdm2id.model.rtdm.*;
+import com.sas.rtdm2id.model.rtdm.extension.CalculatedItemDO;
 import com.sas.rtdm2id.model.rtdm.extension.SubDiagramNodeDataDO;
 import com.sas.rtdm2id.model.rtdm.extension.VarRef;
 import com.sas.rtdm2id.util.model.IBVariableDO;
@@ -123,8 +124,33 @@ public class Converter {
         finalConnectionOfNodes(root, objIDStack);
 
         decision.setFlow(conditionDecisionStep);
+        addCalculatedItemSignatureTerms(batch, decision);
         addMissingVars(decision);
         return decision;
+    }
+
+    private void addCalculatedItemSignatureTerms(Batch batch, Decision decision) {
+        FlowDO sourceFlow = batch.getLogicalUnit().getFlowDO();
+        if (sourceFlow == null || sourceFlow.getCalculatedDataItemList() == null) {
+            return;
+        }
+        for (CalculatedItemDO item : sourceFlow.getCalculatedDataItemList().getCalculatedItemDOs()) {
+            String name = commonProcessing.sanitizeVariableName(RTDM2IDConstants.SOURCE_CALCULATED_DATA_ITEM
+                + "." + item.getName());
+            SignatureTerm term = decision.getSignature().stream()
+                .filter(existing -> name.equalsIgnoreCase(existing.getName())).findFirst().orElseGet(() -> {
+                    SignatureTerm added = new SignatureTerm();
+                    added.setName(name);
+                    added.setDirection(SignatureTerm.DirectionEnum.NONE);
+                    decision.addSignatureItem(added);
+                    return added;
+                });
+            term.setDataType(SignatureTerm.DataTypeEnum.fromValue(
+                commonProcessing.getCalculatedItemDataType(item.getCalculatedItemType())));
+            if (SignatureTerm.DataTypeEnum.DATAGRID.equals(term.getDataType()) && term.getDataGridExtension() == null) {
+                term.setDataGridExtension(new ArrayList<>());
+            }
+        }
     }
 
     private void addMissingVars(Decision decision) {
@@ -137,11 +163,30 @@ public class Converter {
         }
         ConditionDecisionStep decisionFlow = decision.getFlow();
         if (decisionFlow!=null && decisionFlow.getFlow()!=null){
-            for (Step step : decisionFlow.getFlow()) {
+            Deque<Step> pendingSteps = new LinkedList<>(decisionFlow.getFlow());
+            Set<Step> visitedSteps = Collections.newSetFromMap(new IdentityHashMap<>());
+            while (!pendingSteps.isEmpty()) {
+                Step step = pendingSteps.removeFirst();
+                if (step == null || !visitedSteps.add(step)) {
+                    continue;
+                }
+                addBranchSteps(step.getOnTrue(), pendingSteps);
+                addBranchSteps(step.getOnFalse(), pendingSteps);
+                addBranchSteps(step.getDefaultCase(), pendingSteps);
+                if (step.getBranchCases() != null) {
+                    for (BranchCase branchCase : step.getBranchCases()) {
+                        if (branchCase != null) {
+                            addBranchSteps(branchCase.getOnTrue(), pendingSteps);
+                        }
+                    }
+                }
                 if (step.getMappings() == null) {
                     continue;
                 }
                 for (Mapping mapping : step.getMappings()) {
+                    if (mapping == null) {
+                        continue;
+                    }
                     String decisionVarName = mapping.getTargetDecisionTermName();
                     if (decisionVarName == null || mapping.getDirection() == null) {
                         continue;
@@ -163,8 +208,24 @@ public class Converter {
         }
     }
 
+    private void addBranchSteps(ConditionBranch branch, Deque<Step> pendingSteps) {
+        if (branch != null && branch.getSteps() != null) {
+            pendingSteps.addAll(branch.getSteps());
+        }
+    }
+
     private void updateSignatureDirection(SignatureTerm signatureTerm,
             SignatureTerm.DirectionEnum mappingDirection) {
+        if (signatureTerm.getGlobalVariableId() != null) {
+            if (SignatureTerm.DirectionEnum.OUTPUT.equals(mappingDirection)
+                    || SignatureTerm.DirectionEnum.OUTPUT.equals(signatureTerm.getDirection())) {
+                signatureTerm.setDirection(SignatureTerm.DirectionEnum.OUTPUT);
+            } else {
+                signatureTerm.setDirection(SignatureTerm.DirectionEnum.NONE);
+            }
+            return;
+        }
+
         SignatureTerm.DirectionEnum existingDirection = signatureTerm.getDirection();
         if (existingDirection == null || SignatureTerm.DirectionEnum.NONE.equals(existingDirection)) {
             signatureTerm.setDirection(mappingDirection);
@@ -325,16 +386,21 @@ public class Converter {
     }
 
     private void finalConnectionOfNodes(GenericTreeNode<Short> node, Deque<Short> objIDStack) {
-        if (hasConnectedBranches(node)) {
-            return;
+        if (mapStorage.isUseCrossBranchLinks() && !objIDStack.isEmpty()) {
+            String branchNodeId = treeUtil.getObjIdToNodeIdMap().get(objIDStack.peek());
+            ConditionBranch branch = mapStorage.getBranchNodeIdConditionBranchMap().get(branchNodeId);
+            if (branch != null && branch.getSteps() != null && !branch.getSteps().isEmpty()
+                    && branch.getSteps().get(branch.getSteps().size() - 1).getDecisionNodeLinkTarget() != null) {
+                return;
+            }
         }
-
+        boolean branchNode = hasConnectedBranches(node) || node.getNumberOfChildren() > 1;
         for (GenericTreeNode<Short> innerNode : node.getChildren()) {
             Short objId = innerNode.getData();
-            addStep(objId, objIDStack);
-            boolean branchNode = node.getNumberOfChildren() > 1;
             if (branchNode) {
                 objIDStack.push(objId);
+            } else {
+                addStep(objId, objIDStack);
             }
             finalConnectionOfNodes(innerNode, objIDStack);
             if (branchNode) {
@@ -485,17 +551,22 @@ public class Converter {
         for (SplitNodeDataDO.LineItems.SplitNodeLineItemDO splitNodeLineItemDO
                 : splitNodeDataDO.getLineItems().getSplitNodeLineItemDOs()) {
             if (RTDM2IDConstants.REMAINDER_VALUE.equals(splitNodeLineItemDO.getValue())) {
-                ConditionBranch conditionBranch = commonProcessing.createConditionBranch(splitNodeLineItemDO.getCellId(), true);
-                mapStorage.getBranchNodeIdConditionBranchMap().put(splitNodeLineItemDO.getCellId(), conditionBranch);             
-                if (RTDM2IDConstants.REMAINDER_VALUE.equals(splitNodeLineItemDO.getValue())) {
-                    step.setDefaultCase(conditionBranch);
+                ConditionBranch conditionBranch = step.getDefaultCase();
+                if (conditionBranch == null || conditionBranch.getSteps() == null || conditionBranch.getSteps().isEmpty()) {
+                    conditionBranch = commonProcessing.createConditionBranch(splitNodeLineItemDO.getCellId(), true);
                 }
+                mapStorage.getBranchNodeIdConditionBranchMap().putIfAbsent(splitNodeLineItemDO.getCellId(), conditionBranch);
+                step.setDefaultCase(conditionBranch);
             }
         }
 
         for (BranchCase branchCase : step.getBranchCases()) {
-            ConditionBranch conditionBranch = commonProcessing.createConditionBranch(branchCase.getLabel(), true);
-            mapStorage.getBranchNodeIdConditionBranchMap().put(branchCase.getLabel(), conditionBranch);
+            ConditionBranch conditionBranch = mapStorage.isUseCrossBranchLinks()
+                    ? null : mapStorage.getBranchNodeIdConditionBranchMap().get(branchCase.getLabel());
+            if (conditionBranch == null) {
+                conditionBranch = commonProcessing.createConditionBranch(branchCase.getLabel(), true);
+            }
+            mapStorage.getBranchNodeIdConditionBranchMap().putIfAbsent(branchCase.getLabel(), conditionBranch);
             branchCase.setOnTrue(conditionBranch); // this is also updating the nodeIdStepMap entry since the calling method (connectConditionsInsideMap) is iterating the steps from the nodeIdStepMap
         }
     }

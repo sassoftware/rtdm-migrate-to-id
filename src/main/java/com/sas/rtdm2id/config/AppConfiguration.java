@@ -5,45 +5,40 @@ SPDX-License-Identifier: Apache-2.0
 package com.sas.rtdm2id.config;
 
 import com.sas.rtdm2id.model.rtdm.Batch;
-import org.apache.http.conn.ssl.SSLConnectionSocketFactory;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
-import org.apache.http.ssl.TrustStrategy;
+import org.apache.hc.client5.http.config.ConnectionConfig;
+import org.apache.hc.client5.http.impl.classic.HttpClients;
+import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
+import org.apache.hc.core5.util.Timeout;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
 import org.springframework.oxm.jaxb.Jaxb2Marshaller;
 import org.springframework.web.client.RestTemplate;
 
-import javax.net.ssl.SSLContext;
-import java.security.KeyManagementException;
-import java.security.KeyStoreException;
-import java.security.NoSuchAlgorithmException;
-import java.security.cert.X509Certificate;
-import java.util.HashMap;
+import java.time.Duration;
+import java.util.Map;
 
 @Configuration
 public class AppConfiguration {
     @Bean
-    public RestTemplate restTemplate() throws KeyStoreException, NoSuchAlgorithmException, KeyManagementException {
-        TrustStrategy acceptingTrustStrategy = (X509Certificate[] chain, String authType) -> true;
+    public HttpComponentsClientHttpRequestFactory viyaRequestFactory() {
+        ConnectionConfig connectionConfig = ConnectionConfig.custom()
+            .setConnectTimeout(Timeout.ofMilliseconds(1000000))
+            .build();
+        HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory(
+            HttpClients.custom().useSystemProperties()
+                .setConnectionManager(PoolingHttpClientConnectionManagerBuilder.create()
+                    .useSystemProperties()
+                    .setDefaultConnectionConfig(connectionConfig)
+                    .build())
+                .build());
+        requestFactory.setReadTimeout(Duration.ofMillis(1000000));
+        return requestFactory;
+    }
 
-        SSLContext sslContext = org.apache.http.ssl.SSLContexts.custom()
-                .loadTrustMaterial(null, acceptingTrustStrategy)
-                .build();
-
-        SSLConnectionSocketFactory csf = new SSLConnectionSocketFactory(sslContext);
-
-        CloseableHttpClient httpClient = HttpClients.custom()
-                .setSSLSocketFactory(csf)
-                .build();
-        RestTemplate restTemplate = new RestTemplate();
-        HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory();
-        requestFactory.setHttpClient(httpClient);
-        requestFactory.setConnectTimeout(1000000);
-        requestFactory.setReadTimeout(1000000);
-        restTemplate.setRequestFactory(requestFactory);
-        return restTemplate;
+    @Bean
+    public RestTemplate restTemplate(HttpComponentsClientHttpRequestFactory viyaRequestFactory) {
+        return new RestTemplate(viyaRequestFactory);
     }
 
     @Bean
@@ -52,9 +47,7 @@ public class AppConfiguration {
         marshaller.setClassesToBeBound(//all the classes the context needs to know about
                 Batch.class);
 
-        marshaller.setMarshallerProperties(new HashMap<String, Object>() {{
-            put(javax.xml.bind.Marshaller.JAXB_FORMATTED_OUTPUT, true);
-        }});
+        marshaller.setMarshallerProperties(Map.of(jakarta.xml.bind.Marshaller.JAXB_FORMATTED_OUTPUT, true));
 
         return marshaller;
     }

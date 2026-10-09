@@ -8,6 +8,7 @@ import com.sas.rtdm2id.model.rtdm.SplitNodeDataDO;
 import com.sas.rtdm2id.model.rtdm.ValueTypeVarInfoDO;
 import com.sas.rtdm2id.model.rtdm.extension.VarRef;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;
 
 @Mapper
@@ -16,5 +17,10 @@ public interface VarRefMapper {
 
     VarRef varRefGet(SplitNodeDataDO.SplitOnNodeDataDO.VarRefDO varRefDO);
 
+    @Mapping(target = "discrete", ignore = true)
+    @Mapping(target = "noMetadata", ignore = true)
+    @Mapping(target = "sasFormat", ignore = true)
+    @Mapping(target = "subType", ignore = true)
+    @Mapping(target = "valid", ignore = true)
     VarRef varRefGet(ValueTypeVarInfoDO varRefDO);
 }

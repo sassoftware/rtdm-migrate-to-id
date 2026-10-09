@@ -30,9 +30,9 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBElement;
-import javax.xml.bind.Unmarshaller;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBElement;
+import jakarta.xml.bind.Unmarshaller;
 import javax.xml.transform.stream.StreamSource;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.File;
@@ -125,7 +125,7 @@ class CrossTableNodeConverterTest {
     step.setCustomObject(customObjectStep);
 
     ObjectMapper objectMapper = new ObjectMapper()
-        .setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        .setDefaultPropertyInclusion(JsonInclude.Include.NON_NULL);
     String json = objectMapper.writeValueAsString(step);
 
     assertTrue(json.contains("\"type\":\"application/vnd.sas.decision.step.custom.object\""));

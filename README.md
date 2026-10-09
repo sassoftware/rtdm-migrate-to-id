@@ -19,6 +19,8 @@
 Tool to migrate campaigns from SAS Real-Time Decision Manager (RTDM) to SAS Intelligent Decisioning (ID).
 
 ### Prerequisites
+Java 21 is required to build and run the service. Set `JAVA_HOME` to a JDK 21 installation and ensure its `bin` directory is on `PATH`.
+
 Campaigns from RTDM need to be extracted using SAS Customer Intelligence Integration Utilities.
 This step must be performed before running the migration tool.
 
@@ -31,6 +33,8 @@ Download this project and build using provided Maven pom.xml file.
 ```shell script
 mvn clean install
 ```
+The Maven wrappers can also be used: `./mvnw clean install` on Linux or `./mvnw.cmd clean install` on Windows.
+
 This will generate a jar file under the \target folder.
 
 ## Getting Started
@@ -43,11 +47,11 @@ Migrating campaigns from RTDM to ID is a 3-step process.
 Run the migration tool from a command/shell window.
 
 ```shell script
-java -jar rtdm-migrate-to-id-0.14.3.jar
+java -jar rtdm-migrate-to-id-0.14.4.jar
 
 or
 # if port 8080 already in use
-java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.14.3.jar
+java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.14.4.jar
 ```
 
 This row inside command/shell will tell you that service successfully started
@@ -71,6 +75,8 @@ Body: Extract XML generated from SAS Customer Intelligence Integration Utilities
 Example Body: extract/extracted_campaign.xml
 ```
 The parameter protocol is optional. The default value is "http" if not provided. If the target environment is using HTTPS for secure online transactions then protocol must be provided with a value of "https".
+
+Use `protocol=https` when transmitting credentials or tokens. HTTPS connections validate the server certificate and hostname using the JVM truststore. For an internal or self-signed Viya certificate, trust the issuing CA in the JVM truststore or configure a dedicated truststore with `javax.net.ssl.trustStore` and the appropriate runtime truststore settings. Untrusted certificates are no longer accepted automatically.
 
 The parameter parentFolderUri is optional. The default value is /folders/folders/@myFolder if not provided.
 

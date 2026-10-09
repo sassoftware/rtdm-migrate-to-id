@@ -109,8 +109,10 @@ public class ProcessNodeConverter {
         Step extractDataStep = null;
         step.setType(Step.TypeEnum.CUSTOM_OBJECT);
         Step inputValuesStep = mapStorage.getRuleSetStepMap().get(nodeName + "_input_values");
+        boolean hasInputs = process != null && process.getInputVariableList() != null
+                && !process.getInputVariableList().getIbVariableDOs().isEmpty();
         if (process != null) {
-            if (process.getInputVariableList() != null) {
+            if (hasInputs) {
                 processCustomObjectInputMapping(processNodeDataDO, decision, stepList, step);
                 updateRuleSet(process.getInputVariableList(), inputValuesStep, decision);
             }
@@ -124,11 +126,11 @@ public class ProcessNodeConverter {
 
                     extractDataStep = mapStorage.getRuleSetStepMap().get(nodeName + "_extract_values");
  
-                    updateRuleSet(signatureTermDatagrid, extractDataStep);
+                    updateRuleSet(signatureTermDatagrid, extractDataStep, decision);
                 }
             }
         }
-        if (inputValuesStep!=null) {
+        if (hasInputs && inputValuesStep != null) {
             // Unsupported nodes are converted into DS2 code files but we don't create a ruleset node to
             // represent the custom node inputs so inputValuesStep is null in this scenario
             commonProcessing.addStep(stepList, inputValuesStep, processNodeDataDO.getNodeId());
@@ -142,6 +144,10 @@ public class ProcessNodeConverter {
     }
 
     public void updateRuleSet(SignatureTerm signatureTermDataGrid, Step step) {
+        updateRuleSet(signatureTermDataGrid, step, null);
+    }
+
+    public void updateRuleSet(SignatureTerm signatureTermDataGrid, Step step, Decision decision) {
         RuleSet ruleSet = new RuleSet();
         RuleSetStep ruleSetForUpdate = step.getRuleSet();
 
@@ -159,11 +165,27 @@ public class ProcessNodeConverter {
         signature.setDirection(INPUT_DIRECTION);
         signatureList.add(signature);
 
+        boolean updateActions = !Boolean.TRUE.equals(mapStorage.getRuleSetIsActionUpdated().get(ruleSetForUpdate.getName()));
         for (SignatureTermExtension signatureTermExtension : signatureTermDataGrid.getDataGridExtension()) {
             Mapping innerMapping = new Mapping();
 
             innerMapping.setStepTermName(commonProcessing.sanitizeAndReduceVariableName(signatureTermExtension.getName()));
-            innerMapping.setTargetDecisionTermName(commonProcessing.sanitizeVariableName(signatureTermExtension.getName()));
+            String targetName = commonProcessing.sanitizeVariableName(signatureTermExtension.getName());
+            if (decision != null) {
+                SignatureTerm.DataTypeEnum outputType = SignatureTerm.DataTypeEnum.fromValue(signatureTermExtension.getDataType().getValue());
+                SignatureTerm existingTerm = decision.getSignature().stream()
+                    .filter(term -> targetName.equalsIgnoreCase(term.getName())).findFirst().orElse(null);
+                String typedTargetName = existingTerm != null && !outputType.equals(existingTerm.getDataType())
+                    ? commonProcessing.sanitizeVariableName(signatureTermDataGrid.getName() + "_" + signatureTermExtension.getName())
+                    : targetName;
+                SignatureTerm outputTerm = new SignatureTerm();
+                outputTerm.setName(typedTargetName);
+                outputTerm.setDataType(outputType);
+                commonProcessing.checkSignatureTermForDuplicate(NONE_DIRECTION, decision, outputTerm);
+                innerMapping.setTargetDecisionTermName(typedTargetName);
+            } else {
+                innerMapping.setTargetDecisionTermName(targetName);
+            }
             innerMapping.setDirection(Mapping.DirectionEnum.OUTPUT);
             commonProcessing.checkMappingForDuplicate(innerMapping, step);
 
@@ -181,7 +203,9 @@ public class ProcessNodeConverter {
             rule.setActions(Collections.singletonList(addAction(signatureTermExtension.getName(),
                     signatureTermDataGrid.getName(), signatureTermExtension.getDataType().getValue())));
 
-            commonProcessing.addActionToRuleSet(ruleSetForUpdate, rule);
+            if (updateActions) {
+                commonProcessing.addActionToRuleSet(ruleSetForUpdate, rule);
+            }
         }
         ruleSet.setSignature(signatureList);
 
@@ -212,20 +236,39 @@ public class ProcessNodeConverter {
                 signature.setDirection(IN_OUT_DIRECTION);
                 commonProcessing.checkSignatureTermForDuplicate(IN_OUT_DIRECTION, signatureList, signature);
 
+                commonProcessing.addAction(mapper.ibVariableDoGet(ibVariableDO), actionList, signatureList, step, decision);
+                ValueTypeVarInfoDO reference = ibVariableDO.getValue() == null ? null
+                    : ibVariableDO.getValue().getValueTypeVarInfoDO();
+                boolean scalarAssignment = !ibVariableDO.getTypeDescription().contains("list")
+                    && !SignatureTerm.DataTypeEnum.DATAGRID.equals(
+                        commonProcessing.getDatatypeOfVar(ibVariableDO.getTypeDescription()));
+                boolean calculatedReference = reference != null && reference.getVarInfoId() != null
+                    && reference.getVarInfoId().startsWith(CALCULATED_DATA_ITEMS_FOLDER + ".");
+                if (scalarAssignment || calculatedReference) {
+                    Mapping assignedValueMapping = new Mapping();
+                    assignedValueMapping.setStepTermName(signature.getName());
+                    String assignedValueName = reference != null && !calculatedReference
+                        ? ruleSetForUpdate.getName() + "_" + ibVariableDO.getName() : ibVariableDO.getName();
+                    assignedValueMapping.setTargetDecisionTermName(commonProcessing.sanitizeVariableName(assignedValueName));
+                    assignedValueMapping.setDirection(Mapping.DirectionEnum.INOUT);
+                    commonProcessing.checkMappingForDuplicate(assignedValueMapping, step);
+                    SignatureTerm assignedValue = new SignatureTerm();
+                    assignedValue.setName(assignedValueMapping.getTargetDecisionTermName());
+                    assignedValue.setDataType(commonProcessing.getDatatypeOfVar(ibVariableDO.getTypeDescription()));
+                    commonProcessing.checkSignatureTermForDuplicate(NONE_DIRECTION, decision, assignedValue);
+                }
+                GlobalVariable globalVariable = commonProcessing.checkForGlobalVariableRuleSet(ibVariableDO);
+                if (globalVariable != null) {
+                    commonProcessing.addMapping(mapper.ibVariableDoGet(ibVariableDO), INPUT_DIRECTION, step, false, decision);
+                    commonProcessing.addNewSignatureItemGlobalVariable(globalVariable.getName(), "none", decision);
+                }
+
                 if (!(mapStorage.getRuleSetIsActionUpdated().get(ruleSetForUpdate.getName()) &&
                         mapStorage.getRuleSetIsUpdated().get(ruleSetForUpdate.getName()))) {
                     ruleSet.setName(ruleSetForUpdate.getName());
                     rule.setName(UUID.randomUUID().toString());
                     rule.setConditional("if");
                     rule.setRuleFiredTrackingEnabled(false);
-
-                    commonProcessing.addAction(mapper.ibVariableDoGet(ibVariableDO), actionList, signatureList, step, decision);
-                    
-                    GlobalVariable globalVariable = commonProcessing.checkForGlobalVariableRuleSet(ibVariableDO);
-                    if (globalVariable != null) {
-                        commonProcessing.addMapping(mapper.ibVariableDoGet(ibVariableDO), INPUT_DIRECTION, step, false, decision);
-                        commonProcessing.addNewSignatureItemGlobalVariable(globalVariable.getName(), "none", decision);
-                    }
                     rule.setActions(actionList);
                     ruleUpdated = true;
                 }
@@ -843,7 +886,13 @@ public class ProcessNodeConverter {
         signatureTerm.setDirection(SignatureTerm.DirectionEnum.NONE);
         signatureTerm.setDataGridExtension(signatureTermExtensionList);
         commonProcessing.checkSignatureTermForDuplicate("none", decision, signatureTerm);
-        addMapping(signatureTerm, step);
+        Mapping mapping = new Mapping();
+        mapping.setTargetDecisionTermName(signatureTerm.getName());
+        mapping.setDirection(Mapping.DirectionEnum.OUTPUT);
+        mapping.setStepTermName(commonProcessing.sanitizeVariableName(processName + "_dgo"));
+        commonProcessing.checkMappingForDuplicate(mapping, step);
+        addStandardDataProcessOutputMapping("returnCode", step, decision);
+        addStandardDataProcessOutputMapping("rowCount", step, decision);
         return signatureTerm;
     }
 
@@ -867,7 +916,7 @@ public class ProcessNodeConverter {
                 ValueTypeVarInfoDO valueTypeVarInfoDO = ibVariableDOMapped.getValue().getValueTypeVarInfoDO();
                 String varName = ibVariableDO.getName();
                 final String varInfo = valueTypeVarInfoDO != null ? valueTypeVarInfoDO.getVarInfoId() : "";
-                if (!commonProcessing.checkForCalcVariable(varInfo,ibVariableDOMapped.getTypeDescription(), stepList, step, varOriginalName, processNodeDataDO.getNodeId())) {
+                if (!commonProcessing.checkForCalcVariable(varInfo,ibVariableDOMapped.getTypeDescription(), stepList, null, varOriginalName, processNodeDataDO.getNodeId())) {
                     if (ibVariableDO.getTypeDescription().contains("list")) {
                         List<SignatureTermExtension> signatureTermExtensionList = new ArrayList<>();
 
@@ -886,6 +935,8 @@ public class ProcessNodeConverter {
                         commonProcessing.addMapping(ibVariableDOMapped, INPUT_DIRECTION, step, false, decision);
                         commonProcessing.addNewSignatureItem(ibVariableDOMapped, "none", decision, null);
                     }
+                } else {
+                    commonProcessing.addMapping(varOriginalName, varOriginalName, step, false);
                 }
                 if (valueTypeVarInfoDO != null) {
                     VarRef varRef = VarRefMapper.VAR_REF_MAPPER.varRefGet(valueTypeVarInfoDO);
@@ -945,6 +996,20 @@ public class ProcessNodeConverter {
                 commonProcessing.addNewSignatureItem(ibVariableDOInner, "none", decision, null);
             }
         }
+
+        if (commonProcessing.isProcessDataProcess(process.getProcessTypeDescription())
+                && !isDataProcessReturnDataGrid(process)) {
+            addStandardDataProcessOutputMapping("returnCode", step, decision);
+            addStandardDataProcessOutputMapping("rowCount", step, decision);
+        }
+    }
+
+    private void addStandardDataProcessOutputMapping(String variableName, Step step, Decision decision) {
+        IBVariableDO outputVariable = new IBVariableDO();
+        outputVariable.setName(variableName);
+        outputVariable.setTypeDescription(INTEGER_CONSTANT);
+        commonProcessing.addMapping(outputVariable, OUTPUT_DIRECTION, step, false, decision);
+        commonProcessing.addNewSignatureItem(outputVariable, OUTPUT_DIRECTION, decision, null);
     }
 
     private SignatureTermExtension createDataGridExtension(IBVariableDO ibVariableDO) {
