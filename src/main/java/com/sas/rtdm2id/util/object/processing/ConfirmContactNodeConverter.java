@@ -2,7 +2,6 @@ package com.sas.rtdm2id.util.object.processing;
 
 import com.sas.rtdm2id.dao.MapStorage;
 import com.sas.rtdm2id.model.id.decision.*;
-import com.sas.rtdm2id.model.id.rules.RuleSet;
 import com.sas.rtdm2id.model.rtdm.CHandRHNodeDataDO;
 import com.sas.rtdm2id.model.rtdm.extension.IBVariableDO;
 import org.springframework.stereotype.Component;
@@ -42,7 +41,7 @@ public class ConfirmContactNodeConverter {
     public Step addCustomObjectStep(CHandRHNodeDataDO cHandRHNodeDataDO, Decision decision, Short objId, String nodeName) {
         Step inputValuesStep = mapStorage.getRuleSetStepMap().get(nodeName + "_input_values");
         if (inputValuesStep != null) {
-            List<IBVariableDO> ibVariableDOs = cHandRHNodeDataDO.getVariables().getIbVariableDO();
+            List<IBVariableDO> ibVariableDOs = cHandRHNodeDataDO.getVariables() == null ? null : cHandRHNodeDataDO.getVariables().getIbVariableDO();
             if (ibVariableDOs != null && !ibVariableDOs.isEmpty()) {
                 updateRuleSet(ibVariableDOs, inputValuesStep, decision);
             }
@@ -52,15 +51,7 @@ public class ConfirmContactNodeConverter {
     }
 
     public void updateRuleSet(List<IBVariableDO> ibVariableDOs, Step step, Decision decision) {
-        RuleSet ruleSet = new RuleSet();
-        RuleSetStep ruleSetForUpdate = step.getRuleSet();
-        if (ibVariableDOs != null && !ibVariableDOs.isEmpty()) {
-            commonProcessing.processAssignmentVariables(step, decision, ruleSet, ruleSetForUpdate, ibVariableDOs);
-        }
-        if (!(mapStorage.getRuleSetIsActionUpdated().get(ruleSetForUpdate.getName()) &&
-                mapStorage.getRuleSetIsUpdated().get(ruleSetForUpdate.getName()))) {
-            ruleSet.setName(commonProcessing.changeVariableNameToFormat(ruleSetForUpdate.getName()));
-            commonProcessing.callPutRuleSet(ruleSetForUpdate, ruleSet);
-        }
+        // Signature PUT before rule POSTs, shared with the Assignment node
+        AssignmentNodeConverter.updateAssignmentRuleSet(commonProcessing, mapStorage, ibVariableDOs, step, decision);
     }
 }

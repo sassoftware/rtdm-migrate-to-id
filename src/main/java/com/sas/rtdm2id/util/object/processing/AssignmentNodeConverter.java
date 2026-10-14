@@ -8,12 +8,14 @@ import com.sas.rtdm2id.dao.MapStorage;
 import com.sas.rtdm2id.model.id.decision.Decision;
 import com.sas.rtdm2id.model.id.decision.RuleSetStep;
 import com.sas.rtdm2id.model.id.decision.Step;
+import com.sas.rtdm2id.model.id.rules.Rule;
 import com.sas.rtdm2id.model.id.rules.RuleSet;
 import com.sas.rtdm2id.model.rtdm.AssignmentNodeDataDO;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.List;
+
 
 @Component
 public class AssignmentNodeConverter {
@@ -42,17 +44,25 @@ public class AssignmentNodeConverter {
     }
 
     public void updateRuleSet(AssignmentNodeDataDO assignmentNodeDataDO, Step step, Decision decision) {
+        updateAssignmentRuleSet(commonProcessing, mapStorage, assignmentNodeDataDO.getAssignments().getIbVariableDOs(), step, decision);
+    }
+
+    /**
+     * Writes an assignment RuleSet (also used by Confirm/Reject Contact input values). The signature is PUT before
+     * the rules are posted, so the rules are written against a RuleSet that already declares the terms they reference
+     * (and the PUT is not made with a modified date the rule POSTs have already invalidated). An existing (reused)
+     * RuleSet is neither re-signed nor given duplicate rules.
+     */
+    static void updateAssignmentRuleSet(CommonProcessing commonProcessing, MapStorage mapStorage,
+            List<com.sas.rtdm2id.model.rtdm.extension.IBVariableDO> ibVariableDOs, Step step, Decision decision) {
         RuleSet ruleSet = new RuleSet();
         RuleSetStep ruleSetForUpdate = step.getRuleSet();
-        List<com.sas.rtdm2id.model.rtdm.extension.IBVariableDO> ibVariableDOs = assignmentNodeDataDO.getAssignments().getIbVariableDOs();
-        if (ibVariableDOs != null && !ibVariableDOs.isEmpty()) {
-            commonProcessing.processAssignmentVariables(step, decision, ruleSet, ruleSetForUpdate, ibVariableDOs);
+        List<Rule> rules = ibVariableDOs == null || ibVariableDOs.isEmpty() ? List.of()
+            : commonProcessing.buildAssignmentRules(step, decision, ruleSet, ibVariableDOs);
+        if (!Boolean.TRUE.equals(mapStorage.getRuleSetIsUpdated().get(ruleSetForUpdate.getName()))) {
+            ruleSet.setName(commonProcessing.changeVariableNameToFormat(ruleSetForUpdate.getName()));
+            commonProcessing.callPutRuleSet(ruleSetForUpdate, ruleSet);
         }
-        if (!(mapStorage.getRuleSetIsActionUpdated().get(ruleSetForUpdate.getName()) &&
-        mapStorage.getRuleSetIsUpdated().get(ruleSetForUpdate.getName()))) {
-           ruleSet.setName(commonProcessing.changeVariableNameToFormat(ruleSetForUpdate.getName()));
-           commonProcessing.callPutRuleSet(ruleSetForUpdate, ruleSet);
-        }
-
+        commonProcessing.postAssignmentRules(ruleSetForUpdate, rules);
     }
 }

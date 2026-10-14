@@ -1,5 +1,6 @@
 package com.sas.rtdm2id.controller;
 
+import com.sas.rtdm2id.exception.ClientIdException;
 import com.sas.rtdm2id.exception.OAuthTokenException;
 import com.sas.rtdm2id.model.dto.rtdm.model.ClientIdResponse;
 import com.sas.rtdm2id.model.rtdm.Batch;
@@ -135,11 +136,33 @@ class ApplicationControllerTest {
     @Test
     void rejectsRegistrationWithoutClientSecret() throws Exception {
         mockMvc.perform(post("/api/rtdm2id/register-client").param("baseIp", "viya.example")
-                .param("Consul token got from Viya server", "test-consul-token")
-                .param("Id of new user", "migration-client"))
+                .param("consulToken", "test-consul-token")
+                .param("clientId", "migration-client"))
                 .andExpect(status().isBadRequest());
 
         verifyNoInteractions(service);
+    }
+
+    @Test
+    void rejectsLegacyRegistrationParameterNames() throws Exception {
+        mockMvc.perform(post("/api/rtdm2id/register-client").param("baseIp", "viya.example")
+                .param("Consul token got from Viya server", "test-consul-token")
+                .param("Id of new user", "migration-client").param("Secret of new user", "test-client-secret"))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(service);
+    }
+
+    @Test
+    void returnsErrorEnvelopeWhenClientRegistrationFails() throws Exception {
+        when(service.registerClient(anyString(), anyString(), anyString(), anyString(), anyString()))
+                .thenThrow(new ClientIdException());
+
+        mockMvc.perform(registrationRequest())
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.meta.code").value(1))
+                .andExpect(jsonPath("$.meta.description").value("Client ID cannot be created"))
+                .andExpect(jsonPath("$.dataBlock").doesNotExist());
     }
 
     private MockHttpServletRequestBuilder diagramRequest() {
@@ -151,8 +174,8 @@ class ApplicationControllerTest {
 
     private MockHttpServletRequestBuilder registrationRequest() {
         return post("/api/rtdm2id/register-client").param("baseIp", "viya.example")
-                .param("Consul token got from Viya server", "test-consul-token")
-                .param("Id of new user", "migration-client").param("Secret of new user", "test-client-secret")
+                .param("consulToken", "test-consul-token")
+                .param("clientId", "migration-client").param("clientSecret", "test-client-secret")
                 .accept(MediaType.APPLICATION_JSON);
     }
 }

@@ -88,7 +88,7 @@ public class SegmentationTreeService {
     private SegmentationTree createTree(SegmentationTree tree) throws URISyntaxException {
         String path = SEGMENTATION_TREE_PATH;
         if (mapStorage.getParentFolderUri() != null) {
-            path += "?parentFolderUri=" + mapStorage.getParentFolderUri();
+            path += "?parentFolderUri=" + ViyaApi.encodeQueryParam(mapStorage.getParentFolderUri());
         }
         ResponseEntity<SegmentationTree> response = restTemplate.postForEntity(
                 ViyaApi.createUri(mapStorage.getBaseIp(), path, mapStorage.getProtocol()),

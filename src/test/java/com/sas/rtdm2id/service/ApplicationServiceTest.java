@@ -14,7 +14,9 @@ import com.sas.rtdm2id.util.object.processing.ProcessNodeConverter;
 import com.sas.rtdm2id.util.object.processing.SubDiagramNodeConverter;
 import com.sas.rtdm2id.util.tree.impl.GenericTree;
 import com.sas.rtdm2id.util.tree.impl.TreeUtil;
+import com.sas.rtdm2id.model.id.decision.Decision;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
@@ -23,14 +25,21 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -135,9 +144,9 @@ class ApplicationServiceTest {
 	assertEquals("access-token", mapStorage.getAccessToken());
 	assertEquals("viya.example", mapStorage.getBaseIp());
 	assertEquals("https", mapStorage.getProtocol());
-	assertSame(token, service.oAuthTokenResponseMap.get(Arrays.asList("viya.example", "https", "login")));
-	assertTrue(!service.expirationTimeMap.get(Arrays.asList("viya.example", "https", "login")).isBefore(beforeRequest.plusSeconds(3600)));
-	assertTrue(!service.expirationTimeMap.get(Arrays.asList("viya.example", "https", "login")).isAfter(Instant.now().plusSeconds(3600)));
+	assertSame(token, service.oAuthTokenResponseMap.get(ApplicationService.tokenCacheKey("viya.example", "https", "login", "password")));
+	assertTrue(!service.expirationTimeMap.get(ApplicationService.tokenCacheKey("viya.example", "https", "login", "password")).isBefore(beforeRequest.plusSeconds(3600)));
+	assertTrue(!service.expirationTimeMap.get(ApplicationService.tokenCacheKey("viya.example", "https", "login", "password")).isAfter(Instant.now().plusSeconds(3600)));
     }
 
     @Test
@@ -158,14 +167,14 @@ class ApplicationServiceTest {
 	MapStorage mapStorage = new MapStorage();
 	OAuthTokenResponse replacement = stubToken(restTemplate);
 	ApplicationService service = serviceWith(restTemplate, mapStorage);
-	service.oAuthTokenResponseMap.put(Arrays.asList("viya.example", "https", "login"), OAuthTokenResponse.builder().accessToken("expired").build());
-	service.expirationTimeMap.put(Arrays.asList("viya.example", "https", "login"), Instant.EPOCH);
+	service.oAuthTokenResponseMap.put(ApplicationService.tokenCacheKey("viya.example", "https", "login", "password"), OAuthTokenResponse.builder().accessToken("expired").build());
+	service.expirationTimeMap.put(ApplicationService.tokenCacheKey("viya.example", "https", "login", "password"), Instant.EPOCH);
 
 	assertSame(replacement, service.getAccessToken("viya.example", "login", "password", "https"));
 
-	assertSame(replacement, service.oAuthTokenResponseMap.get(Arrays.asList("viya.example", "https", "login")));
+	assertSame(replacement, service.oAuthTokenResponseMap.get(ApplicationService.tokenCacheKey("viya.example", "https", "login", "password")));
 	assertEquals("access-token", mapStorage.getAccessToken());
-	assertTrue(service.expirationTimeMap.get(Arrays.asList("viya.example", "https", "login")).isAfter(Instant.now()));
+	assertTrue(service.expirationTimeMap.get(ApplicationService.tokenCacheKey("viya.example", "https", "login", "password")).isAfter(Instant.now()));
 	verify(restTemplate).postForEntity(any(URI.class), any(HttpEntity.class), eq(OAuthTokenResponse.class));
     }
 
@@ -285,7 +294,188 @@ class ApplicationServiceTest {
 	verify(restTemplate).postForEntity(eq(URI.create("https://viya.example/SASLogon/oauth/clients")),
 		entity.capture(), eq(ClientIdResponse.class));
 	assertEquals("Bearer access-token", entity.getValue().getHeaders().getFirst("Authorization"));
-	assertEquals("https", mapStorage.getProtocol());
+	assertNull(mapStorage.getProtocol());
+	assertNull(mapStorage.getAccessToken());
+	assertNull(mapStorage.getBaseIp());
+    }
+
+    @Test
+    void encodesServiceIdInRegistrationTokenRequest() {
+	RestTemplate restTemplate = mock(RestTemplate.class);
+	stubToken(restTemplate);
+	ApplicationService service = serviceWith(restTemplate, new MapStorage());
+
+	service.getRegistrationToken("viya.example", "test-consul-token", "client a&b+c", "HTTPS");
+
+	verify(restTemplate).postForEntity(
+		eq(URI.create("https://viya.example/SASLogon/oauth/clients/consul?callback=false&serviceId=client%20a%26b%2Bc")),
+		any(HttpEntity.class), eq(OAuthTokenResponse.class));
+    }
+
+    @Test
+    void requestsNewTokenWhenPasswordDiffers() {
+	RestTemplate restTemplate = mock(RestTemplate.class);
+	OAuthTokenResponse first = OAuthTokenResponse.builder().accessToken("first").expiresIn(3600).build();
+	when(restTemplate.postForEntity(any(URI.class), any(HttpEntity.class), eq(OAuthTokenResponse.class)))
+		.thenReturn(ResponseEntity.ok(first))
+		.thenThrow(new HttpClientErrorException(HttpStatus.UNAUTHORIZED));
+	ApplicationService service = serviceWith(restTemplate, new MapStorage());
+
+	assertSame(first, service.getAccessToken("viya.example", "login", "password", "http"));
+	assertThrows(OAuthTokenException.class,
+		() -> service.getAccessToken("viya.example", "login", "wrong-password", "http"));
+
+	verify(restTemplate, times(2)).postForEntity(any(URI.class), any(HttpEntity.class), eq(OAuthTokenResponse.class));
+	service.oAuthTokenResponseMap.keySet().forEach(key -> assertFalse(key.contains("password")));
+    }
+
+    @Test
+    void refreshesTokenShortlyBeforeExpiry() {
+	RestTemplate restTemplate = mock(RestTemplate.class);
+	OAuthTokenResponse replacement = stubToken(restTemplate);
+	ApplicationService service = serviceWith(restTemplate, new MapStorage());
+	List<String> key = ApplicationService.tokenCacheKey("viya.example", "http", "login", "password");
+	service.oAuthTokenResponseMap.put(key, OAuthTokenResponse.builder().accessToken("nearly-expired").expiresIn(3600).build());
+	service.expirationTimeMap.put(key, Instant.now().plusSeconds(120));
+
+	assertSame(replacement, service.getAccessToken("viya.example", "login", "password", "http"));
+	verify(restTemplate).postForEntity(any(URI.class), any(HttpEntity.class), eq(OAuthTokenResponse.class));
+    }
+
+    @Test
+    void reusesShortLivedTokenWithinHalfItsLifetime() {
+	RestTemplate restTemplate = mock(RestTemplate.class);
+	ApplicationService service = serviceWith(restTemplate, new MapStorage());
+	List<String> key = ApplicationService.tokenCacheKey("viya.example", "http", "login", "password");
+	OAuthTokenResponse cached = OAuthTokenResponse.builder().accessToken("short-lived").expiresIn(120).build();
+	service.oAuthTokenResponseMap.put(key, cached);
+	service.expirationTimeMap.put(key, Instant.now().plusSeconds(100));
+
+	assertSame(cached, service.getAccessToken("viya.example", "login", "password", "http"));
+	verifyNoInteractions(restTemplate);
+	assertEquals(300, ApplicationService.refreshMarginSeconds(3600));
+	assertEquals(60, ApplicationService.refreshMarginSeconds(120));
+	assertEquals(0, ApplicationService.refreshMarginSeconds(0));
+    }
+
+    @Test
+    void evictsExpiredTokensForOtherUsers() {
+	RestTemplate restTemplate = mock(RestTemplate.class);
+	stubToken(restTemplate);
+	ApplicationService service = serviceWith(restTemplate, new MapStorage());
+	List<String> staleKey = ApplicationService.tokenCacheKey("other.example", "http", "someone", "secret");
+	service.oAuthTokenResponseMap.put(staleKey, OAuthTokenResponse.builder().accessToken("stale").build());
+	service.expirationTimeMap.put(staleKey, Instant.now().minusSeconds(1));
+
+	service.getAccessToken("viya.example", "login", "password", "http");
+
+	assertFalse(service.oAuthTokenResponseMap.containsKey(staleKey));
+	assertFalse(service.expirationTimeMap.containsKey(staleKey));
+	assertEquals(1, service.oAuthTokenResponseMap.size());
+    }
+
+    @Test
+    void encodesCredentialsInTokenRequestBody() {
+	RestTemplate restTemplate = mock(RestTemplate.class);
+	stubToken(restTemplate);
+	ApplicationService service = serviceWith(restTemplate, new MapStorage());
+
+	service.getAccessToken("viya.example", "dom\\user&x", "p&ss+w%rd=", "http");
+
+	ArgumentCaptor<HttpEntity<?>> entity = ArgumentCaptor.forClass(HttpEntity.class);
+	verify(restTemplate).postForEntity(any(URI.class), entity.capture(), eq(OAuthTokenResponse.class));
+	assertEquals("grant_type=password&username=dom%5Cuser%26x&password=p%26ss%2Bw%25rd%3D", entity.getValue().getBody());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"connection", "server"})
+    void wrapsConnectionAndServerFailuresWithoutCredentials(String failure) {
+	RestTemplate restTemplate = mock(RestTemplate.class);
+	RuntimeException cause = "connection".equals(failure)
+		? new ResourceAccessException("I/O error: PKIX path building failed")
+		: new HttpServerErrorException(HttpStatus.BAD_GATEWAY);
+	when(restTemplate.postForEntity(any(URI.class), any(HttpEntity.class), eq(OAuthTokenResponse.class))).thenThrow(cause);
+	ApplicationService service = serviceWith(restTemplate, new MapStorage());
+
+	OAuthTokenException exception = assertThrows(OAuthTokenException.class,
+		() -> service.getAccessToken("viya.example", "login", "s3cret-pass", "https"));
+
+	assertSame(cause, exception.getCause());
+	assertTrue(exception.getMessage().startsWith("Could not get OAuth token from https://viya.example: "));
+	assertTrue(exception.getMessage().contains(cause.getMessage()));
+	assertFalse(exception.getMessage().contains("s3cret-pass"));
+	assertTrue(service.oAuthTokenResponseMap.isEmpty());
+    }
+
+    @Test
+    void doesNotWriteDecisionJsonByDefault(@TempDir Path workDir) throws Exception {
+	ApplicationService service = migratingService(new MapStorage());
+	service.decisionJsonPath = workDir.resolve("decision.json").toString();
+
+	assertEquals("Migrated migrated to ID successfully", migrate(service));
+	assertFalse(service.writeDecisionJson);
+	assertFalse(Files.exists(workDir.resolve("decision.json")));
+    }
+
+    @Test
+    void writesDecisionJsonWhenEnabled(@TempDir Path workDir) throws Exception {
+	ApplicationService service = migratingService(new MapStorage());
+	service.writeDecisionJson = true;
+	service.decisionJsonPath = workDir.resolve("debug.json").toString();
+
+	assertEquals("Migrated migrated to ID successfully", migrate(service));
+	assertTrue(Files.readString(workDir.resolve("debug.json")).contains("\"name\" : \"Migrated\""));
+    }
+
+    @Test
+    void decisionJsonWriteFailureDoesNotFailMigration(@TempDir Path workDir) throws Exception {
+	ApplicationService service = migratingService(new MapStorage());
+	service.writeDecisionJson = true;
+	service.decisionJsonPath = workDir.resolve("missing-dir").resolve("decision.json").toString();
+
+	assertEquals("Migrated migrated to ID successfully", migrate(service));
+    }
+
+    @Test
+    void encodesParentFolderUriAndClearsRequestContextAfterMigration() throws Exception {
+	MapStorage mapStorage = new MapStorage();
+	RestTemplate restTemplate = mock(RestTemplate.class);
+	ApplicationService service = migratingService(mapStorage, restTemplate);
+
+	service.createDiagram("viya.example", batchWithCampaignName("Migrated"), "login", "password", "https",
+		"/folders/folders/a b&c+d", "true");
+
+	verify(restTemplate).postForEntity(
+		eq(URI.create("https://viya.example/decisions/flows?parentFolderUri=/folders/folders/a%20b%26c%2Bd")),
+		any(HttpEntity.class), eq(String.class));
+	assertNull(mapStorage.getAccessToken());
+	assertNull(mapStorage.getBaseIp());
+	assertNull(mapStorage.getProtocol());
+	assertNull(mapStorage.getParentFolderUri());
+    }
+
+    private String migrate(ApplicationService service) {
+	return service.createDiagram("viya.example", batchWithCampaignName("Migrated"), "login", "password", "http",
+		"/folders/folders/@myFolder", "true");
+    }
+
+    private ApplicationService migratingService(MapStorage mapStorage) {
+	return migratingService(mapStorage, mock(RestTemplate.class));
+    }
+
+    private ApplicationService migratingService(MapStorage mapStorage, RestTemplate restTemplate) {
+	stubToken(restTemplate);
+	when(restTemplate.postForEntity(any(URI.class), any(HttpEntity.class), eq(String.class)))
+		.thenReturn(ResponseEntity.status(HttpStatus.CREATED).body("{}"));
+	CommonProcessing commonProcessing = mock(CommonProcessing.class);
+	when(commonProcessing.getSubDiagramNodeNames(any(Batch.class))).thenReturn(Collections.emptyList());
+	Converter converter = mock(Converter.class);
+	Decision decision = new Decision();
+	decision.setName("Migrated");
+	when(converter.createDecision(any(Batch.class), any())).thenReturn(decision);
+	TreeUtil treeUtil = mock(TreeUtil.class);
+	return new ApplicationService(restTemplate, mock(MarshallerWrapper.class), converter,
+		mock(ProcessNodeConverter.class), mock(SubDiagramNodeConverter.class), commonProcessing, treeUtil, mapStorage);
     }
 
     @ParameterizedTest

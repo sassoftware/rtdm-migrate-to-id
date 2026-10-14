@@ -1,0 +1,129 @@
+{
+  "name" : "characterization",
+  "description" : "campaign-id",
+  "flow" : {
+    "steps" : [ {
+      "type" : "application/vnd.sas.decision.step.branch",
+      "id" : "s1",
+      "branchCases" : [ {
+        "label" : "Node a",
+        "onTrue" : {
+          "steps" : [ {
+            "type" : "application/vnd.sas.decision.step.branch",
+            "id" : "s2",
+            "branchCases" : [ {
+              "label" : "Node c",
+              "onTrue" : {
+                "steps" : [ {
+                  "type" : "application/vnd.sas.decision.step.custom.object",
+                  "id" : "pc",
+                  "mappings" : [ {
+                    "stepTermName" : "out",
+                    "direction" : "output",
+                    "targetDecisionTermName" : "v_pc"
+                  } ],
+                  "name" : "pc"
+                }, {
+                  "type" : "application/vnd.sas.decision.step.node.link",
+                  "decisionNodeLinkTarget" : "link-1"
+                } ]
+              }
+            } ],
+            "mappings" : [ {
+              "stepTermName" : "out",
+              "direction" : "output",
+              "targetDecisionTermName" : "v_s2"
+            } ],
+            "defaultCase" : {
+              "steps" : [ {
+                "type" : "application/vnd.sas.decision.step.ruleset",
+                "id" : "ppm_input",
+                "linkLabel" : "link-1",
+                "mappings" : [ {
+                  "stepTermName" : "out",
+                  "direction" : "output",
+                  "targetDecisionTermName" : "v_ppm_input"
+                } ],
+                "name" : "ppm_input"
+              }, {
+                "type" : "application/vnd.sas.decision.step.custom.object",
+                "id" : "ppm",
+                "mappings" : [ {
+                  "stepTermName" : "out",
+                  "direction" : "output",
+                  "targetDecisionTermName" : "v_ppm"
+                } ],
+                "name" : "ppm"
+              }, {
+                "type" : "application/vnd.sas.decision.step.ruleset",
+                "id" : "r1",
+                "mappings" : [ {
+                  "stepTermName" : "out",
+                  "direction" : "output",
+                  "targetDecisionTermName" : "v_r1"
+                } ],
+                "name" : "r1"
+              } ]
+            },
+            "name" : "s2"
+          } ]
+        }
+      } ],
+      "mappings" : [ {
+        "stepTermName" : "out",
+        "direction" : "output",
+        "targetDecisionTermName" : "v_s1"
+      } ],
+      "defaultCase" : {
+        "steps" : [ {
+          "type" : "application/vnd.sas.decision.step.custom.object",
+          "id" : "pb",
+          "mappings" : [ {
+            "stepTermName" : "out",
+            "direction" : "output",
+            "targetDecisionTermName" : "v_pb"
+          } ],
+          "name" : "pb"
+        }, {
+          "type" : "application/vnd.sas.decision.step.node.link",
+          "decisionNodeLinkTarget" : "link-1"
+        } ]
+      },
+      "name" : "s1"
+    } ]
+  },
+  "signature" : [ {
+    "name" : "Treatments",
+    "dataType" : "dataGrid",
+    "direction" : "output",
+    "dataGridExtension" : [ ]
+  }, {
+    "name" : "v_s1",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_pb",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_s2",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_ppm_input",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_ppm",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_r1",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_pc",
+    "dataType" : "unknown",
+    "direction" : "none"
+  } ]
+}

@@ -803,6 +803,8 @@ class CrossTableNodeConverterTest {
             .addSegmentationTreeStep(source, decision, (short) 7, "upstream").get(0);
         assertEquals("Event_Integer_Double_OutputCharacterNominal", step.getMappings().get(0).getTargetDecisionTermName());
         assertEquals("UpstreamNodeOutputs_OutputCharacterNominal", step.getMappings().get(2).getTargetDecisionTermName());
+        // Cross-Table steps go through addStep so fan-in into the node is cross-branch linked
+        org.mockito.Mockito.verify(processing).addStep(org.mockito.ArgumentMatchers.anyList(), eq(step), eq(source.getNodeId()));
         }
 
         @Test
@@ -867,7 +869,16 @@ class CrossTableNodeConverterTest {
                 .thenAnswer(invocation -> invocation.getArgument(0));
         when(commonProcessing.sanitizeAndReduceVariableName(anyString()))
             .thenAnswer(invocation -> invocation.getArgument(0));
+        addStepsToList(commonProcessing);
         return commonProcessing;
+    }
+
+    private static void addStepsToList(CommonProcessing commonProcessing) {
+        org.mockito.Mockito.doAnswer(invocation -> {
+            List<Step> steps = invocation.getArgument(0);
+            steps.add(invocation.getArgument(1));
+            return null;
+        }).when(commonProcessing).addStep(org.mockito.ArgumentMatchers.anyList(), any(Step.class), anyString());
     }
 
     private SegmentationTree.SignatureTerm signatureTerm(String name, String dataType, String direction) {

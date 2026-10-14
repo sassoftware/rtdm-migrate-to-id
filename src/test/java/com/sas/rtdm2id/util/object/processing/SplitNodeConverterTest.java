@@ -312,4 +312,308 @@ class SplitNodeConverterTest {
         assertEquals("1", json.get("rhsConstant").asText());
         assertEquals(condition, new ObjectMapper().treeToValue(json, SimpleBranchCondition.class));
     }
+    private static List<int[]> ranges(String... percentages) {
+        List<BigDecimal> values = new java.util.ArrayList<>();
+        for (String percentage : percentages) {
+            values.add(new BigDecimal(percentage));
+        }
+        return SplitNodeConverter.percentRanges(values);
+    }
+
+    private static void assertRanges(List<int[]> actual, int... bounds) {
+        assertEquals(bounds.length / 2, actual.size());
+        for (int i = 0; i < actual.size(); i++) {
+            assertEquals(bounds[2 * i], actual.get(i)[0], "lower bound of branch " + i);
+            assertEquals(bounds[2 * i + 1], actual.get(i)[1], "upper bound of branch " + i);
+        }
+    }
+
+    @Test
+    void percentRangesCoverTheWholeZeroToNinetyNineDomain() {
+        assertRanges(ranges("50", "50"), 0, 49, 50, 99);
+        assertRanges(ranges("100"), 0, 99);
+        assertRanges(ranges("12.5", "87.5"), 0, 12, 13, 99);
+        assertRanges(ranges("33.3", "33.3", "33.4"), 0, 32, 33, 66, 67, 99);
+        assertRanges(ranges("33.3", "33.3", "33.3"), 0, 32, 33, 66, 67, 99);
+        assertRanges(ranges("10", "20", "30", "40"), 0, 9, 10, 29, 30, 59, 60, 99);
+        // A branch that rounds to nothing gets an empty range; the remaining branches still cover 0..99
+        assertRanges(ranges("0.2", "99.8"), 0, -1, 0, 99);
+    }
+
+    private SplitNodeDataDO percentSplit(String enableSeed, String seedXml, String... percentages) throws Exception {
+        StringBuilder lineItems = new StringBuilder();
+        for (int i = 0; i < percentages.length; i++) {
+            lineItems.append("<SplitNodeLineItemDO><CellId>cell-").append(i).append("</CellId>")
+                .append("<RequiredPercent StoredType=\"Double\">").append(percentages[i]).append("</RequiredPercent>")
+                .append("</SplitNodeLineItemDO>");
+        }
+        String xml = "<SplitNodeDataDO><NodeId>pct</NodeId><NodeName>Percent split</NodeName>"
+            + "<EnableSeed>" + enableSeed + "</EnableSeed>" + seedXml
+            + "<SplitType>percents</SplitType><LineItems>" + lineItems + "</LineItems></SplitNodeDataDO>";
+        return JAXBContext.newInstance(SplitNodeDataDO.class).createUnmarshaller()
+            .unmarshal(new StreamSource(new StringReader(xml)), SplitNodeDataDO.class).getValue();
+    }
+
+    private Step randomNumberStep(MapStorage storage, String name, boolean existing) {
+        Step step = new Step();
+        com.sas.rtdm2id.model.id.decision.RuleSetStep ruleSet = new com.sas.rtdm2id.model.id.decision.RuleSetStep();
+        ruleSet.setName(name);
+        ruleSet.setId("rs-id");
+        step.setRuleSet(ruleSet);
+        storage.getRuleSetStepMap().put(name, step);
+        storage.getRuleSetModifiedDate().put(name, new java.util.Date());
+        storage.getRuleSetIsUpdated().put(name, existing);
+        storage.getRuleSetIsActionUpdated().put(name, existing);
+        storage.setBaseIp("viya.example");
+        return step;
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void percentSplitBranchesOnZeroBasedRangesAndWritesSignatureBeforeRule() throws Exception {
+        SplitNodeDataDO source = percentSplit("true",
+            "<SeedVarRefDO><Type>Numeric</Type><VarInfoId>events.Customer Id</VarInfoId><VarName>Customer Id</VarName></SeedVarRefDO>",
+            "12.5", "87.5");
+        MapStorage storage = new MapStorage();
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        CommonProcessing processing = new CommonProcessing(restTemplate, storage, new TreeUtil());
+        Step randomNumber = randomNumberStep(storage, "pctnode_random-number", false);
+
+        List<Step> steps = new SplitNodeConverter(processing, storage).createBranch(source, new Decision(), "pctnode");
+
+        assertEquals(2, steps.size());
+        assertTrue(steps.get(0) == randomNumber);
+        Step branch = steps.get(1);
+        assertEquals("0", branch.getBranchCases().get(0).getCompoundCondition().getLhsSimpleCondition().getRhsConstant());
+        assertEquals("12", branch.getBranchCases().get(0).getCompoundCondition().getRhsSimpleCondition().getRhsConstant());
+        assertEquals("13", branch.getBranchCases().get(1).getCompoundCondition().getLhsSimpleCondition().getRhsConstant());
+        assertEquals("99", branch.getBranchCases().get(1).getCompoundCondition().getRhsSimpleCondition().getRhsConstant());
+        String seed = processing.sanitizeAndReduceVariableName("Customer Id");
+        assertEquals(seed, randomNumber.getMappings().get(0).getStepTermName());
+
+        org.mockito.ArgumentCaptor<org.springframework.http.HttpEntity> rule =
+            org.mockito.ArgumentCaptor.forClass(org.springframework.http.HttpEntity.class);
+        org.mockito.InOrder order = org.mockito.Mockito.inOrder(restTemplate);
+        order.verify(restTemplate).exchange(org.mockito.ArgumentMatchers.any(java.net.URI.class),
+            org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.PUT),
+            org.mockito.ArgumentMatchers.any(org.springframework.http.HttpEntity.class),
+            org.mockito.ArgumentMatchers.eq(com.sas.rtdm2id.model.id.rules.RuleSet.class));
+        order.verify(restTemplate).exchange(org.mockito.ArgumentMatchers.any(java.net.URI.class),
+            org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.POST), rule.capture(),
+            org.mockito.ArgumentMatchers.eq(com.sas.rtdm2id.model.id.rules.Rule.class));
+        String expression = ((com.sas.rtdm2id.model.id.rules.Rule) rule.getValue().getBody()).getActions().get(0).getExpression();
+        assertEquals("random_number = FLOOR(MODZ(ABS(" + seed + ") * 811, 100))", expression);
+    }
+
+    @Test
+    void percentSplitWithoutSeedUsesSameIntegerDomainAndReusesExistingRuleSet() throws Exception {
+        SplitNodeDataDO source = percentSplit("false", "", "50", "50");
+        MapStorage storage = new MapStorage();
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        CommonProcessing processing = new CommonProcessing(restTemplate, storage, new TreeUtil());
+        randomNumberStep(storage, "pctnode_random-number", true);
+
+        List<Step> steps = new SplitNodeConverter(processing, storage).createBranch(source, new Decision(), "pctnode");
+
+        assertEquals("49", steps.get(1).getBranchCases().get(0).getCompoundCondition().getRhsSimpleCondition().getRhsConstant());
+        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+    }
+
+    @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void percentSplitWithoutSeedDrawsAnIntegerBetweenZeroAndNinetyNine() throws Exception {
+        SplitNodeDataDO source = percentSplit("false", "", "100");
+        MapStorage storage = new MapStorage();
+        RestTemplate restTemplate = mock(RestTemplate.class);
+        randomNumberStep(storage, "pctnode_random-number", false);
+
+        new SplitNodeConverter(new CommonProcessing(restTemplate, storage, new TreeUtil()), storage)
+            .createBranch(source, new Decision(), "pctnode");
+
+        org.mockito.ArgumentCaptor<org.springframework.http.HttpEntity> rule =
+            org.mockito.ArgumentCaptor.forClass(org.springframework.http.HttpEntity.class);
+        org.mockito.Mockito.verify(restTemplate).exchange(org.mockito.ArgumentMatchers.any(java.net.URI.class),
+            org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.POST), rule.capture(),
+            org.mockito.ArgumentMatchers.eq(com.sas.rtdm2id.model.id.rules.Rule.class));
+        assertEquals("random_number = FLOOR(RAND('uniform') * 100)",
+            ((com.sas.rtdm2id.model.id.rules.Rule) rule.getValue().getBody()).getActions().get(0).getExpression());
+    }
+
+    @Test
+    void percentSplitStepsAreCrossBranchLinked() throws Exception {
+        SplitNodeDataDO source = percentSplit("false", "", "100");
+        MapStorage storage = new MapStorage();
+        storage.setUseCrossBranchLinks(true);
+        TreeUtil treeUtil = new TreeUtil();
+        treeUtil.getNodeIdInputNodesMap().put("pct", "a, b");
+        CommonProcessing processing = new CommonProcessing(mock(RestTemplate.class), storage, treeUtil);
+        Step randomNumber = randomNumberStep(storage, "pctnode_random-number", true);
+
+        new SplitNodeConverter(processing, storage).createBranch(source, new Decision(), "pctnode");
+
+        assertNotNull(randomNumber.getLinkLabel());
+        assertEquals(randomNumber.getLinkLabel(), storage.getNodeIdLinkLabelMap().get("pct"));
+    }
+
+    private Step intervalSplit(String type, String intervals, String cells) throws Exception {
+        String xml = "<SplitNodeDataDO><NodeId>interval-split</NodeId><NodeName>Bands</NodeName>"
+            + "<SplitType>dataItem</SplitType><LineItems>" + cells
+            + "<SplitNodeLineItemDO><CellId>other</CellId><Value>(Remainder)</Value></SplitNodeLineItemDO>"
+            + "</LineItems><SplitOnNodeDataDO><VarRefDO><Type>" + type + "</Type>"
+            + "<VarInfoId>events.Score</VarInfoId><VarName>Score</VarName></VarRefDO><LineItems>" + intervals
+            + "</LineItems></SplitOnNodeDataDO></SplitNodeDataDO>";
+        SplitNodeDataDO source = JAXBContext.newInstance(SplitNodeDataDO.class).createUnmarshaller()
+            .unmarshal(new StreamSource(new StringReader(xml)), SplitNodeDataDO.class).getValue();
+        MapStorage storage = new MapStorage();
+        CommonProcessing processing = spy(new CommonProcessing(mock(RestTemplate.class), storage, new TreeUtil()));
+        doReturn(new ConditionBranch()).when(processing).createConditionBranch("other", true);
+        return new SplitNodeConverter(processing, storage).createBranch(source, new Decision(), "Bands").get(0);
+    }
+
+    private static String interval(String lower, String lowerInclusive, String upper, String upperInclusive) {
+        return "<IntervalLineItemDO><MissingGroup>false</MissingGroup>"
+            + (lower == null ? "" : "<LowerBound StoredType=\"Double\">" + lower + "</LowerBound>")
+            + "<LowerBoundInclusive>" + lowerInclusive + "</LowerBoundInclusive>"
+            + (upper == null ? "" : "<UpperBound StoredType=\"Double\">" + upper + "</UpperBound>")
+            + "<UpperBoundInclusive>" + upperInclusive + "</UpperBoundInclusive></IntervalLineItemDO>";
+    }
+
+    private static String cell(String id) {
+        return "<SplitNodeLineItemDO><CellId>" + id + "</CellId><Value>" + id + "</Value></SplitNodeLineItemDO>";
+    }
+
+    @Test
+    void preservesRtdmBoundInclusivityForEveryInterval() throws Exception {
+        Step branch = intervalSplit("Numeric",
+            interval("0", "true", "10", "false") + interval("10", "true", "20", "false") + interval("20", "false", "30", "true"),
+            cell("low") + cell("mid") + cell("high"));
+
+        assertEquals("range", branch.getBranchType());
+        for (int i = 0; i < 2; i++) {
+            com.sas.rtdm2id.model.id.decision.CompoundBranchCondition condition = branch.getBranchCases().get(i).getCompoundCondition();
+            assertEquals(">=", condition.getLhsSimpleCondition().getOperator());
+            assertEquals("<", condition.getRhsSimpleCondition().getOperator());
+        }
+        com.sas.rtdm2id.model.id.decision.CompoundBranchCondition last = branch.getBranchCases().get(2).getCompoundCondition();
+        assertEquals(">", last.getLhsSimpleCondition().getOperator());
+        assertEquals("<=", last.getRhsSimpleCondition().getOperator());
+    }
+
+    @Test
+    void convertsOpenEndedIntervalsToOneSidedConditions() throws Exception {
+        Step branch = intervalSplit("Numeric",
+            interval(null, "false", "10", "false") + interval("10", "true", null, "false"),
+            cell("below") + cell("above"));
+
+        assertNull(branch.getBranchCases().get(0).getCompoundCondition());
+        assertEquals("<", branch.getBranchCases().get(0).getSimpleCondition().getOperator());
+        assertEquals("10", branch.getBranchCases().get(0).getSimpleCondition().getRhsConstant());
+        assertEquals(">=", branch.getBranchCases().get(1).getSimpleCondition().getOperator());
+        assertEquals("10", branch.getBranchCases().get(1).getSimpleCondition().getRhsConstant());
+    }
+
+    @ParameterizedTest
+    @CsvSource(value = {
+        "date| 2023-01-15T00:00:00| '15JAN2023:00:00:00'dt",
+        "Date| 2023-1-5| '05JAN2023:00:00:00'dt",
+        // RTDM's own format, with the narrow no-break space recent JDKs put before AM/PM
+        "Date| 9/7/26, 7:25 AM| '07SEP2026:07:25:00'dt",
+        "Date| 1/2/70, 1:05 PM| '02JAN1970:13:05:00'dt",
+        "STRING| O'Brien| 'O''Brien'",
+        "CHAR| x| 'x'"
+    }, delimiter = '|', quoteCharacter = '"')
+    void quotesDiscreteValuesByCaseInsensitiveType(String type, String value, String expected) throws Exception {
+        String xml = "<SplitNodeDataDO><NodeId>typed</NodeId><NodeName>Typed</NodeName>"
+            + "<SplitType>dataItem</SplitType><LineItems>" + cell("value")
+            + "</LineItems><SplitOnNodeDataDO><VarRefDO><Type>" + type + "</Type>"
+            + "<VarInfoId>events.Item</VarInfoId><VarName>Item</VarName></VarRefDO><LineItems>"
+            + "<DiscreteLineItemDO><Value StoredType=\"String\">" + value + "</Value></DiscreteLineItemDO>"
+            + "</LineItems></SplitOnNodeDataDO></SplitNodeDataDO>";
+        SplitNodeDataDO source = JAXBContext.newInstance(SplitNodeDataDO.class).createUnmarshaller()
+            .unmarshal(new StreamSource(new StringReader(xml)), SplitNodeDataDO.class).getValue();
+        MapStorage storage = new MapStorage();
+        CommonProcessing processing = new CommonProcessing(mock(RestTemplate.class), storage, new TreeUtil());
+
+        Step branch = new SplitNodeConverter(processing, storage).createBranch(source, new Decision(), "Typed").get(0);
+
+        assertEquals(expected, branch.getBranchCases().get(0).getSimpleCondition().getRhsConstant());
+    }
+
+    // Bound and value shapes from the RTDM sample extracts RTDMBranchByDataItemIntervalAdvanced.xml and
+    // RTDMBranchByDataItemDiscreteAdvanced.xml: a VarInfoBriefDO instead of a literal
+    private static String reference(String element, String id, String name, String varType) {
+        return "<" + element + " ConcreteClass=\"com.sas.analytics.crm.custdata.client.VarInfoBriefDO\" objid=\"489\">"
+            + "<Aggregate>false</Aggregate><Id>" + id + "</Id><Level>Interval</Level><Name>" + name + "</Name>"
+            + "<NameWithSourceContext>Request." + name + "</NameWithSourceContext><Source>Request</Source>"
+            + "<VarType>" + varType + "</VarType></" + element + ">";
+    }
+
+    @Test
+    void namesRequestSplitVariableAsTheStartNodeDeclaresIt() throws Exception {
+        // events.Score is declared by the Start node as RequestScore; the split must test that term regardless of
+        // whether another node happened to resolve the same variable earlier
+        Step branch = intervalSplit("Numeric", interval("0", "true", "10", "true"), cell("low"));
+
+        assertEquals("RequestScore",
+            branch.getBranchCases().get(0).getCompoundCondition().getLhsSimpleCondition().getLhsTerm().getName());
+    }
+
+    @Test
+    void comparesIntervalBoundsThatReferenceVariables() throws Exception {
+        String bounds = "<IntervalLineItemDO><MissingGroup>false</MissingGroup>"
+            + reference("LowerBound", "events.pubDouble", "pubDouble", "Numeric")
+            + "<LowerBoundInclusive>true</LowerBoundInclusive>"
+            + reference("UpperBound", "events.pubInt64", "pubInt64", "Numeric")
+            + "<UpperBoundInclusive>false</UpperBoundInclusive></IntervalLineItemDO>";
+
+        Step branch = intervalSplit("Numeric", bounds + interval("2.0", "true", "3.0", "true"), cell("between") + cell("fixed"));
+
+        assertEquals("range", branch.getBranchType());
+        com.sas.rtdm2id.model.id.decision.CompoundBranchCondition condition = branch.getBranchCases().get(0).getCompoundCondition();
+        assertEquals(">=", condition.getLhsSimpleCondition().getOperator());
+        assertNull(condition.getLhsSimpleCondition().getRhsConstant());
+        assertTrue(condition.getLhsSimpleCondition().getRhsTerm().getName().contains("pubDouble"));
+        assertEquals("<", condition.getRhsSimpleCondition().getOperator());
+        assertTrue(condition.getRhsSimpleCondition().getRhsTerm().getName().contains("pubInt64"));
+        assertEquals("2", branch.getBranchCases().get(1).getCompoundCondition().getLhsSimpleCondition().getRhsConstant()
+            .replace(".0", ""));
+    }
+
+    @Test
+    void comparesDiscreteValuesThatReferenceVariables() throws Exception {
+        String xml = "<SplitNodeDataDO><NodeId>typed</NodeId><NodeName>Typed</NodeName>"
+            + "<SplitType>dataItem</SplitType><LineItems>" + cell("value")
+            + "</LineItems><SplitOnNodeDataDO><VarRefDO><Type>Char</Type>"
+            + "<VarInfoId>events.Item</VarInfoId><VarName>Item</VarName></VarRefDO><LineItems>"
+            + "<DiscreteLineItemDO><FormattedValue>Request.pubStr</FormattedValue>"
+            + reference("Value", "events.pubStr", "pubStr", "Char") + "</DiscreteLineItemDO>"
+            + "</LineItems></SplitOnNodeDataDO></SplitNodeDataDO>";
+        SplitNodeDataDO source = JAXBContext.newInstance(SplitNodeDataDO.class).createUnmarshaller()
+            .unmarshal(new StreamSource(new StringReader(xml)), SplitNodeDataDO.class).getValue();
+        MapStorage storage = new MapStorage();
+        CommonProcessing processing = new CommonProcessing(mock(RestTemplate.class), storage, new TreeUtil());
+        Decision decision = new Decision();
+
+        Step branch = new SplitNodeConverter(processing, storage).createBranch(source, decision, "Typed").get(0);
+
+        SimpleBranchCondition condition = branch.getBranchCases().get(0).getSimpleCondition();
+        assertEquals("=", condition.getOperator());
+        assertNull(condition.getRhsConstant());
+        assertTrue(condition.getRhsTerm().getName().contains("pubStr"));
+        assertTrue(decision.getSignature().stream().anyMatch(term -> term.getName().contains("pubStr")));
+    }
+
+    @Test
+    void reportsSplitWithoutDataItemClearly() {
+        SplitNodeDataDO source = new SplitNodeDataDO();
+        source.setNodeId("broken");
+        source.setNodeName("Broken");
+        MapStorage storage = new MapStorage();
+        SplitNodeConverter converter = new SplitNodeConverter(
+            new CommonProcessing(mock(RestTemplate.class), storage, new TreeUtil()), storage);
+
+        IllegalArgumentException exception = org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+            () -> converter.createBranch(source, new Decision(), "Broken"));
+        assertTrue(exception.getMessage().contains("Broken"));
+    }
 }

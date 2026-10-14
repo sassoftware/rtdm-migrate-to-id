@@ -17,6 +17,7 @@ import com.sas.rtdm2id.model.id.decision.Decision;
 import com.sas.rtdm2id.model.id.decision.Mapping;
 import com.sas.rtdm2id.model.id.decision.RuleSetStep;
 import com.sas.rtdm2id.model.id.decision.SignatureTerm;
+import com.sas.rtdm2id.model.id.decision.SignatureTermExtension;
 import com.sas.rtdm2id.model.id.decision.Step;
 import com.sas.rtdm2id.model.id.globals.GlobalVariable;
 import com.sas.rtdm2id.model.id.globals.GlobalVariableCollection;
@@ -42,6 +43,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URISyntaxException;
@@ -62,6 +64,17 @@ public class CommonProcessing {
 
     private static final String UNDERSCORE = "_";
     private static final String EMPTY_STRING = "";
+    private static final String SAFE_EMPTY_NAME = "v";
+    private static final Pattern CALCULATED_REFERENCE = Pattern.compile("<<(.*?)\\.(.*?)>>");
+
+    // Per-migration lookups that are rebuilt at the start of every createRuleSets call (MapStorage does not hold them).
+    // Calculated item definitions are needed to schedule the calculated items an expression depends on, and declared
+    // source types are used to type RuleSet input terms by their source rather than by the assigned variable.
+    private final Map<String, CalculatedItemDO> calculatedItemsByName = new HashMap<>();
+    private final Map<String, String> sourceDataTypes = new HashMap<>();
+
+    @Value("${rtdm2id.consolidate-calculated-rulesets:true}")
+    private boolean consolidateCalculatedRuleSets = true;
 
     public CommonProcessing(RestTemplate restTemplate, MapStorage mapStorage, TreeUtil treeUtil) {
         this.restTemplate = restTemplate;
@@ -70,29 +83,35 @@ public class CommonProcessing {
     }
 
     public Map<String, Step> createRuleSets(Batch batch) {
+        // Output names are needed by calculated expressions below and by every node converted afterwards
+        registerNodeOutputs(batch);
         // Rulesets are unique so we must append the Node ID to the name. This applies anywhere we need to create a ruleset
         // to represent the input/output variables of a RTDM node including calculated data items since they're created on a
         // per node basis.
         // Each node in a RTDM campaign has its own unique set of input/output variable assignments so we must create a
         // unique ruleset for each node.
         List<CalculatedItemDO> calculatedItemDOs = batch.getLogicalUnit().getFlowDO().getCalculatedDataItemList().getCalculatedItemDOs();
-        if (!calculatedItemDOs.isEmpty()) {
-            Map<String, String> requestDataTypes = new HashMap<>();
-            StartNodeDataDO start = batch.getLogicalUnit().getStartNodeDataDO();
-            if (start != null) {
-                List<StartNodeDataDO.Event.RequestVars.IBVariableDO> requestVars = Collections.emptyList();
-                if (start.getEvent() != null && start.getEvent().getRequestVars() != null) {
-                    requestVars = start.getEvent().getRequestVars().getIbVariableDOs();
-                } else if (start.getEvent() == null && start.getInputVariables() != null) {
-                    requestVars = start.getInputVariables().getIbVariableDOs();
-                }
-                for (StartNodeDataDO.Event.RequestVars.IBVariableDO requestVar : requestVars) {
-                    String name = requestVar.getName() != null && !requestVar.getName().isEmpty()
-                        ? requestVar.getName() : requestVar.getPhysicalName();
+        calculatedItemsByName.clear();
+        sourceDataTypes.clear();
+        Map<String, String> requestDataTypes = sourceDataTypes;
+        StartNodeDataDO start = batch.getLogicalUnit().getStartNodeDataDO();
+        if (start != null) {
+            List<StartNodeDataDO.Event.RequestVars.IBVariableDO> requestVars = Collections.emptyList();
+            if (start.getEvent() != null && start.getEvent().getRequestVars() != null) {
+                requestVars = start.getEvent().getRequestVars().getIbVariableDOs();
+            } else if (start.getEvent() == null && start.getInputVariables() != null) {
+                requestVars = start.getInputVariables().getIbVariableDOs();
+            }
+            for (StartNodeDataDO.Event.RequestVars.IBVariableDO requestVar : requestVars) {
+                String name = requestVar.getName() != null && !requestVar.getName().isEmpty()
+                    ? requestVar.getName() : requestVar.getPhysicalName();
+                if (name != null && requestVar.getTypeDescription() != null) {
                     requestDataTypes.put(sanitizeVariableName(SOURCE_EVENT + "." + name).toLowerCase(Locale.ROOT),
                         getDatatypeOfVar(requestVar.getTypeDescription()).getValue());
                 }
             }
+        }
+        if (!calculatedItemDOs.isEmpty()) {
             IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
             for (ProcessNodeDataDO processNode : batch.getLogicalUnit().getProcessNodeDataDOs()) {
                 if (processNode.getProcess() != null && processNode.getProcess().getInputVariableList() != null) {
@@ -114,12 +133,23 @@ public class CommonProcessing {
                 }
             }
             for (CalculatedItemDO calculatedItemDO : calculatedItemDOs) {
+                if (calculatedItemDO.getName() != null) {
+                    calculatedItemsByName.putIfAbsent(calculatedItemDO.getName(), calculatedItemDO);
+                }
                 requestDataTypes.put(sanitizeVariableName(SOURCE_CALCULATED_DATA_ITEM + "."
                     + calculatedItemDO.getName()).toLowerCase(Locale.ROOT),
                     getCalculatedItemDataType(calculatedItemDO.getCalculatedItemType()));
             }
             for (CalculatedItemDO calculatedItemDO : calculatedItemDOs) {
-                addRulesetForCalculatedItem(calculatedItemDO, requestDataTypes);
+                if (consolidateCalculatedRuleSets) {
+                    // Each consumer node gets one RuleSet computing all of its calculated items, written once the
+                    // flow is converted (writeCalculatedNodeGroups), so no per-item RuleSet is created
+                    mapStorage.getCalculatedVariableMap().put(calculatedItemDO.getName(), calculatedItemDO.getNodeId());
+                    mapStorage.getCalculatedVariableDataTypeMap().put(CALCULATED_DATA_ITEMS_FOLDER + "." + calculatedItemDO.getName(),
+                        getCalculatedItemDataType(calculatedItemDO.getCalculatedItemType()));
+                } else {
+                    addRulesetForCalculatedItem(calculatedItemDO, requestDataTypes);
+                }
             }
         }
         List<SplitNodeDataDO> splitNodeDataDOS = batch.getLogicalUnit().getSplitNodeDataDOs();
@@ -138,7 +168,7 @@ public class CommonProcessing {
             for (ProcessNodeDataDO processNodeDataDO : processNodeDataDOs) {
                 ProcessNodeDataDO.Process process = processNodeDataDO.getProcess();
                 if (process != null) {
-                    if (process.getInputVariableList() != null && !process.getInputVariableList().getIbVariableDOs().isEmpty()) {
+                    if (hasInputValuesRuleSet(process)) {
                         findOrAddRuleSet(makeProcessNodeRuleSetName(processNodeDataDO) + "_input_values", processNodeDataDO.getNodeDescription());
                     }
                     if (!isProcessNotDataProcess(process.getProcessTypeDescription()) && Boolean.parseBoolean(process.getReturnDatagridFlag())) {
@@ -189,7 +219,7 @@ public class CommonProcessing {
                     ruleSet.setSignature(signature);
                     ruleSet.setDescription(description);
 
-                    ResponseEntity<RuleSet> response = restTemplate.postForEntity(ViyaApi.createUri(mapStorage.getBaseIp(), "/businessRules/ruleSets?parentFolderUri=" + mapStorage.getParentFolderUri(), mapStorage.getProtocol()),
+                    ResponseEntity<RuleSet> response = restTemplate.postForEntity(ViyaApi.createUri(mapStorage.getBaseIp(), "/businessRules/ruleSets?parentFolderUri=" + ViyaApi.encodeQueryParam(mapStorage.getParentFolderUri()), mapStorage.getProtocol()),
                             ViyaApi.createRule(ruleSet, mapStorage.getAccessToken()), RuleSet.class);
                     if (response.getStatusCode().value() == 201) {
                         RuleSet responseBody = response.getBody();
@@ -233,23 +263,30 @@ public class CommonProcessing {
         }
     }
 
+    /**
+     * Returns whether a Decision with the given name exists on the target. A failed lookup is not treated as
+     * "does not exist": it would bypass the duplicate-Decision guard and report subdiagrams as missing, so it throws.
+     */
     public boolean findDecision(String decisionName) {
-        boolean decisionExists = false;
+        CodeFileCollection codeFileCollection;
         try {
-            CodeFileCollection codeFileCollection
+            codeFileCollection
                     = getCodeFileCollection(mapStorage.getBaseIp(), decisionName, mapStorage.getAccessToken(), "/decisions/flows");
-            if (codeFileCollection != null) {
-                if (codeFileCollection.getCount() > 0) {
-                    decisionExists = true;
-                }
-            }
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new IllegalStateException("Unable to look up Decision '" + decisionName + "' on the target Viya: "
+                    + e.getMessage(), e);
         }
-        return decisionExists;
+        if (codeFileCollection == null) {
+            throw new IllegalStateException("Unable to look up Decision '" + decisionName
+                    + "' on the target Viya: unexpected response");
+        }
+        return codeFileCollection.getCount() > 0;
     }
 
     public SignatureTerm.DataTypeEnum getDatatypeOfVar(String typeDescription) {
+        if (typeDescription == null) {
+            return SignatureTerm.DataTypeEnum.ANY;
+        }
         SignatureTerm.DataTypeEnum dataTypeEnum;
         switch (typeDescription.toLowerCase(Locale.ROOT)) {
             case CHAR_CONSTANT:
@@ -274,9 +311,11 @@ public class CommonProcessing {
                 dataTypeEnum = SignatureTerm.DataTypeEnum.INTEGER;
                 break;
             case DATAGRID_CONSTANT:
+            case "datagrid": // ID "dataGrid" (DATAGRID_CONSTANT_SID), lower-cased
                 dataTypeEnum = SignatureTerm.DataTypeEnum.DATAGRID;
                 break;
             case DATE_CONSTANT:
+            case DATETIME_CONSTANT:
             case DATE_LIST_CONSTANT:
                 dataTypeEnum = SignatureTerm.DataTypeEnum.DATETIME;
                 break;
@@ -328,17 +367,35 @@ public class CommonProcessing {
 
     public void checkSignatureTermForDuplicate(String direction, List<Signature> signatureList, Signature signature) {
         handleIncomingSignatureUpdate(direction, signatureList, signature);
-        if (!signatureList.contains(signature)) {
+        // RuleSet term names must be unique (case-insensitively); a duplicate name makes the signature PUT fail.
+        // The same term can arrive with different types (e.g. one source assigned to integer and decimal variables),
+        // so dedupe by name and merge the types instead of adding a second term.
+        Optional<Signature> existing = signatureList.stream()
+                .filter(term -> term.getName() != null && term.getName().equalsIgnoreCase(signature.getName())).findFirst();
+        if (existing.isEmpty()) {
             signatureList.add(signature);
         } else {
-            if (signature.getDataType().equals(SignatureTerm.DataTypeEnum.DECIMAL.getValue())) {
-                int i = signatureList.indexOf(signature);
-                Signature signatureThatExist = signatureList.get(i);
-                if (!signatureThatExist.getDataType().equals(SignatureTerm.DataTypeEnum.DECIMAL.getValue())) {
-                    signatureThatExist.setDataType(SignatureTerm.DataTypeEnum.DECIMAL.toString());
-                }
-            }
+            Signature signatureThatExist = existing.get();
+            signatureThatExist.setDataType(mergeDataTypes(signatureThatExist.getDataType(), signature.getDataType()));
         }
+    }
+
+    /**
+     * Merges the data type of a duplicate RuleSet term into the existing one: the first concrete type wins, except
+     * that integer and decimal widen to decimal.
+     */
+    static String mergeDataTypes(String existingType, String incomingType) {
+        if (existingType == null || SignatureTerm.DataTypeEnum.ANY.getValue().equals(existingType)) {
+            return incomingType != null ? incomingType : existingType;
+        }
+        if (incomingType == null || existingType.equals(incomingType)) {
+            return existingType;
+        }
+        Set<String> numeric = Set.of(SignatureTerm.DataTypeEnum.INTEGER.getValue(), SignatureTerm.DataTypeEnum.DECIMAL.getValue());
+        if (numeric.contains(existingType) && numeric.contains(incomingType)) {
+            return SignatureTerm.DataTypeEnum.DECIMAL.getValue();
+        }
+        return existingType;
     }
 
     public void handleIncomingSignatureUpdate(String direction, List<Signature> signatureList, Signature signature) {
@@ -420,22 +477,17 @@ public class CommonProcessing {
     }
 
     public boolean checkForCalcVariable(String varInfoId, String type, List<Step> stepList, Step originStep, String varName, String nodeId) {
-        if (!varInfoId.isEmpty()) {
+        if (varInfoId != null && varInfoId.indexOf('.') >= 0) {
             String source = varInfoId.substring(0, varInfoId.indexOf("."));
             if (CALCULATED_DATA_ITEMS_FOLDER.equals(source)) {
                 String calculatedVariableName = varInfoId.substring(varInfoId.indexOf(".") + 1);
                 String variableName = sanitizeVariableName(SOURCE_CALCULATED_DATA_ITEM + "." + calculatedVariableName);
 
-                Step step = mapStorage.getRuleSetStepMap().get(calculatedVariableName+"_"+mapStorage.getCalculatedVariableMap().get(calculatedVariableName));
-                if (step != null) {
-                    if (originStep != null) {
-                        addMapping(variableName, varName, originStep, true);
-                    }
-                    if (!mapStorage.getCalculatedVariableRulesetNodes().contains(step)){
-                        updateRuleSet(variableName, type, step);
-                        addStep(stepList, step, nodeId);
-                        mapStorage.getCalculatedVariableRulesetNodes().add(step);
-                    }
+                Step step = consolidateCalculatedRuleSets
+                    ? addToCalculatedNodeGroup(calculatedVariableName, stepList, nodeId)
+                    : scheduleCalculatedItem(calculatedVariableName, type, stepList, nodeId, new HashSet<>());
+                if (step != null && originStep != null) {
+                    addMapping(variableName, varName, originStep, true);
                 }
 
                 if (mapStorage.getVarInfoIdToVariableNameMap().get(varInfoId)==null) {
@@ -448,6 +500,194 @@ public class CommonProcessing {
         }
 
         return false;
+    }
+
+    /**
+     * Adds a calculated item, preceded by the calculated items its expression depends on, to the one RuleSet step
+     * that computes the calculated items of node {@code nodeId}. The step is inserted (empty) the first time the node
+     * references a calculated item; its RuleSet is written by {@link #writeCalculatedNodeGroups} once the whole flow is
+     * converted. Like RTDM, which evaluates a calculated item where it is used, every node computes the items it uses
+     * itself, so the result does not depend on which node the flow reaches first.
+     */
+    private Step addToCalculatedNodeGroup(String calculatedVariableName, List<Step> stepList, String nodeId) {
+        if (!calculatedItemsByName.containsKey(calculatedVariableName)) {
+            log.error("Calculated data item '{}' referenced by node {} is not defined in the extract; "
+                + "it will not be computed in the migrated Decision", calculatedVariableName, nodeId);
+            return null;
+        }
+        MapStorage.CalculatedNodeGroup group = mapStorage.getCalculatedNodeGroups().get(nodeId);
+        if (group == null) {
+            Step step = new Step();
+            step.setType(Step.TypeEnum.RULESET);
+            step.setMappings(new ArrayList<>());
+            group = new MapStorage.CalculatedNodeGroup(step, new LinkedHashSet<>());
+            mapStorage.getCalculatedNodeGroups().put(nodeId, group);
+            addStep(stepList, step, nodeId);
+            mapStorage.getCalculatedVariableRulesetNodes().add(step);
+        }
+        addWithCalculatedDependencies(calculatedVariableName, group.items(), new HashSet<>());
+        return group.step();
+    }
+
+    /**
+     * Without consolidation: inserts the RuleSet step that computes a calculated item, preceded by the steps of the
+     * calculated items its expression depends on (in dependency order). Every step is inserted at most once per
+     * migration ({@code calculatedVariableRulesetNodes}), exactly as for direct references.
+     */
+    private Step scheduleCalculatedItem(String calculatedVariableName, String type, List<Step> stepList, String nodeId,
+            Set<String> visiting) {
+        String ruleSetName = calculatedItemRuleSetName(calculatedVariableName);
+        Step step = ruleSetName == null ? null : mapStorage.getRuleSetStepMap().get(ruleSetName);
+        if (step == null) {
+            log.error("No RuleSet step exists for calculated data item '{}' (RuleSet {}) referenced by node {}; "
+                + "the item will not be computed in the migrated Decision", calculatedVariableName, ruleSetName, nodeId);
+            return null;
+        }
+        if (!mapStorage.getCalculatedVariableRulesetNodes().contains(step) && visiting.add(calculatedVariableName)) {
+            for (String dependency : getCalculatedDependencies(calculatedVariableName)) {
+                String dependencyType = mapStorage.getCalculatedVariableDataTypeMap()
+                    .get(CALCULATED_DATA_ITEMS_FOLDER + "." + dependency);
+                scheduleCalculatedItem(dependency, dependencyType, stepList, nodeId, visiting);
+            }
+            if (!mapStorage.getCalculatedVariableRulesetNodes().contains(step)) {
+                updateRuleSet(sanitizeVariableName(SOURCE_CALCULATED_DATA_ITEM + "." + calculatedVariableName), type, step);
+                addStep(stepList, step, nodeId);
+                mapStorage.getCalculatedVariableRulesetNodes().add(step);
+            }
+        }
+        return step;
+    }
+
+    private void addWithCalculatedDependencies(String calculatedVariableName, Set<String> ordered, Set<String> visiting) {
+        if (ordered.contains(calculatedVariableName) || !visiting.add(calculatedVariableName)) {
+            return;
+        }
+        for (String dependency : getCalculatedDependencies(calculatedVariableName)) {
+            if (calculatedItemsByName.containsKey(dependency)) {
+                addWithCalculatedDependencies(dependency, ordered, visiting);
+            } else {
+                log.error("Calculated data item '{}' used by '{}' is not defined in the extract; "
+                    + "it will not be computed in the migrated Decision", dependency, calculatedVariableName);
+            }
+        }
+        ordered.add(calculatedVariableName);
+    }
+
+    /**
+     * Writes the RuleSet of every node's calculated item step (see {@link #addToCalculatedNodeGroup}): one rule whose
+     * actions compute the items in dependency order. Items are read and written under their Decision terms
+     * ({@code CalculatedDataItem<name>}), so a later action reads the value an earlier one assigned. The name carries a
+     * content fingerprint; an existing RuleSet is reused only if its signature and actions match exactly.
+     */
+    public void writeCalculatedNodeGroups() {
+        CalculatedRuleSetWriter writer = new CalculatedRuleSetWriter(restTemplate, mapStorage);
+        mapStorage.getCalculatedNodeGroups().forEach((nodeId, group) -> {
+            Step step = group.step();
+            RuleSet ruleSet = new RuleSet();
+            ruleSet.setRuleSetType("assignment");
+            ruleSet.setDescription(CalculatedRuleSetWriter.DESCRIPTION);
+            Map<String, String> variableTargets = new LinkedHashMap<>();
+            Map<String, String> calculatedTerms = new HashMap<>();
+            for (String item : group.items()) {
+                String target = SOURCE_CALCULATED_DATA_ITEM + "." + item;
+                String term = uniqueExpressionTerm(
+                    changeVariableNameToFormat(sanitizeAndReduceVariableName(target)), target, variableTargets);
+                variableTargets.put(term, target);
+                calculatedTerms.put(item, term);
+            }
+            Set<String> assigned = new HashSet<>();
+            Set<String> readBeforeAssigned = new HashSet<>();
+            List<Action> actions = new ArrayList<>();
+            for (String item : group.items()) {
+                CalculatedItemDO calculatedItemDO = calculatedItemsByName.get(item);
+                String expression = calculatedItemDO.getExpression();
+                Matcher references = CALCULATED_REFERENCE.matcher(expression == null ? "" : expression);
+                while (references.find()) {
+                    String reference = references.group(2);
+                    if (CALCULATED_DATA_ITEMS_FOLDER.equals(references.group(1)) && calculatedTerms.containsKey(reference)
+                            && !assigned.contains(reference)) {
+                        // Only in a cyclic definition: the value the item had before this step is read
+                        readBeforeAssigned.add(calculatedTerms.get(reference));
+                    }
+                }
+                String value = expression == null || "Missing".equals(expression)
+                    ? getMissingValue(getCalculatedItemDataType(calculatedItemDO.getCalculatedItemType()))
+                    : transferInSIDFormat(expression, variableTargets, calculatedTerms);
+                Action action = new Action();
+                action.setType("complex");
+                action.setExpression(calculatedTerms.get(item) + "=" + value);
+                actions.add(action);
+                assigned.add(item);
+            }
+            Map<String, String> outputTypes = new HashMap<>();
+            group.items().forEach(item -> outputTypes.put(calculatedTerms.get(item),
+                getCalculatedItemDataType(calculatedItemsByName.get(item).getCalculatedItemType())));
+            List<Signature> signature = new ArrayList<>();
+            step.setMappings(new ArrayList<>());
+            variableTargets.forEach((term, target) -> {
+                String targetName = sanitizeVariableName(target);
+                String outputType = outputTypes.get(term);
+                Signature signatureTerm = new Signature();
+                signatureTerm.setName(term);
+                if (outputType != null) {
+                    signatureTerm.setDataType(outputType);
+                    signatureTerm.setDirection(readBeforeAssigned.contains(term) ? INOUT_DIRECTION : OUTPUT_DIRECTION);
+                } else {
+                    // Upstream process/subdiagram outputs are typed by their producer (see registerNodeOutputType)
+                    String targetKey = targetName.toLowerCase(Locale.ROOT);
+                    signatureTerm.setDataType(sourceDataTypes.getOrDefault(targetKey,
+                        mapStorage.getNodeOutputDataTypes().getOrDefault(targetKey, "any")));
+                    signatureTerm.setDirection(INPUT_DIRECTION);
+                }
+                signature.add(signatureTerm);
+                Mapping mapping = new Mapping();
+                mapping.setStepTermName(term);
+                mapping.setTargetDecisionTermName(targetName);
+                mapping.setDirection(INPUT_DIRECTION.equals(signatureTerm.getDirection()) ? Mapping.DirectionEnum.INPUT
+                    : OUTPUT_DIRECTION.equals(signatureTerm.getDirection()) ? Mapping.DirectionEnum.OUTPUT
+                    : Mapping.DirectionEnum.INOUT);
+                step.getMappings().add(mapping);
+            });
+            ruleSet.setSignature(signature);
+            Rule rule = new Rule();
+            rule.setConditional("if");
+            rule.setRuleFiredTrackingEnabled(false);
+            rule.setActions(actions);
+            String fingerprint = CalculatedRuleSetWriter.fingerprint(nodeId, ruleSet, rule);
+            ruleSet.setName(makeNameValid("Calculated_" + nodeId + "_" + fingerprint));
+            rule.setName("Calculated_" + fingerprint);
+            writer.write(ruleSet, rule, step);
+        });
+    }
+
+    /**
+     * Name of the ungrouped RuleSet created for a calculated item, computed exactly as at creation
+     * ({@link #makeCalculatedDataItemRuleSetName}), or null if no RuleSet was created for the item.
+     */
+    private String calculatedItemRuleSetName(String calculatedVariableName) {
+        if (!mapStorage.getCalculatedVariableMap().containsKey(calculatedVariableName)) {
+            return null;
+        }
+        return makeCalculatedDataItemRuleSetName(calculatedVariableName,
+            mapStorage.getCalculatedVariableMap().get(calculatedVariableName));
+    }
+
+    /** Calculated items referenced by a calculated item's expression, in order of first reference. */
+    private List<String> getCalculatedDependencies(String calculatedVariableName) {
+        CalculatedItemDO item = calculatedItemsByName.get(calculatedVariableName);
+        if (item == null || item.getExpression() == null
+                || !mapStorage.getCalculatedVariableMap().containsKey(calculatedVariableName)) {
+            return Collections.emptyList();
+        }
+        Set<String> dependencies = new LinkedHashSet<>();
+        Matcher references = CALCULATED_REFERENCE.matcher(item.getExpression());
+        while (references.find()) {
+            if (CALCULATED_DATA_ITEMS_FOLDER.equals(references.group(1))) {
+                dependencies.add(references.group(2));
+            }
+        }
+        dependencies.remove(calculatedVariableName);
+        return new ArrayList<>(dependencies);
     }
 
     public void checkForAdditionalVariables(String varName, VarRef varRef, String direction, Decision decision) {
@@ -468,8 +708,13 @@ public class CommonProcessing {
     }
 
     public boolean checkForGlobalVariable(VarRef varRef, Step originStep, String varName, Decision decision, boolean isRuleSet) {
+        // Returns false when the reference was handled here (or there is nothing to reference), true when the
+        // caller should treat it as a non-global variable.
+        if (varRef == null || varRef.getVarInfoId() == null || varRef.getVarInfoId().isEmpty()) {
+            return false;
+        }
         String varInfoId = varRef.getVarInfoId();
-        if (!varInfoId.isEmpty()) {
+        if (varInfoId.indexOf('.') >= 0) {
             String source = varInfoId.substring(0, varInfoId.indexOf("."));
             if (GLOBALS_FOLDER.equals(source)) {
                 String name = varRef.getVarInfoId().substring(varRef.getVarInfoId().indexOf(".") + 1);
@@ -663,13 +908,20 @@ public class CommonProcessing {
                     value = sanitizeAndReduceVariableName(buildVariableName(ibVariableDO.getValue().getValueTypeVarInfoDO()));
                     Signature signature = new Signature();
                     ValueTypeVarInfoDO reference = ibVariableDO.getValue().getValueTypeVarInfoDO();
-                    String sourceType = ibVariableDO.getTypeDescription();
-                    if (reference.getVarInfoId().startsWith(GLOBALS_FOLDER + ".") && reference.getType() != null) {
+                    // Type the input term by its source, not by the variable it is assigned to, so the same source
+                    // referenced from variables of different types yields one consistently typed term.
+                    String sourceType = getDatatypeOfVar(ibVariableDO.getTypeDescription()).getValue();
+                    String declaredType = sourceDataTypes.get(
+                        sanitizeVariableName(buildVariableName(reference)).toLowerCase(Locale.ROOT));
+                    if (reference.getVarInfoId() != null && reference.getVarInfoId().startsWith(GLOBALS_FOLDER + ".")
+                            && reference.getType() != null) {
                         GlobalVariable global = mapStorage.getGlobalVariableMap().get(sanitizeVariableName(buildVariableName(reference)));
-                        sourceType = global != null ? global.getDataType() : reference.getType();
+                        sourceType = getDatatypeOfVar(global != null ? global.getDataType() : reference.getType()).getValue();
+                    } else if (declaredType != null && !SignatureTerm.DataTypeEnum.ANY.getValue().equals(declaredType)) {
+                        sourceType = declaredType;
                     }
-                    signature.setDataType(mapStorage.getCalculatedVariableDataTypeMap().getOrDefault(
-                        reference.getVarInfoId(), getDatatypeOfVar(sourceType).getValue()));
+                    signature.setDataType(reference.getVarInfoId() == null ? sourceType
+                        : mapStorage.getCalculatedVariableDataTypeMap().getOrDefault(reference.getVarInfoId(), sourceType));
                     signature.setName(value);
                     signature.setDirection(INPUT_DIRECTION);
 
@@ -698,6 +950,15 @@ public class CommonProcessing {
             else {
                 value = "'" + ibVariableDO.getValue().getStringValue() + "'";
             }
+        }
+        if (value.isEmpty()) {
+            // No value in RTDM (an unset parameter): pass it as missing rather than emitting "x = ". A data grid
+            // cannot be assigned a missing value, so it is simply left unassigned.
+            SignatureTerm.DataTypeEnum dataType = getDatatypeOfVar(ibVariableDO.getTypeDescription());
+            if (SignatureTerm.DataTypeEnum.DATAGRID.equals(dataType)) {
+                return;
+            }
+            value = SignatureTerm.DataTypeEnum.STRING.equals(dataType) ? "''" : ".";
         }
         action.setExpression(sanitizeAndReduceVariableName(ibVariableDO.getName()) + " = " + value);
         actionList.add(action);
@@ -814,19 +1075,6 @@ public class CommonProcessing {
         checkSignatureTermForDuplicate(direction, decision, signatureItem);
     }
 
-    public void addNewSignatureItemForDataGridExtension(IBVariableDO ibVariableDO, String direction, Decision decision) {
-        SignatureTerm signatureItem = new SignatureTerm();
-        signatureItem.setDataType(getDatatypeOfVar(ibVariableDO.getTypeDescription()));
-        if (SignatureTerm.DataTypeEnum.DATAGRID.equals(signatureItem.getDataType())) {
-            signatureItem.setDataGridExtension(new ArrayList<>());
-        }
-        signatureItem.setName(sanitizeVariableName(changeVariableNameToFormat(ibVariableDO.getName())));
-        boolean conflictingType = decision.getSignature().stream().anyMatch(term ->
-            signatureItem.getName().equalsIgnoreCase(term.getName()) && !signatureItem.getDataType().equals(term.getDataType()));
-        if (!conflictingType) {
-            checkSignatureTermForDuplicate(direction, decision, signatureItem);
-        }
-    }
 
     public void addNewSignatureItem(IBVariableDO ibVariableDO, String direction, Decision decision, String varInfoSource) {
         SignatureTerm signatureItem = new SignatureTerm();
@@ -839,6 +1087,14 @@ public class CommonProcessing {
         checkSignatureTermForDuplicate(direction, decision, signatureItem);
     }
 
+    /**
+     * The Decision term a Start request variable is declared as (see Converter.createDecision), e.g. {@code RequestX}.
+     * A parent's sub-decision step maps the child's inputs under these names.
+     */
+    public String requestTermName(String rtdmName) {
+        return sanitizeVariableName(changeVariableNameToFormat(SOURCE_EVENT + "." + rtdmName));
+    }
+
     public void addNewSignatureItem(VarRef varRef, String direction, Decision decision) {
         addNewSignatureItem(varRef, direction, decision, varRef.getType());
     }
@@ -846,7 +1102,8 @@ public class CommonProcessing {
     public void addNewSignatureItem(VarRef varRef, String direction, Decision decision, String varType) {
         SignatureTerm signatureItem = new SignatureTerm();
 
-        signatureItem.setDataType(getDatatypeOfVar(varType));
+        String producerType = nodeOutputDataType(varRef.getVarInfoId());
+        signatureItem.setDataType(getDatatypeOfVar(producerType != null ? producerType : varType));
         if (SignatureTerm.DataTypeEnum.DATAGRID.equals(signatureItem.getDataType())) {
             signatureItem.setDataGridExtension(new ArrayList<>());
         }
@@ -873,25 +1130,26 @@ public class CommonProcessing {
     }
 
     private String makeNameValid(String name) {
+        // Signature items only allow alphanumeric and underscore. Strip invalid characters first so the reserved-word
+        // and leading-digit checks see the final name (e.g. "Date " must not become the reserved word "Date").
+        // Names that were already valid produce exactly the same result as before.
+        name = name.replaceAll("[^a-zA-Z0-9_]", EMPTY_STRING);
+
+        if (name.isEmpty()) {
+            return SAFE_EMPTY_NAME;
+        }
+
         if (isReservedWord(name)) {
             // Some reserved words start with an underscore so to avoid confusion prefix with a letter
             name = "r" + UNDERSCORE + name;
         }
 
-        // Check if the string starts with a numeric character
-        boolean startsWithNumeric = Character.isDigit(name.charAt(0));
-
         // If it starts with a numeric character, prefix with an underscore
-        if (startsWithNumeric) {
+        if (Character.isDigit(name.charAt(0))) {
             name = UNDERSCORE + name;
         }
 
-        if (name.matches("(?i)[a-z][a-z0-9_]*")) {
-            return name;
-        } else {
-            // signature item only allows alphanumeric and underscore
-            return name.replaceAll("[^a-zA-Z0-9_]", EMPTY_STRING);
-        }
+        return name;
     }
 
     private boolean isReservedWord(String value) {
@@ -916,8 +1174,15 @@ public class CommonProcessing {
         mapping.setStepTermName(sanitizeAndReduceVariableName(termName));
         if (ibVariableDO.getValue() != null && ibVariableDO.getValue().getValueTypeVarInfoDO() != null) {
             if (!isReplyVar) {
-                if (!RTDM2IDConstants.SOURCE_GLOBAL.equals(ibVariableDO.getValue().getValueTypeVarInfoDO().getVarInfoSource())){
-                    mapping.setTargetDecisionTermName(sanitizeVariableName(changeVariableNameToFormat(buildVariableName(ibVariableDO.getValue().getValueTypeVarInfoDO()))));
+                ValueTypeVarInfoDO reference = ibVariableDO.getValue().getValueTypeVarInfoDO();
+                if (!RTDM2IDConstants.SOURCE_GLOBAL.equals(reference.getVarInfoSource())){
+                    mapping.setTargetDecisionTermName(sanitizeVariableName(changeVariableNameToFormat(buildVariableName(reference))));
+                } else {
+                    // Read the global itself: checkForGlobalVariable (via addDataPickerSignatureItems below) declares it
+                    // as Global<name>, which ID populates from the Viya global variable
+                    String globalName = sourceQualifiedName(reference.getVarInfoId());
+                    mapping.setTargetDecisionTermName(sanitizeVariableName(globalName != null ? globalName
+                        : SOURCE_GLOBAL + "." + reference.getVarName()));
                 }
                 // If the value is a variable assignment like a RTDM global variable or identifier, etc. then we
                 // need to create a signature item for it.
@@ -941,25 +1206,6 @@ public class CommonProcessing {
         checkMappingForDuplicate(mapping, step);
     }
 
-    public void addOutputMappingForProcess(IBVariableDO ibVariableDO, String direction, Step step, boolean isReplyVar, Decision decision, String processName) {
-        Mapping mapping = new Mapping();
-        mapping.setDirection(Mapping.DirectionEnum.fromValue(direction));
-
-        // The target variable name in the Decision should be uniquely qualified with the source, process name and variable name
-        String targetDecisionTermName = RTDM2IDConstants.SOURCE_PROCESS + processName + sanitizeVariableName(ibVariableDO.getName());
-
-        mapping.setTargetDecisionTermName(changeVariableNameToFormat(targetDecisionTermName));
-        mapping.setStepTermName(sanitizeAndReduceVariableName(ibVariableDO.getName()));
-        checkMappingForDuplicate(mapping, step);
-
-        if (ibVariableDO.getTypeDescription() != null) {
-            SignatureTerm signatureItem = new SignatureTerm();
-            signatureItem.setName(mapping.getTargetDecisionTermName());
-            signatureItem.setDataType(getDatatypeOfVar(ibVariableDO.getTypeDescription()));
-            checkSignatureTermForDuplicate(NONE_DIRECTION, decision, signatureItem);
-        }
-    }
-
     public void addMapping(String targetDecisionTermName, String stepTermName, Step step, boolean isRuleSet) {
         Mapping mapping = new Mapping();
         String targetDecisionTermNameChanged = sanitizeVariableName(changeVariableNameToFormat(targetDecisionTermName));
@@ -967,7 +1213,8 @@ public class CommonProcessing {
         mapping.setDirection(Mapping.DirectionEnum.INPUT);
         mapping.setStepTermName(sanitizeAndReduceVariableName(stepTermName));
         if (isRuleSet) {
-            mapping.setStepTermName(targetDecisionTermNameChanged);
+            // RuleSet terms are reduced to at most 32 characters, so the mapping must use the reduced name too
+            mapping.setStepTermName(sanitizeAndReduceVariableName(targetDecisionTermNameChanged));
         }
         checkMappingForDuplicate(mapping, step);
     }
@@ -979,6 +1226,30 @@ public class CommonProcessing {
                 || WEB_SERVICE_CONSTANT.equals(processTypeDescription)
                 || MODEL_CONSTANT.equals(processTypeDescription)
                 ;
+    }
+
+    /**
+     * Whether a process input is assigned in the node's {@code _input_values} RuleSet. Data grid and list inputs (lists
+     * are one-column data grids) are read by the code file step straight from their source (see ProcessNodeConverter),
+     * so the RuleSet has nothing to assign for them; a grid term declared there would also be left unmapped, which ID
+     * rejects ("Mapping ... is invalid"). The exception is a calculated data item, whose value is passed through the
+     * RuleSet.
+     */
+    public static boolean isAssignedInInputValues(ProcessNodeDataDO.Process.InputVariableList.IBVariableDO input) {
+        String type = input.getTypeDescription();
+        boolean grid = type != null && (type.contains("list") || DATAGRID_CONSTANT.equalsIgnoreCase(type)
+            || DATAGRID_CONSTANT_SID.equalsIgnoreCase(type));
+        if (!grid) {
+            return true;
+        }
+        ValueTypeVarInfoDO reference = input.getValue() == null ? null : input.getValue().getValueTypeVarInfoDO();
+        return reference != null && reference.getVarInfoId() != null
+            && reference.getVarInfoId().startsWith(CALCULATED_DATA_ITEMS_FOLDER + ".");
+    }
+
+    public static boolean hasInputValuesRuleSet(ProcessNodeDataDO.Process process) {
+        return process.getInputVariableList() != null
+            && process.getInputVariableList().getIbVariableDOs().stream().anyMatch(CommonProcessing::isAssignedInInputValues);
     }
 
     public boolean isProcessDataProcess(String processTypeDescription) {
@@ -1044,12 +1315,10 @@ public class CommonProcessing {
 
         if (mapStorage.isUseCrossBranchLinks()) {
             if (mapStorage.getNodeIdLinkLabelMap().get(nodeId)==null) {
-                // Find out how many input nodes this RTDM node has. This is different than the comments above. What we're checking
-                // here is if the RTDM node has multiple input nodes. If it does then we need to utilize cross-branch link steps
-                // otherwise the migration tool will create duplicate paths in the Decision (one for each input node).
-                List<String> nodes = Arrays.asList(treeUtil.getNodeIdInputNodesMap().get(nodeId).split(REGEXP));
-            
-                if (nodes.size() > 1) {
+                // Find out how many upstream paths lead into this RTDM node (counting through cells, which can merge paths
+                // without steps of their own). If there are several then we need to utilize cross-branch link steps
+                // otherwise the migration tool will create duplicate paths in the Decision (one for each input path).
+                if (treeUtil.upstreamPathCount(nodeId) > 1) {
                     // Multiple inputs nodes so this node requires a linkLabel
                     String linkLabel = UUID.randomUUID().toString();
                     step.setLinkLabel(linkLabel);
@@ -1095,7 +1364,11 @@ public class CommonProcessing {
     }
 
     public String makeCalculatedDataItemRuleSetName(CalculatedItemDO calculatedItemDO) {
-        return makeNameValid(calculatedItemDO.getName() + "_" + calculatedItemDO.getNodeId());
+        return makeCalculatedDataItemRuleSetName(calculatedItemDO.getName(), calculatedItemDO.getNodeId());
+    }
+
+    public String makeCalculatedDataItemRuleSetName(String calculatedItemName, String calculatedItemNodeId) {
+        return makeNameValid(calculatedItemName + "_" + calculatedItemNodeId);
     }
 
     public String makeReplyNodeRuleSetName(ReplyNodeDataDO replyNodeDataDO) {
@@ -1179,8 +1452,9 @@ public class CommonProcessing {
     private void addRulesetForCalculatedItem(CalculatedItemDO calculatedItemDO, Map<String, String> requestDataTypes) {
         try {
             String ruleSetName = makeCalculatedDataItemRuleSetName(calculatedItemDO);
-
-
+            if (calculatedItemDO.getName() != null) {
+                calculatedItemsByName.putIfAbsent(calculatedItemDO.getName(), calculatedItemDO);
+            }
 
             String expression = calculatedItemDO.getExpression();
             findOrAddRuleSet(ruleSetName, calculatedItemDO.getDescription());
@@ -1190,6 +1464,14 @@ public class CommonProcessing {
             mapStorage.getCalculatedVariableMap().put(calculatedItemDO.getName(), calculatedItemDO.getNodeId());
             Rule rule = new Rule();
             Step step = mapStorage.getRuleSetStepMap().get(ruleSetName);
+            if (step == null || step.getRuleSet() == null) {
+                // findOrAddRuleSet logs and swallows lookup/creation failures; say clearly what that means here.
+                mapStorage.getCalculatedVariableDataTypeMap().put(CALCULATED_DATA_ITEMS_FOLDER + "." + calculatedItemDO.getName(),
+                    getCalculatedItemDataType(calculatedItemDO.getCalculatedItemType()));
+                log.error("RuleSet {} for calculated data item '{}' could not be found or created; "
+                    + "the item will not be computed in the migrated Decision", ruleSetName, calculatedItemDO.getName());
+                return;
+            }
             RuleSetStep ruleSetForUpdate = step.getRuleSet();
             List<Signature> signatureList = new ArrayList<>();
             List<Action> actionList = new ArrayList<>();
@@ -1230,8 +1512,10 @@ public class CommonProcessing {
             varsInExpresion.forEach((item, targetName)->{
                 Signature _signature = new Signature();
                 _signature.setName(sanitizeAndReduceVariableName(changeVariableNameToFormat(item)));
-                _signature.setDataType(requestDataTypes.getOrDefault(
-                    sanitizeVariableName(targetName).toLowerCase(Locale.ROOT), "any"));
+                String targetKey = sanitizeVariableName(targetName).toLowerCase(Locale.ROOT);
+                // Upstream process/subdiagram outputs are typed by their producer (see registerNodeOutputType)
+                _signature.setDataType(requestDataTypes.getOrDefault(targetKey,
+                    mapStorage.getNodeOutputDataTypes().getOrDefault(targetKey, "any")));
                 _signature.setDirection(INPUT_DIRECTION);
                 checkSignatureTermForDuplicate(INPUT_DIRECTION, signatureList, _signature);
                 Mapping inputMapping = new Mapping();
@@ -1243,12 +1527,13 @@ public class CommonProcessing {
             ruleSet.setSignature(signatureList);
             ruleSet.setDescription(calculatedItemDO.getDescription());
             
-            if (!(mapStorage.getRuleSetIsActionUpdated().get(ruleSetForUpdate.getName()) && mapStorage.getRuleSetIsUpdated().get(ruleSetForUpdate.getName()))) {
+            if (!(Boolean.TRUE.equals(mapStorage.getRuleSetIsActionUpdated().get(ruleSetForUpdate.getName()))
+                    && Boolean.TRUE.equals(mapStorage.getRuleSetIsUpdated().get(ruleSetForUpdate.getName())))) {
                 callPutRuleSet(ruleSetForUpdate, ruleSet);
                 addActionToRuleSet(ruleSetForUpdate, rule);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            log.error("Could not prepare the RuleSet for calculated data item '{}'", calculatedItemDO.getName(), e);
         }
     }
 
@@ -1260,6 +1545,7 @@ public class CommonProcessing {
                 break;
             case DECIMAL_CONSTANT:
             case DATE_CONSTANT:
+            case DATETIME_CONSTANT:
             case DATAGRID_CONSTANT_SID:
             case BOOLEAN_CONSTANT:
                 missingValue = ".";
@@ -1271,7 +1557,18 @@ public class CommonProcessing {
         return missingValue;
     }
 
+    private static final String HASHED_TERM_PREFIX = "h";
+
     private String transferInSIDFormat(String expression, Map<String, String> variableTargets) {
+        return transferInSIDFormat(expression, variableTargets, Collections.emptyMap());
+    }
+
+    /**
+     * @param calculatedTerms calculated items computed by the same RuleSet -> the term they are assigned to, which
+     *                        references to them must use
+     */
+    private String transferInSIDFormat(String expression, Map<String, String> variableTargets,
+            Map<String, String> calculatedTerms) {
         String pattern = "<<(.*?)\\.(.*?)>>";
         Pattern regex = Pattern.compile(pattern);
         Matcher matcher = regex.matcher(expression);
@@ -1295,29 +1592,33 @@ public class CommonProcessing {
                 //
                 // ID cannot contain ruleset term names > 32 character so use hash codes to reduce the variable name length.
                 if (mapStorage.getCustomObjectStepHashMap()!=null && !mapStorage.getCustomObjectStepHashMap().isEmpty()) {
-                    Iterator<Map.Entry<Short, CustomObjectStep>> it = mapStorage.getCustomObjectStepHashMap().entrySet().iterator();
-                    while (it.hasNext()) {
-                        // Iterate the custom object step map to find the node name used in the calculated variable expression
-                        Map.Entry<Short, CustomObjectStep> customObjectStep = it.next();
-                        CustomObjectStep customStepValue = customObjectStep.getValue();
-                        if (matchedVar.startsWith(customStepValue.getName())) {
-                            String stepName = customStepValue.getName();
-                            int idx = matchedVar.indexOf(stepName);
-                            if (idx > -1) {
-                                // Hash step name to reduce length
-                                String termName = matchedVar.substring(stepName.length());
-                                matchedVar = stepName.hashCode() + "_" + termName;
-                                if (matchedVar.length() > 32) {
-                                    // It's possible the name is still too long so hash the variable name
-                                    matchedVar = stepName.hashCode() + "_" + termName.hashCode();
-                                }
-                            }
+                    // Find the custom object step (node) name used in the calculated variable expression. The longest
+                    // matching name wins so the result does not depend on HashMap iteration order.
+                    String stepName = null;
+                    for (CustomObjectStep customStepValue : mapStorage.getCustomObjectStepHashMap().values()) {
+                        String candidate = customStepValue == null ? null : customStepValue.getName();
+                        if (candidate != null && !candidate.isEmpty() && matchedVar.startsWith(candidate)
+                                && (stepName == null || candidate.length() > stepName.length())) {
+                            stepName = candidate;
+                        }
+                    }
+                    if (stepName != null) {
+                        // Hash step name to reduce length (unsigned so a negative hash cannot leave a leading '-'). The
+                        // 'h' prefix makes the term start with a letter: a leading digit would otherwise be turned into
+                        // a leading '_' by makeNameValid, which ID rejected ("Mapping _3066298432_... is invalid").
+                        String termName = matchedVar.substring(stepName.length());
+                        matchedVar = HASHED_TERM_PREFIX + Integer.toUnsignedString(stepName.hashCode()) + "_" + termName;
+                        if (matchedVar.length() > 32) {
+                            // It's possible the name is still too long so hash the variable name
+                            matchedVar = HASHED_TERM_PREFIX + Integer.toUnsignedString(stepName.hashCode()) + "_"
+                                + Integer.toUnsignedString(termName.hashCode());
                         }
                     }
                 }
             }
 
-            String modifiedVar  = changeVariableNameToFormat(matchedVar); 
+            // Use the same (reduced) name in the expression as in the RuleSet signature
+            String modifiedVar = sanitizeAndReduceVariableName(changeVariableNameToFormat(matchedVar));
             String targetName = modifiedVar;
             switch (source) {
                 case "inputVariables":
@@ -1326,18 +1627,57 @@ public class CommonProcessing {
                     break;
                 case CALCULATED_DATA_ITEMS_FOLDER:
                     targetName = SOURCE_CALCULATED_DATA_ITEM + "." + referencedName;
+                    modifiedVar = calculatedTerms.getOrDefault(referencedName, modifiedVar);
                     break;
                 case GLOBALS_FOLDER:
                     targetName = SOURCE_GLOBAL + "." + referencedName;
                     break;
+                case IDENTIFIERS_FOLDER:
+                    targetName = Objects.requireNonNullElse(nodeOutputReference(source + "." + referencedName),
+                        SOURCE_IDENTIFIER + "." + referencedName);
+                    break;
                 default:
+                    // An upstream process/subdiagram output, read under the name its producer writes
+                    String nodeOutput = nodeOutputReference(source + "." + referencedName);
+                    if (nodeOutput != null) {
+                        targetName = nodeOutput;
+                    }
                     break;
             }
+            modifiedVar = uniqueExpressionTerm(modifiedVar, targetName, variableTargets);
             variableTargets.put(modifiedVar, targetName);
-            matcher.appendReplacement(outputBuffer, modifiedVar);
+            matcher.appendReplacement(outputBuffer, Matcher.quoteReplacement(modifiedVar));
         }
         matcher.appendTail(outputBuffer);
         return outputBuffer.toString();
+    }
+
+    /**
+     * Returns the RuleSet term used for a reference inside a calculated expression. The bare variable name is kept
+     * (as before) unless another source with the same name was already referenced in the expression, e.g.
+     * {@code <<events.Amt>> - <<globals.Amt>>}; then the source-qualified name keeps the two inputs distinct.
+     */
+    private String uniqueExpressionTerm(String term, String targetName, Map<String, String> variableTargets) {
+        String candidate = term;
+        int suffix = 1;
+        while (true) {
+            String existingKey = null;
+            for (String key : variableTargets.keySet()) {
+                if (key.equalsIgnoreCase(candidate)) {
+                    existingKey = key;
+                    break;
+                }
+            }
+            if (existingKey == null) {
+                return candidate;
+            }
+            if (sanitizeVariableName(variableTargets.get(existingKey)).equalsIgnoreCase(sanitizeVariableName(targetName))) {
+                return existingKey;
+            }
+            candidate = suffix == 1 ? sanitizeAndReduceVariableName(targetName)
+                : sanitizeAndReduceVariableName(targetName + UNDERSCORE + suffix);
+            suffix++;
+        }
     }
 
     public String getCalculatedItemDataType(String type){
@@ -1351,6 +1691,9 @@ public class CommonProcessing {
                 dataType = DECIMAL_CONSTANT;
                 break;
             case CALCULATED_DATA_TYPE_TIMESTAMP:
+                // A timestamp holds date and time, like RTDM date variables (see getDatatypeOfVar)
+                dataType = DATETIME_CONSTANT;
+                break;
             case CALCULATED_DATA_TYPE_DATE:
                 dataType = DATE_CONSTANT;
                 break;
@@ -1378,7 +1721,8 @@ public class CommonProcessing {
             // _00_scoreValueWith3_852147483647
 
             // Generate hash code of variable name
-            String hashCodeValue = String.valueOf(Math.abs(reducedVariableName.hashCode()));
+            // (widened to long so Integer.MIN_VALUE does not stay negative and leave a '-' in the name)
+            String hashCodeValue = String.valueOf(Math.abs((long) reducedVariableName.hashCode()));
 
             // Subtract hash code length from 32 and substring remaining characters from variable name
             String amountOfCharactersToExtract = reducedVariableName.substring(0, 32 - hashCodeValue.length());
@@ -1392,7 +1736,17 @@ public class CommonProcessing {
     }
 
     public void processAssignmentVariables(Step step, Decision decision, RuleSet ruleSet, RuleSetStep ruleSetForUpdate,List<com.sas.rtdm2id.model.rtdm.extension.IBVariableDO> ibVariableDOs) {
+        postAssignmentRules(ruleSetForUpdate, buildAssignmentRules(step, decision, ruleSet, ibVariableDOs));
+    }
+
+    /**
+     * Builds one rule per assignment, adds the step mappings and Decision signature terms, and sets the RuleSet
+     * signature on {@code ruleSet} — without writing anything to Viya, so callers can PUT the signature before the
+     * rules that reference it are posted.
+     */
+    public List<Rule> buildAssignmentRules(Step step, Decision decision, RuleSet ruleSet, List<com.sas.rtdm2id.model.rtdm.extension.IBVariableDO> ibVariableDOs) {
         List<Signature> signatureList = new ArrayList<>();
+        List<Rule> rules = new ArrayList<>();
         IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
 
         for (com.sas.rtdm2id.model.rtdm.extension.IBVariableDO ibVariableDO : ibVariableDOs) {
@@ -1429,11 +1783,22 @@ public class CommonProcessing {
             rule.setName(UUID.randomUUID().toString());
             rule.setConditional("if");
             rule.setRuleFiredTrackingEnabled(false);
-            addActionToRuleSet(ruleSetForUpdate, rule);
-
+            rules.add(rule);
         }
 
         ruleSet.setSignature(signatureList);
+        return rules;
+    }
+
+    /** Posts assignment rules unless the RuleSet is reused and therefore already has them. */
+    public void postAssignmentRules(RuleSetStep ruleSetForUpdate, List<Rule> rules) {
+        // Decided once, before any rule is posted (each successful post marks the RuleSet as action-updated): a reused
+        // RuleSet already has its rules, so posting them again would append duplicates on every re-run.
+        if (ruleSetForUpdate == null
+                || Boolean.TRUE.equals(mapStorage.getRuleSetIsActionUpdated().get(ruleSetForUpdate.getName()))) {
+            return;
+        }
+        rules.forEach(rule -> addActionToRuleSet(ruleSetForUpdate, rule));
     }
 
     private void processEventVars(Decision decision, IBVariableDO ibVariableDO, String direction, ProcessNodeDataDO.Process.InputVariableList.IBVariableDO.Value value) {
@@ -1450,9 +1815,14 @@ public class CommonProcessing {
     }
 
     private String buildVariableName(ValueTypeVarInfoDO valueTypeVarInfoDO) {
+        // Upstream node outputs and identifiers: the term their producer writes (see registerNodeOutputs)
+        String registered = nodeOutputReference(valueTypeVarInfoDO.getVarInfoId());
+        if (registered != null) {
+            return registered;
+        }
         String variableName = null;
 
-        switch (valueTypeVarInfoDO.getVarInfoSource()) {
+        switch (Objects.requireNonNullElse(valueTypeVarInfoDO.getVarInfoSource(), EMPTY_STRING)) {
             case SOURCE_NODE:
                 // Upstream Nodes folder (return Node Name + "." + Output Variable Name)
                 // Example: Read Database.AGE
@@ -1591,17 +1961,253 @@ public class CommonProcessing {
     }
 
     private String buildVariableName(VarRef varRef) {
-        // Use display value if available otherwise fallback to varInfoId
-        String variableName = mapStorage.getVarInfoIdToVariableNameMap().get(varRef.getVarInfoId());
-        if (variableName==null) variableName = varRef.getVarInfoId();
-        return variableName;
+        return variableNameFor(varRef.getVarInfoId());
     }
 
     public String buildVariableName(VarRefDO varRefDO) {
-        // Use display value if available otherwise fallback to varInfoId
-        String variableName = mapStorage.getVarInfoIdToVariableNameMap().get(varRefDO.getVarInfoId());
-        if (variableName==null) variableName = varRefDO.getVarInfoId();
+        return variableNameFor(varRefDO.getVarInfoId());
+    }
+
+    private String variableNameFor(String varInfoId) {
+        // Request, global, calculated and identifier items are named after their source, exactly as the Decision
+        // signature declares them; process/subdiagram outputs by the name their producer writes; otherwise use the
+        // display value recorded for the id if available, else the id itself.
+        String variableName = nodeOutputReference(varInfoId);
+        if (variableName == null) variableName = sourceQualifiedName(varInfoId);
+        if (variableName == null) variableName = mapStorage.getVarInfoIdToVariableNameMap().get(varInfoId);
+        if (variableName == null) variableName = varInfoId;
         return variableName;
+    }
+
+    /**
+     * Records, for every process and subdiagram output in the extract, the name it is written under in the Decision.
+     * RTDM refers to an output as {@code <NodeName>.<ProcessName><var>} (subdiagrams: {@code <NodeName>.<var>}). An
+     * output linked to an identifier is written to that identifier ({@code Identifier.<name>}), because in RTDM the
+     * value lives there and later nodes read it from there; any other output is written under its qualified id.
+     * Producers ({@link #addProducedOutput}) and readers ({@link #nodeOutputReference}) both resolve names here.
+     */
+    public void registerNodeOutputs(Batch batch) {
+        Map<String, String> outputs = mapStorage.getNodeOutputReferences();
+        outputs.clear();
+        mapStorage.getNodeOutputDataTypes().clear();
+        if (batch == null || batch.getLogicalUnit() == null) {
+            return;
+        }
+        // An identifier fed by a Start request variable lives in that request variable's term: the caller supplies the
+        // initial value and processes linked to the identifier overwrite it, as RTDM does. Other identifiers have their
+        // own Identifier.<name> term. Readers of identifiers.<name> resolve through the same entries.
+        for (StartNodeDataDO.Event.RequestVars.IBVariableDO variable : startRequestVariables(batch.getLogicalUnit().getStartNodeDataDO())) {
+            String identifier = variable.getIdentifier() == null ? null : variable.getIdentifier().getName();
+            String name = variable.getName() != null && !variable.getName().isEmpty() ? variable.getName() : variable.getPhysicalName();
+            if (identifier != null && !identifier.isBlank() && name != null) {
+                outputs.putIfAbsent(IDENTIFIERS_FOLDER + "." + identifier, SOURCE_EVENT + "." + name);
+            }
+        }
+        for (ProcessNodeDataDO node : batch.getLogicalUnit().getProcessNodeDataDOs()) {
+            ProcessNodeDataDO.Process process = node.getProcess();
+            if (process == null || process.getOutputVariableList() == null) {
+                continue;
+            }
+            // The columns of a data process's returned grid are lists in RTDM but are extracted as scalars (see the
+            // _extract_values RuleSet), so they are typed by their element type; other list outputs are data grids
+            boolean gridColumns = !isProcessNotDataProcess(process.getProcessTypeDescription())
+                && Boolean.parseBoolean(process.getReturnDatagridFlag());
+            String prefix = outputReferencePrefix(process);
+            process.getOutputVariableList().getIbVariableDOs().forEach(output -> {
+                registerNodeOutput(outputs, node.getNodeName(), prefix, output);
+                registerNodeOutputType(nodeOutputId(node.getNodeName(), prefix, output.getName()),
+                    output.getTypeDescription(), !gridColumns);
+            });
+            // A data process returning a data grid: the grid is referenced as <NodeName>.<ProcessName><DatagridName>
+            // and may be copied to an identifier (DatagridIdentifier)
+            if (Boolean.parseBoolean(process.getReturnDatagridFlag()) && process.getDatagridName() != null
+                    && !process.getDatagridName().isBlank()) {
+                String identifier = process.getDatagridIdentifier() == null ? null : process.getDatagridIdentifier().getName();
+                String gridId = nodeOutputId(node.getNodeName(), process.getName(), process.getDatagridName());
+                registerNodeOutput(outputs, gridId, identifier);
+                registerNodeOutputType(gridId, DATAGRID_CONSTANT, true);
+            }
+        }
+        for (SubDiagramNodeDataDO node : batch.getLogicalUnit().getSubDiagramNodeDataDOs()) {
+            if (node.getSubdiagramEvent() != null && node.getSubdiagramEvent().getReplyVars() != null) {
+                node.getSubdiagramEvent().getReplyVars().getIbVariableDOs().forEach(output -> {
+                    registerNodeOutput(outputs, node.getNodeName(), null, output);
+                    registerNodeOutputType(nodeOutputId(node.getNodeName(), null, output.getName()),
+                        output.getTypeDescription(), true);
+                });
+            }
+        }
+        // Assignment nodes write a term named after the variable, which is also how calculated expressions read it
+        // (<<Node Name.Variable>>)
+        for (AssignmentNodeDataDO node : batch.getLogicalUnit().getAssignmentNodeDataDOs()) {
+            if (node.getAssignments() == null || node.getAssignments().getIbVariableDOs() == null) {
+                continue;
+            }
+            for (com.sas.rtdm2id.model.rtdm.extension.IBVariableDO variable : node.getAssignments().getIbVariableDOs()) {
+                SignatureTerm.DataTypeEnum type = getDatatypeOfVar(variable.getTypeDescription());
+                if (variable.getName() != null && !SignatureTerm.DataTypeEnum.ANY.equals(type)) {
+                    mapStorage.getNodeOutputDataTypes().putIfAbsent(
+                        sanitizeVariableName(changeVariableNameToFormat(variable.getName())).toLowerCase(Locale.ROOT),
+                        type.getValue());
+                }
+            }
+        }
+    }
+
+    /**
+     * Records the ID data type of the term an output is written under, so terms that read it before its producer is
+     * converted (e.g. calculated item RuleSets, built first) are declared with the producer's type rather than "any",
+     * which ID rejects when the term is mapped ("Mapped term ... has an invalid data type"). Lists are written as data
+     * grids when {@code listsAreGrids}. When several producers write the same term (an identifier) the first type is
+     * kept.
+     */
+    private void registerNodeOutputType(String outputId, String typeDescription, boolean listsAreGrids) {
+        if (outputId == null || typeDescription == null || nodeOutputReference(outputId) == null) {
+            return;
+        }
+        SignatureTerm.DataTypeEnum type = listsAreGrids && typeDescription.contains("list")
+            ? SignatureTerm.DataTypeEnum.DATAGRID : getDatatypeOfVar(typeDescription);
+        if (!SignatureTerm.DataTypeEnum.ANY.equals(type)) {
+            mapStorage.getNodeOutputDataTypes().putIfAbsent(nodeOutputTermName(outputId).toLowerCase(Locale.ROOT), type.getValue());
+        }
+    }
+
+    private static List<StartNodeDataDO.Event.RequestVars.IBVariableDO> startRequestVariables(StartNodeDataDO start) {
+        if (start == null) {
+            return List.of();
+        }
+        if (start.getEvent() != null && start.getEvent().getRequestVars() != null) {
+            return start.getEvent().getRequestVars().getIbVariableDOs();
+        }
+        if (start.getInputVariables() != null) {
+            return start.getInputVariables().getIbVariableDOs();
+        }
+        return List.of();
+    }
+
+    private static void registerNodeOutput(Map<String, String> outputs, String nodeName, String processName,
+            ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO output) {
+        if (output.getName() == null) {
+            return;
+        }
+        String identifier = output.getIdentifier() == null ? null : output.getIdentifier().getName();
+        registerNodeOutput(outputs, nodeOutputId(nodeName, processName, output.getName()), identifier);
+    }
+
+    private static void registerNodeOutput(Map<String, String> outputs, String id, String identifier) {
+        if (identifier == null || identifier.isBlank()) {
+            outputs.put(id, id);
+            return;
+        }
+        // Linked outputs write the identifier's term (a Start request variable's term when it feeds the identifier)
+        String identifierKey = IDENTIFIERS_FOLDER + "." + identifier;
+        outputs.putIfAbsent(identifierKey, SOURCE_IDENTIFIER + "." + identifier);
+        outputs.put(id, outputs.get(identifierKey));
+    }
+
+    /**
+     * The process name RTDM puts in front of a process output's name when other nodes refer to it, see
+     * {@link #nodeOutputId}. Outputs of a rules group are referred to without it ({@code <NodeName>.<var>}, every one of
+     * the 159 references in the customer extracts); those of other processes with it.
+     */
+    public static String outputReferencePrefix(ProcessNodeDataDO.Process process) {
+        return BUSINESS_RULES_CONSTANT.equals(process.getProcessTypeDescription()) ? null : process.getName();
+    }
+
+    /**
+     * RTDM's id for a node output: {@code <NodeName>.<ProcessName><var>}; subdiagram and rules group outputs have no
+     * process name.
+     */
+    public static String nodeOutputId(String nodeName, String processName, String variableName) {
+        return Objects.toString(nodeName, "") + "." + Objects.toString(processName, "") + variableName;
+    }
+
+    /** The (unsanitized) name a process/subdiagram output is written under, or null if the id is not one. */
+    public String nodeOutputReference(String varInfoId) {
+        return varInfoId == null ? null : mapStorage.getNodeOutputReferences().get(varInfoId);
+    }
+
+    /**
+     * Maps a process/subdiagram output to the Decision term it is written under (see {@link #registerNodeOutputs})
+     * and declares that term.
+     */
+    public void addProducedOutput(String outputId, String stepTermName, String typeDescription, Step step, Decision decision) {
+        addProducedOutput(outputId, stepTermName, getDatatypeOfVar(typeDescription), null, step, decision);
+    }
+
+    /**
+     * As {@link #addProducedOutput(String, String, String, Step, Decision)} for an explicit type; a data grid term is
+     * declared with its columns. Returns the Decision term name.
+     */
+    public String addProducedOutput(String outputId, String stepTermName, SignatureTerm.DataTypeEnum dataType,
+            List<SignatureTermExtension> gridColumns, Step step, Decision decision) {
+        String targetName = nodeOutputTermName(outputId);
+        Mapping mapping = new Mapping();
+        mapping.setDirection(Mapping.DirectionEnum.OUTPUT);
+        mapping.setStepTermName(sanitizeAndReduceVariableName(stepTermName));
+        mapping.setTargetDecisionTermName(targetName);
+        checkMappingForDuplicate(mapping, step);
+
+        SignatureTerm term = new SignatureTerm();
+        term.setName(targetName);
+        term.setDataType(dataType);
+        if (SignatureTerm.DataTypeEnum.DATAGRID.equals(dataType)) {
+            term.setDataGridExtension(gridColumns != null ? new ArrayList<>(gridColumns) : new ArrayList<>());
+        }
+        checkSignatureTermForDuplicate(NONE_DIRECTION, decision, term);
+        return targetName;
+    }
+
+    /**
+     * The ID data type its producer writes a process/subdiagram/assignment output under, or null when the reference is
+     * not a registered output. Readers use it over the type on their own variable reference: a reference without
+     * metadata (NoMetadata) can carry a default type (e.g. Numeric for a string output), which would declare the
+     * Decision term with a type the producer's mapping and the consuming RuleSets contradict.
+     */
+    public String nodeOutputDataType(String varInfoId) {
+        if (varInfoId == null || nodeOutputReference(varInfoId) == null) {
+            return null;
+        }
+        return mapStorage.getNodeOutputDataTypes().get(nodeOutputTermName(varInfoId).toLowerCase(Locale.ROOT));
+    }
+
+    /** The (sanitized) Decision term a process/subdiagram output is written under (see {@link #registerNodeOutputs}). */
+    public String nodeOutputTermName(String outputId) {
+        String reference = nodeOutputReference(outputId);
+        return sanitizeVariableName(changeVariableNameToFormat(reference != null ? reference : outputId));
+    }
+
+    /**
+     * The (unsanitized) name a variable reference is read under: a registered process/subdiagram output or identifier,
+     * else a request/global/calculated/identifier source name; null for anything else.
+     */
+    public String resolveReference(String varInfoId) {
+        String reference = nodeOutputReference(varInfoId);
+        return reference != null ? reference : sourceQualifiedName(varInfoId);
+    }
+
+    /**
+     * The source-qualified name the Decision signature uses for a request ({@code events.X} / {@code inputVariables.X}
+     * -> {@code Request.X}), global ({@code globals.X} -> {@code Global.X}) or calculated item
+     * ({@code calculatedDataItems.X} -> {@code CalculatedDataItem.X}) variable id; null for any other id. Callers
+     * sanitize the result (e.g. {@code RequestX}). Resolving these from the id alone keeps names independent of the
+     * order in which nodes are converted.
+     */
+    public static String sourceQualifiedName(String varInfoId) {
+        if (varInfoId == null || varInfoId.indexOf('.') <= 0) {
+            return null;
+        }
+        String folder = varInfoId.substring(0, varInfoId.indexOf('.'));
+        String name = varInfoId.substring(varInfoId.indexOf('.') + 1);
+        String source = switch (folder) {
+            case EVENTS_FOLDER, "inputVariables" -> SOURCE_EVENT;
+            case GLOBALS_FOLDER -> SOURCE_GLOBAL;
+            case CALCULATED_DATA_ITEMS_FOLDER -> SOURCE_CALCULATED_DATA_ITEM;
+            // Written by the process/subdiagram outputs linked to the identifier (see registerNodeOutputs)
+            case IDENTIFIERS_FOLDER -> SOURCE_IDENTIFIER;
+            default -> null;
+        };
+        return source == null || name.isEmpty() ? null : source + "." + name;
     }
 
     public List<String> getSubDiagramNodeNames(final Batch batch) {

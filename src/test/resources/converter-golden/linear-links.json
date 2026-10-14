@@ -1,0 +1,65 @@
+{
+  "name" : "characterization",
+  "description" : "campaign-id",
+  "flow" : {
+    "steps" : [ {
+      "type" : "application/vnd.sas.decision.step.custom.object",
+      "id" : "p1",
+      "mappings" : [ {
+        "stepTermName" : "out",
+        "direction" : "output",
+        "targetDecisionTermName" : "v_p1"
+      } ],
+      "name" : "p1"
+    }, {
+      "type" : "application/vnd.sas.decision.step.ruleset",
+      "id" : "pp2_input",
+      "mappings" : [ {
+        "stepTermName" : "out",
+        "direction" : "output",
+        "targetDecisionTermName" : "v_pp2_input"
+      } ],
+      "name" : "pp2_input"
+    }, {
+      "type" : "application/vnd.sas.decision.step.custom.object",
+      "id" : "pp2",
+      "mappings" : [ {
+        "stepTermName" : "out",
+        "direction" : "output",
+        "targetDecisionTermName" : "v_pp2"
+      } ],
+      "name" : "pp2"
+    }, {
+      "type" : "application/vnd.sas.decision.step.ruleset",
+      "id" : "r1",
+      "mappings" : [ {
+        "stepTermName" : "out",
+        "direction" : "output",
+        "targetDecisionTermName" : "v_r1"
+      } ],
+      "name" : "r1"
+    } ]
+  },
+  "signature" : [ {
+    "name" : "Treatments",
+    "dataType" : "dataGrid",
+    "direction" : "output",
+    "dataGridExtension" : [ ]
+  }, {
+    "name" : "v_p1",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_pp2_input",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_pp2",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_r1",
+    "dataType" : "unknown",
+    "direction" : "none"
+  } ]
+}

@@ -12,6 +12,7 @@ import java.io.Serializable;
 
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlType(name = "", propOrder = {
+        "listDelimiter",
         "listTypes",
         "text"
 })
@@ -21,6 +22,9 @@ public class Values implements Serializable {
 
     private final static long serialVersionUID = -1L;
 
+    // Separator between list entries, e.g. "," or ",!" (used when entries such as formatted dates contain commas)
+    @XmlAttribute(name = "ListDelimiter")
+    private String listDelimiter;
     @XmlAttribute(name = "ListTypes")
     private String listTypes;
     @XmlValue

@@ -57,22 +57,29 @@ public class CrossTableNodeConverter {
 
         public List<Step> addSegmentationTreeStep(CrossTableNodeDataDO source, Decision decision, Short objId,
             String nodeName) {
+        // No _input_values RuleSet is created for Cross-Table nodes (see CommonProcessing.createRuleSets)
         List<Step> stepList = new LinkedList<>();
         Step step = new Step();
         step.setType(Step.TypeEnum.CUSTOM_OBJECT);
-        Step inputValuesStep = mapStorage.getRuleSetStepMap().get(nodeName + "_input_values");
-        if (inputValuesStep != null) {
-            stepList.add(inputValuesStep);
-        }
+        String nodeId = source == null ? null : source.getNodeId();
 
         step.setCustomObject(mapStorage.getCustomObjectStepHashMap().get(objId));
         addSegmentationTreeMappings(decision, objId, step, source);
         List<SegmentationTree.SignatureTerm> signature = mapStorage.getSegmentationTreeSignatureMap().get(objId);
         if (signature.stream().anyMatch(term -> term.getDerivationExpression() != null)) {
-            stepList.add(createDerivedInputStep(signature, decision, nodeName));
+            addStep(stepList, createDerivedInputStep(signature, decision, nodeName), nodeId);
         }
-        stepList.add(step);
+        addStep(stepList, step, nodeId);
         return stepList;
+    }
+
+    private void addStep(List<Step> stepList, Step step, String nodeId) {
+        if (nodeId != null) {
+            // Registers a cross-branch link label on the first step when the node has more than one input node
+            commonProcessing.addStep(stepList, step, nodeId);
+        } else {
+            stepList.add(step);
+        }
     }
 
     private Step createDerivedInputStep(List<SegmentationTree.SignatureTerm> signature, Decision decision,

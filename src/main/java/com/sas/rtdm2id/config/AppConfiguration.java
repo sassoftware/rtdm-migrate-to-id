@@ -9,6 +9,7 @@ import org.apache.hc.client5.http.config.ConnectionConfig;
 import org.apache.hc.client5.http.impl.classic.HttpClients;
 import org.apache.hc.client5.http.impl.io.PoolingHttpClientConnectionManagerBuilder;
 import org.apache.hc.core5.util.Timeout;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory;
@@ -21,9 +22,11 @@ import java.util.Map;
 @Configuration
 public class AppConfiguration {
     @Bean
-    public HttpComponentsClientHttpRequestFactory viyaRequestFactory() {
+    public HttpComponentsClientHttpRequestFactory viyaRequestFactory(
+            @Value("${rtdm2id.http.connect-timeout:30s}") Duration connectTimeout,
+            @Value("${rtdm2id.http.read-timeout:10m}") Duration readTimeout) {
         ConnectionConfig connectionConfig = ConnectionConfig.custom()
-            .setConnectTimeout(Timeout.ofMilliseconds(1000000))
+            .setConnectTimeout(Timeout.of(connectTimeout))
             .build();
         HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory(
             HttpClients.custom().useSystemProperties()
@@ -32,7 +35,7 @@ public class AppConfiguration {
                     .setDefaultConnectionConfig(connectionConfig)
                     .build())
                 .build());
-        requestFactory.setReadTimeout(Duration.ofMillis(1000000));
+        requestFactory.setReadTimeout(readTimeout);
         return requestFactory;
     }
 

@@ -20,6 +20,8 @@ import com.sas.rtdm2id.model.rtdm.extension.SubdiagramEvent;
 import com.sas.rtdm2id.model.rtdm.extension.VarRef;
 import com.sas.rtdm2id.util.ViyaApi;
 import com.sas.rtdm2id.util.model.IBVariableDO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -27,8 +29,11 @@ import org.springframework.web.client.RestTemplate;
 
 import java.net.URISyntaxException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static com.sas.rtdm2id.util.model.RTDM2IDConstants.INPUT_DIRECTION;
@@ -38,6 +43,8 @@ import static com.sas.rtdm2id.util.model.RTDM2IDConstants.SOURCE_GLOBAL;
 
 @Component
 public class SubDiagramNodeConverter {
+    private static final Logger log = LoggerFactory.getLogger(SubDiagramNodeConverter.class);
+
     private final CommonProcessing commonProcessing;
     private final RestTemplate restTemplate;
     private final MapStorage mapStorage;
@@ -49,26 +56,55 @@ public class SubDiagramNodeConverter {
     }
 
     public void getSubdiagrams(Batch batch) {
-        try {
-            for (SubDiagramNodeDataDO subDiagramNodeDataDO : batch.getLogicalUnit().getSubDiagramNodeDataDOs()) {
-                CustomObjectStep codeStep = new CustomObjectStep();
-                DecisionCollection decisionCollection
-                        = getDecisionCollection(mapStorage.getBaseIp(), subDiagramNodeDataDO.getCampaignId(), mapStorage.getAccessToken(),mapStorage.getProtocol());
-                if (decisionCollection != null && decisionCollection.getCount() != 0) {
-                    Decision2 decisionCodeFile = decisionCollection.getItems().get(0);
-                    DecisionCollection decisionCollectionRevision
-                            = getDecisionCollectionRevision(mapStorage.getBaseIp(), decisionCodeFile.getId(), mapStorage.getAccessToken(), subDiagramNodeDataDO.getCampaignId(), mapStorage.getProtocol());
-                    assert decisionCollectionRevision != null;
-                    Decision2 decisionCodeFileRevision = decisionCollectionRevision.getItems().get(0);
-                    codeStep.setUri("/decisions/flows/" + decisionCodeFile.getId() + "/revisions/" + decisionCodeFileRevision.getId());
-                    codeStep.setName(decisionCodeFile.getName());
-                    codeStep.setType("decision");
-                    mapStorage.getCustomObjectStepHashMap().put(subDiagramNodeDataDO.getObjid(), codeStep);
-                }
+        // Resolve each subdiagram independently so one failure does not silently skip the remaining subdiagrams.
+        // A subdiagram step without a resolved Decision reference cannot run in ID, so any failure is reported
+        // (naming the subdiagram it belongs to) and fails the migration.
+        List<String> failures = new ArrayList<>();
+        for (SubDiagramNodeDataDO subDiagramNodeDataDO : batch.getLogicalUnit().getSubDiagramNodeDataDOs()) {
+            try {
+                resolveSubdiagram(subDiagramNodeDataDO);
+            } catch (Exception exception) {
+                log.error("Could not resolve subdiagram {}", describe(subDiagramNodeDataDO), exception);
+                failures.add(describe(subDiagramNodeDataDO) + ": " + exception.getMessage());
             }
-        } catch (Exception exception) {
-            exception.printStackTrace();
         }
+        if (!failures.isEmpty()) {
+            throw new IllegalStateException("Could not resolve the migrated Decision for subdiagram(s): "
+                    + String.join("; ", failures));
+        }
+    }
+
+    private void resolveSubdiagram(SubDiagramNodeDataDO subDiagramNodeDataDO) throws URISyntaxException {
+        String campaignId = subDiagramNodeDataDO.getCampaignId();
+        DecisionCollection decisionCollection
+                = getDecisionCollection(mapStorage.getBaseIp(), campaignId, mapStorage.getAccessToken(), mapStorage.getProtocol());
+        Decision2 decisionCodeFile = firstItem(decisionCollection);
+        if (decisionCodeFile == null) {
+            throw new IllegalStateException("no Decision found with description " + campaignId);
+        }
+        DecisionCollection decisionCollectionRevision
+                = getDecisionCollectionRevision(mapStorage.getBaseIp(), decisionCodeFile.getId(), mapStorage.getAccessToken(), campaignId, mapStorage.getProtocol());
+        Decision2 decisionCodeFileRevision = firstItem(decisionCollectionRevision);
+        if (decisionCodeFileRevision == null) {
+            throw new IllegalStateException("no revision found for Decision " + decisionCodeFile.getName()
+                    + " (" + decisionCodeFile.getId() + ")");
+        }
+        CustomObjectStep codeStep = new CustomObjectStep();
+        codeStep.setUri("/decisions/flows/" + decisionCodeFile.getId() + "/revisions/" + decisionCodeFileRevision.getId());
+        codeStep.setName(decisionCodeFile.getName());
+        codeStep.setType("decision");
+        mapStorage.getCustomObjectStepHashMap().put(subDiagramNodeDataDO.getObjid(), codeStep);
+    }
+
+    private static Decision2 firstItem(DecisionCollection decisionCollection) {
+        if (decisionCollection == null || decisionCollection.getItems() == null || decisionCollection.getItems().isEmpty()) {
+            return null;
+        }
+        return decisionCollection.getItems().get(0);
+    }
+
+    private static String describe(SubDiagramNodeDataDO subDiagramNodeDataDO) {
+        return "'" + subDiagramNodeDataDO.getNodeName() + "' (campaign " + subDiagramNodeDataDO.getCampaignId() + ")";
     }
 
     private DecisionCollection getDecisionCollection(String baseIp, String id, String accessToken, String protocol) throws URISyntaxException {
@@ -95,6 +131,9 @@ public class SubDiagramNodeConverter {
     }
 
     public List<Step> createSubDiagram(SubDiagramNodeDataDO subDiagramNodeDataDO, Decision decision) {
+        // Only the Decision signature side effects of this method are used by the Converter; the returned steps are
+        // replaced by addCustomObjectStep. The step is therefore added without commonProcessing.addStep, which would
+        // otherwise claim this node's cross-branch link label for a step that never reaches the Decision.
         List<Step> stepList = new ArrayList<>();
         Step step = new Step();
         step.setType(Step.TypeEnum.CUSTOM_OBJECT);
@@ -102,10 +141,9 @@ public class SubDiagramNodeConverter {
 
         IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
 
-        for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO
-                : subDiagramNodeDataDO.getSubdiagramEvent().getRequestVars().getIbVariableDOs()) {
+        for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO : requestVars(subDiagramNodeDataDO)) {
             IBVariableDO ibVariableDOInner = mapper.ibVariableDoGet(ibVariableDO);
-            
+
             if (ibVariableDOInner.getValue()!=null) {
                 ValueTypeVarInfoDO valueTypeVarInfoDO = ibVariableDOInner.getValue().getValueTypeVarInfoDO();
                 final String varInfoSource = valueTypeVarInfoDO != null ? valueTypeVarInfoDO.getVarInfoSource() : "";
@@ -117,13 +155,12 @@ public class SubDiagramNodeConverter {
                 commonProcessing.addNewSignatureItem(ibVariableDOInner, "none", decision, null);
             }
         }
-        for (ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO ibVariableDO
-                : subDiagramNodeDataDO.getSubdiagramEvent().getReplyVars().getIbVariableDOs()) {
+        for (ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO ibVariableDO : replyVars(subDiagramNodeDataDO)) {
             IBVariableDO ibVariableDOInner = mapper.ibVariableDoGet(ibVariableDO);
             commonProcessing.addMapping(ibVariableDOInner, OUTPUT_DIRECTION, step, false, decision);
             commonProcessing.addNewSignatureItem(ibVariableDOInner, "none", decision, null);
         }
-        commonProcessing.addStep(stepList, step, subDiagramNodeDataDO.getNodeId());
+        stepList.add(step);
         return stepList;
     }
 
@@ -139,9 +176,19 @@ public class SubDiagramNodeConverter {
         }
 
         SubdiagramEvent subdiagramEvent = subDiagramNodeDataDO.getSubdiagramEvent();
-        if (subdiagramEvent.getRequestVars()!=null) {
+        if (subdiagramEvent != null && subdiagramEvent.getRequestVars()!=null) {
             processCustomObjectInputMapping(subDiagramNodeDataDO, decision, stepList, step);
-            updateRuleSet(subdiagramEvent.getRequestVars(), inputValuesStep, decision);
+            useChildRequestTermNames(subDiagramNodeDataDO, step);
+            if (inputValuesStep != null) {
+                updateRuleSet(subdiagramEvent.getRequestVars(), inputValuesStep, decision);
+            }
+        }
+
+        // Map the sub-decision's reply variables back to the Decision on the step that is actually kept, under the name
+        // later nodes read them by: the linked identifier, or the RTDM output id "<NodeName>.<var>"
+        for (ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO ibVariableDO : replyVars(subDiagramNodeDataDO)) {
+            commonProcessing.addProducedOutput(CommonProcessing.nodeOutputId(subDiagramNodeDataDO.getNodeName(), null, ibVariableDO.getName()),
+                    ibVariableDO.getName(), ibVariableDO.getTypeDescription(), step, decision);
         }
 
         step.setCustomObject(mapStorage.getCustomObjectStepHashMap().get(objId));
@@ -150,52 +197,57 @@ public class SubDiagramNodeConverter {
     }
 
     public void updateRuleSet(ProcessNodeDataDO.Process.InputVariableList inputVariableList, Step step, Decision decision) {
+        if (inputVariableList == null || step == null || step.getRuleSet() == null) {
+            return;
+        }
+        List<ProcessNodeDataDO.Process.InputVariableList.IBVariableDO> ibVariableDOs = inputVariableList.getIbVariableDOs();
+        if (ibVariableDOs == null || ibVariableDOs.isEmpty()) {
+            return;
+        }
+
         RuleSet ruleSet = new RuleSet();
         Rule rule = new Rule();
 
         RuleSetStep ruleSetForUpdate = step.getRuleSet();
-        List<ProcessNodeDataDO.Process.InputVariableList.IBVariableDO> ibVariableDOs = inputVariableList.getIbVariableDOs();
         List<Signature> signatureList = new ArrayList<>();
         List<Action> actionList = new ArrayList<>();
 
         IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
 
-        if (ibVariableDOs != null && !ibVariableDOs.isEmpty()) {
-            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO : ibVariableDOs) {
-                Signature signature = new Signature();
-                signature.setDataType(commonProcessing.getDatatypeOfVar(ibVariableDO.getTypeDescription()).getValue());
+        for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO : ibVariableDOs) {
+            Signature signature = new Signature();
+            signature.setDataType(commonProcessing.getDatatypeOfVar(ibVariableDO.getTypeDescription()).getValue());
 
-                signature.setName(commonProcessing.sanitizeAndReduceVariableName(ibVariableDO.getName()));
-                signature.setDirection(IN_OUT_DIRECTION);
-                if (!signatureList.contains(signature)) {
-                    signatureList.add(signature);
-                }
-
-                if (!(mapStorage.getRuleSetIsActionUpdated().get(ruleSetForUpdate.getName()) &&
-                        mapStorage.getRuleSetIsUpdated().get(ruleSetForUpdate.getName()))) {
-                    ruleSet.setName(ruleSetForUpdate.getName());
-                    rule.setName(UUID.randomUUID().toString());
-                    rule.setConditional("if");
-                    rule.setRuleFiredTrackingEnabled(false);
-
-                    commonProcessing.addAction(mapper.ibVariableDoGet(ibVariableDO), actionList, signatureList, step, decision);
-                    rule.setActions(actionList);
-                }
-
+            signature.setName(commonProcessing.sanitizeAndReduceVariableName(ibVariableDO.getName()));
+            signature.setDirection(IN_OUT_DIRECTION);
+            if (!signatureList.contains(signature)) {
+                signatureList.add(signature);
             }
-            ruleSet.setSignature(signatureList);
 
+            commonProcessing.addAction(mapper.ibVariableDoGet(ibVariableDO), actionList, signatureList, step, decision);
+        }
+        ruleSet.setName(ruleSetForUpdate.getName());
+        ruleSet.setSignature(signatureList);
+
+        rule.setName(UUID.randomUUID().toString());
+        rule.setConditional("if");
+        rule.setRuleFiredTrackingEnabled(false);
+        rule.setActions(actionList);
+
+        // Like the Reply node: the signature must be in place before the rule that references it is posted, and an
+        // existing (reused) RuleSet is neither re-signed nor given a duplicate rule.
+        if (!Boolean.TRUE.equals(mapStorage.getRuleSetIsUpdated().get(ruleSetForUpdate.getName()))) {
             commonProcessing.callPutRuleSet(ruleSetForUpdate, ruleSet);
+        }
+        if (!Boolean.TRUE.equals(mapStorage.getRuleSetIsActionUpdated().get(ruleSetForUpdate.getName()))) {
             commonProcessing.addActionToRuleSet(ruleSetForUpdate, rule);
         }
     }
 
     private void processCustomObjectInputMapping(SubDiagramNodeDataDO subDiagramNodeDataDO, Decision decision, List<Step> stepList, Step step) {
-        SubdiagramEvent subdiagramEvent = subDiagramNodeDataDO.getSubdiagramEvent();
-        
         IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
 
-        for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO : subdiagramEvent.getRequestVars().getIbVariableDOs()) {
+        for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO : requestVars(subDiagramNodeDataDO)) {
             IBVariableDO ibVariableDOMapped = mapper.ibVariableDoGet(ibVariableDO);
             String varOriginalName = ibVariableDOMapped.getName();
             if (ibVariableDOMapped.getValue() != null) {
@@ -215,7 +267,57 @@ public class SubDiagramNodeConverter {
                     VarRef varRef = VarRefMapper.VAR_REF_MAPPER.varRefGet(valueTypeVarInfoDO);
                     commonProcessing.checkForAdditionalVariables(varName, varRef, "none", decision);
                 }
+            } else {
+                // An unset request variable is still declared (and assigned missing) by the _input_values RuleSet, so
+                // it needs its Decision term and mapping like a set one; otherwise ID rejects the RuleSet's mapping
+                commonProcessing.addMapping(ibVariableDOMapped, INPUT_DIRECTION, step, false, decision);
+                commonProcessing.addNewSignatureItem(ibVariableDOMapped, "none", decision, null);
             }
         }
+    }
+
+    /**
+     * The migrated sub-decision declares its Start request variables as {@code Request<name>} (see
+     * Converter.createDecision), so the step's input mappings must use those names as their step terms; mappings to
+     * terms the child does not declare are rejected by ID.
+     */
+    private void useChildRequestTermNames(SubDiagramNodeDataDO subDiagramNodeDataDO, Step step) {
+        if (step.getMappings() == null) {
+            return;
+        }
+        for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO requestVar : requestVars(subDiagramNodeDataDO)) {
+            String name = requestVar.getName() != null && !requestVar.getName().isEmpty()
+                ? requestVar.getName() : requestVar.getPhysicalName();
+            if (name == null) {
+                continue;
+            }
+            Set<String> localNames = new HashSet<>(List.of(commonProcessing.sanitizeAndReduceVariableName(name),
+                commonProcessing.sanitizeVariableName(name)));
+            String childTerm = commonProcessing.requestTermName(name);
+            for (Mapping mapping : step.getMappings()) {
+                if (Mapping.DirectionEnum.INPUT.equals(mapping.getDirection())
+                        && localNames.contains(mapping.getStepTermName())) {
+                    mapping.setStepTermName(childTerm);
+                }
+            }
+        }
+    }
+
+    private static List<ProcessNodeDataDO.Process.InputVariableList.IBVariableDO> requestVars(SubDiagramNodeDataDO subDiagramNodeDataDO) {
+        SubdiagramEvent subdiagramEvent = subDiagramNodeDataDO.getSubdiagramEvent();
+        if (subdiagramEvent == null || subdiagramEvent.getRequestVars() == null
+                || subdiagramEvent.getRequestVars().getIbVariableDOs() == null) {
+            return Collections.emptyList();
+        }
+        return subdiagramEvent.getRequestVars().getIbVariableDOs();
+    }
+
+    private static List<ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO> replyVars(SubDiagramNodeDataDO subDiagramNodeDataDO) {
+        SubdiagramEvent subdiagramEvent = subDiagramNodeDataDO.getSubdiagramEvent();
+        if (subdiagramEvent == null || subdiagramEvent.getReplyVars() == null
+                || subdiagramEvent.getReplyVars().getIbVariableDOs() == null) {
+            return Collections.emptyList();
+        }
+        return subdiagramEvent.getReplyVars().getIbVariableDOs();
     }
 }

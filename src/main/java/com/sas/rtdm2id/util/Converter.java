@@ -28,7 +28,6 @@ import com.sas.rtdm2id.util.tree.impl.TreeUtil;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 import static com.sas.rtdm2id.util.model.RTDM2IDConstants.CUSTOM_CONSTANT;
 import static com.sas.rtdm2id.util.model.RTDM2IDConstants.DATAGRID_CONSTANT;
@@ -114,19 +113,49 @@ public class Converter {
             replyOutVariable.setTypeDescription(DATAGRID_CONSTANT);
             processEventVars(decision, replyOutVariable, OUTPUT_DIRECTION, replyOutVariable.getValue());
         }
+        // The Decision's interface is what RTDM defines on the Start node: request variables in, reply variables out
+        Set<String> interfaceTerms = new HashSet<>();
+        for (SignatureTerm term : decision.getSignature()) {
+            if (term.getName() != null && !SignatureTerm.DirectionEnum.NONE.equals(term.getDirection())) {
+                interfaceTerms.add(term.getName().toLowerCase(Locale.ROOT));
+            }
+        }
 
+        // The structure built by TreeUtil is a DAG: nodes with several input nodes are shared by all of their
+        // parents. Each walk below therefore remembers what it has already expanded so that the work stays
+        // proportional to the size of the RTDM diagram instead of the number of paths through it.
         GenericTreeNode<Short> root = tree.getRoot();
-        walkTree(root, decision);
+        walkTree(root, decision, Collections.newSetFromMap(new IdentityHashMap<>()));
+        commonProcessing.writeCalculatedNodeGroups();
         connectConditionsInsideMap(root);
         ConditionDecisionStep conditionDecisionStep = new ConditionDecisionStep();
-        fillConditionDecisionStep(root.getChildren().get(0).getData(), conditionDecisionStep);
+        if (root.hasChildren()) {
+            fillConditionDecisionStep(root.getChildren().get(0).getData(), conditionDecisionStep);
+        }
         Deque<Short> objIDStack = new ArrayDeque<>();
         finalConnectionOfNodes(root, objIDStack);
 
         decision.setFlow(conditionDecisionStep);
+        labelBranchCasesWithCellNames(decision);
         addCalculatedItemSignatureTerms(batch, decision);
         addMissingVars(decision);
+        keepOnlyInterfaceTermsPublic(decision, interfaceTerms);
         return decision;
+    }
+
+    /**
+     * Every other term is internal to the flow (direction none), however steps read or write it. A Decision used as a
+     * sub-decision exposes its input/output terms to the calling step, which must map each of them; exposing the
+     * flow's internal terms made ID reject the parent with hundreds of "Mapping ... is invalid" errors. Global variable
+     * terms keep their own direction handling (see updateSignatureDirection).
+     */
+    private void keepOnlyInterfaceTermsPublic(Decision decision, Set<String> interfaceTerms) {
+        for (SignatureTerm term : decision.getSignature()) {
+            if (term.getName() != null && term.getGlobalVariableId() == null
+                    && !interfaceTerms.contains(term.getName().toLowerCase(Locale.ROOT))) {
+                term.setDirection(SignatureTerm.DirectionEnum.NONE);
+            }
+        }
     }
 
     private void addCalculatedItemSignatureTerms(Batch batch, Decision decision) {
@@ -208,6 +237,47 @@ public class Converter {
         }
     }
 
+    /**
+     * Branch cases are labelled with the RTDM cell node id while the flow is wired (fillBranchStepWithInnerSteps uses
+     * the label as that key). Once wiring is complete the label is replaced with the cell's name as shown in the RTDM
+     * diagram (e.g. "1 - CONTROLE"), so the ID branch reads like the original. Labels that are not cell ids are kept.
+     */
+    private void labelBranchCasesWithCellNames(Decision decision) {
+        ConditionDecisionStep decisionFlow = decision.getFlow();
+        if (decisionFlow == null || decisionFlow.getFlow() == null) {
+            return;
+        }
+        Deque<Step> pendingSteps = new LinkedList<>(decisionFlow.getFlow());
+        Set<Step> visitedSteps = Collections.newSetFromMap(new IdentityHashMap<>());
+        while (!pendingSteps.isEmpty()) {
+            Step step = pendingSteps.pop();
+            if (step == null || !visitedSteps.add(step)) {
+                continue;
+            }
+            addBranchSteps(step.getOnTrue(), pendingSteps);
+            addBranchSteps(step.getOnFalse(), pendingSteps);
+            addBranchSteps(step.getDefaultCase(), pendingSteps);
+            if (step.getBranchCases() != null) {
+                for (BranchCase branchCase : step.getBranchCases()) {
+                    addBranchSteps(branchCase.getOnTrue(), pendingSteps);
+                    String cellName = cellName(branchCase.getLabel());
+                    if (cellName != null) {
+                        branchCase.setLabel(cellName);
+                    }
+                }
+            }
+        }
+    }
+
+    private String cellName(String nodeId) {
+        RTDMObject rtdmObject = nodeId == null ? null : treeUtil.getNodeIdObjectHashMap().get(nodeId);
+        if (rtdmObject != null && rtdmObject.getObject() instanceof CellNodeDataDO cell
+                && cell.getNodeName() != null && !cell.getNodeName().isBlank()) {
+            return cell.getNodeName().trim();
+        }
+        return null;
+    }
+
     private void addBranchSteps(ConditionBranch branch, Deque<Step> pendingSteps) {
         if (branch != null && branch.getSteps() != null) {
             pendingSteps.addAll(branch.getSteps());
@@ -240,7 +310,9 @@ public class Converter {
             , ProcessNodeDataDO.Process.InputVariableList.IBVariableDO.Value value) {
         commonProcessing.addNewSignatureItem(ibVariableDO, direction, decision,
                 INPUT_DIRECTION.equals(direction) ? SOURCE_EVENT : null);
-        if (value != null) {
+        // Only variable references can point at a global variable; literal values have no ValueTypeVarInfoDO
+        if (value != null && ibVariableDO.getValue() != null
+                && ibVariableDO.getValue().getValueTypeVarInfoDO() != null) {
             VarRef varRef = VarRefMapper.VAR_REF_MAPPER.varRefGet(ibVariableDO.getValue().getValueTypeVarInfoDO());
             if (commonProcessing.checkForGlobalVariable(varRef, null, ibVariableDO.getName(), decision, false)) {
                 commonProcessing.checkForAdditionalVariables(ibVariableDO.getName(), varRef, "none", decision);
@@ -248,8 +320,12 @@ public class Converter {
         }
     }
 
-    private void walkTree(GenericTreeNode<Short> node, Decision decision) {
+    private void walkTree(GenericTreeNode<Short> node, Decision decision, Set<GenericTreeNode<Short>> walkedNodes) {
         for (GenericTreeNode<Short> innerNode : node.getChildren()) {
+            // A shared (fan-in) node and everything below it was fully processed the first time it was reached
+            if (!walkedNodes.add(innerNode)) {
+                continue;
+            }
             Short objId = innerNode.getData();
 
             // Make sure the node is only processed once
@@ -262,7 +338,7 @@ public class Converter {
                 }
             }
 
-            walkTree(innerNode, decision);
+            walkTree(innerNode, decision, walkedNodes);
         }
     }
 
@@ -300,7 +376,10 @@ public class Converter {
             // Unsupported nodes will be converted into Code File nodes
             case "cHandRH":
                 CHandRHNodeDataDO cHandRHNodeDataDO = (CHandRHNodeDataDO) rtdmObject.getObject();
-                commonProcessing.addStep(stepList, confirmContactNodeConverter.addCustomObjectStep(cHandRHNodeDataDO, decision, objId, commonProcessing.makeConfirmContactNodeRuleSetName(cHandRHNodeDataDO)), cHandRHNodeDataDO.getNodeId());
+                Step contactInputsStep = confirmContactNodeConverter.addCustomObjectStep(cHandRHNodeDataDO, decision, objId, commonProcessing.makeConfirmContactNodeRuleSetName(cHandRHNodeDataDO));
+                if (contactInputsStep != null) {
+                    commonProcessing.addStep(stepList, contactInputsStep, cHandRHNodeDataDO.getNodeId());
+                }
                 commonProcessing.addStep(stepList, confirmContactNodeConverter.createRecordContactStep(cHandRHNodeDataDO, decision), cHandRHNodeDataDO.getNodeId());
                 break;
             case "stagedTreatment":
@@ -312,6 +391,7 @@ public class Converter {
                 RemoveStagedTreatmentsNodeDataDO removeStagedTreatmentsNodeDataDO = (RemoveStagedTreatmentsNodeDataDO) rtdmObject.getObject();
                 stepList = stagedTreatmentConverter.addCustomObjectStep(null, decision, objId,
                         commonProcessing.makeRemoveStagedTreatmentName(removeStagedTreatmentsNodeDataDO));
+                break;
             case "crossTable":
                 CrossTableNodeDataDO crossTableNodeDataDO = (CrossTableNodeDataDO) rtdmObject.getObject();
                 stepList = crossTableNodeConverter.addSegmentationTreeStep(crossTableNodeDataDO, decision, objId,
@@ -356,16 +436,20 @@ public class Converter {
     }
 
     private void connectConditionsInsideMap(GenericTreeNode<Short> root) {
-        connectConditionsInsideMap(root, new HashSet<String>());
+        connectConditionsInsideMap(root, new HashSet<String>(), Collections.newSetFromMap(new IdentityHashMap<>()));
     }
 
-    private void connectConditionsInsideMap(GenericTreeNode<Short> node, Set<String> connectedNodeIds) {
+    private void connectConditionsInsideMap(GenericTreeNode<Short> node, Set<String> connectedNodeIds,
+                                            Set<GenericTreeNode<Short>> expandedNodes) {
         for (GenericTreeNode<Short> child : node.getChildren()) {
             String nodeId = treeUtil.getObjIdToNodeIdMap().get(child.getData());
             if (connectedNodeIds.add(nodeId)) {
                 connectConditionNode(nodeId);
             }
-            connectConditionsInsideMap(child, connectedNodeIds);
+            // Everything below a shared node was connected the first time the node was reached
+            if (expandedNodes.add(child)) {
+                connectConditionsInsideMap(child, connectedNodeIds, expandedNodes);
+            }
         }
     }
 
@@ -386,6 +470,24 @@ public class Converter {
     }
 
     private void finalConnectionOfNodes(GenericTreeNode<Short> node, Deque<Short> objIDStack) {
+        finalConnectionOfNodes(node, objIDStack, new IdentityHashMap<>());
+    }
+
+    /**
+     * Appends the steps of every node to the condition branch it belongs to (the branch of the innermost enclosing
+     * split/filter cell, i.e. the top of {@code objIDStack}).
+     * <p>
+     * The work done for a node depends only on the node and the branch on top of the stack. Repeating a visit for
+     * the same (node, branch) pair is a no-op: every step is already in the branch (steps are only ever appended),
+     * a cross-branch link step is not added next to its own link label, and a branch ending in a link never
+     * receives more steps. {@code visitedBranchesByNode} records the visited pairs so that a shared (fan-in) node
+     * reached along many paths is only expanded once per branch.
+     */
+    private void finalConnectionOfNodes(GenericTreeNode<Short> node, Deque<Short> objIDStack,
+                                        Map<GenericTreeNode<Short>, Set<Short>> visitedBranchesByNode) {
+        if (!visitedBranchesByNode.computeIfAbsent(node, key -> new HashSet<>()).add(objIDStack.peek())) {
+            return;
+        }
         if (mapStorage.isUseCrossBranchLinks() && !objIDStack.isEmpty()) {
             String branchNodeId = treeUtil.getObjIdToNodeIdMap().get(objIDStack.peek());
             ConditionBranch branch = mapStorage.getBranchNodeIdConditionBranchMap().get(branchNodeId);
@@ -402,7 +504,7 @@ public class Converter {
             } else {
                 addStep(objId, objIDStack);
             }
-            finalConnectionOfNodes(innerNode, objIDStack);
+            finalConnectionOfNodes(innerNode, objIDStack, visitedBranchesByNode);
             if (branchNode) {
                 objIDStack.pop();
             }
@@ -457,20 +559,7 @@ public class Converter {
                                 mapStorage.getDecisionNodeLinkMap().add(linkLabel);
                             }
                         }
-    
-                        // Prevent a decisionNodeLinkTarget being added onto a step list containing a linkLabel
-                        if (!conditionBranch.getSteps().isEmpty()) {
-                            Step firstConditionBranchStep = conditionBranch.getSteps().get(0);
-                            if (firstConditionBranchStep.getDecisionNodeLinkTarget()!=null) {
-                                if (!stepList.isEmpty()) {
-                                    Step firstStep = stepList.get(0);
-                                    if (firstStep.getLinkLabel()!=null) {
-                                        conditionBranch.setSteps(stepList);
-                                    }
-                                }
-                            }
-                        }
-    
+
                         processStepList(conditionBranch, stepList);
                     }
                 }
@@ -483,56 +572,64 @@ public class Converter {
         }
     }
 
+    /**
+     * Appends the steps of {@code stepList} that are not already in the branch. Presence is checked by identity:
+     * Step.equals is a deep, value based comparison (through branch cases and their nested branches), which is
+     * both expensive and not what is meant here - the same step object must not be added twice.
+     */
     private void processStepList(ConditionBranch conditionBranch, List<Step> stepList) {
-        for (Step step : stepList) {
-            List<Step> copy = new LinkedList<>(conditionBranch.getSteps());
-            int indexOf = copy.indexOf(step);
+        List<Step> branchSteps = new ArrayList<>(conditionBranch.getSteps());
+        Set<Step> stepsInBranch = Collections.newSetFromMap(new IdentityHashMap<>());
+        stepsInBranch.addAll(branchSteps);
 
-            if (mapStorage.isUseCrossBranchLinks()) {
-                if (!copy.isEmpty() && !stepList.isEmpty()) {
-                    for (Step copyStep : copy) {
-                        String copyStepLinkLabel = copyStep.getLinkLabel();
-    
-                        if (copyStepLinkLabel!=null) {
-                            for (Step step1 : stepList) {
-                                String stepDecisionNodeLinkTarget = step1.getDecisionNodeLinkTarget();
-                                
-                                if (stepDecisionNodeLinkTarget!=null) {
-                                    if (copyStepLinkLabel.equals(stepDecisionNodeLinkTarget)) {
-                                        // Avoid a cross-branch link that links to itself
-                                        // This can occur when two immediate upstream nodes feed into the same reply node
-                                        conditionBranch.setSteps(copy);
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (indexOf == -1) {
-                copy.add(step);
-                conditionBranch.setSteps(copy);
-            } else {
-                Step stepCopy = copy.get(indexOf);
-                if (stepCopy.getMappings() != null) {
-                    List<Mapping> differences = stepCopy.getMappings().stream()
-                            .filter(element -> !step.getMappings().contains(element))
-                            .collect(Collectors.toList());
-                    if (!differences.isEmpty()) {
-                        copy.add(step);
-                        conditionBranch.setSteps(copy);
-                    }
+        Set<String> linkTargets = new HashSet<>();
+        if (mapStorage.isUseCrossBranchLinks()) {
+            for (Step step : stepList) {
+                if (step.getDecisionNodeLinkTarget() != null) {
+                    linkTargets.add(step.getDecisionNodeLinkTarget());
                 }
             }
         }
+
+        boolean changed = false;
+        for (Step step : stepList) {
+            if (!linkTargets.isEmpty() && containsLinkLabel(branchSteps, linkTargets)) {
+                // Avoid a cross-branch link that links to itself
+                // This can occur when two immediate upstream nodes feed into the same reply node
+                conditionBranch.setSteps(branchSteps);
+                return;
+            }
+
+            if (stepsInBranch.add(step)) {
+                branchSteps.add(step);
+                changed = true;
+            }
+        }
+        if (changed) {
+            conditionBranch.setSteps(branchSteps);
+        }
+    }
+
+    private boolean containsLinkLabel(List<Step> steps, Set<String> linkLabels) {
+        for (Step step : steps) {
+            if (step.getLinkLabel() != null && linkLabels.contains(step.getLinkLabel())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void fillConditionStepWithInnerSteps(Step step, String stepNodeId, List<String> outputNodes) {
         MultiSelectNodeDataDO multiSelectNodeDataDO
                 = (MultiSelectNodeDataDO) treeUtil.getNodeIdObjectHashMap().get(stepNodeId).getObject();
         String remainderOutputCellID = multiSelectNodeDataDO.getRemainderOutputCellID();
+        // An ID condition step only has true/false branches, so a second selected output would silently replace the
+        // first one (and any cross-branch links into it) rather than migrate.
+        long selectedOutputs = outputNodes.stream().filter(node -> !node.equals(remainderOutputCellID)).count();
+        if (selectedOutputs > 1) {
+            throw new IllegalStateException("Filter node '" + multiSelectNodeDataDO.getNodeName() + "' (" + stepNodeId
+                + ") has " + selectedOutputs + " selected outputs; only one selected output plus an optional remainder is supported");
+        }
         for (String node : outputNodes) {
             ConditionBranch conditionBranch = commonProcessing.createConditionBranch(node, true);
             mapStorage.getBranchNodeIdConditionBranchMap().put(node, conditionBranch);

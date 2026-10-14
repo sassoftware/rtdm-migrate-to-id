@@ -1,0 +1,78 @@
+{
+  "name" : "characterization",
+  "description" : "campaign-id",
+  "flow" : {
+    "steps" : [ {
+      "type" : "application/vnd.sas.decision.step.branch",
+      "id" : "s1",
+      "branchCases" : [ {
+        "label" : "Node a",
+        "onTrue" : {
+          "steps" : [ {
+            "type" : "application/vnd.sas.decision.step.custom.object",
+            "id" : "pa",
+            "mappings" : [ {
+              "stepTermName" : "out",
+              "direction" : "output",
+              "targetDecisionTermName" : "v_pa"
+            } ],
+            "name" : "pa"
+          }, {
+            "type" : "application/vnd.sas.decision.step.node.link",
+            "decisionNodeLinkTarget" : "link-1"
+          } ]
+        }
+      } ],
+      "mappings" : [ {
+        "stepTermName" : "out",
+        "direction" : "output",
+        "targetDecisionTermName" : "v_s1"
+      } ],
+      "defaultCase" : {
+        "steps" : [ {
+          "type" : "application/vnd.sas.decision.step.custom.object",
+          "id" : "m1",
+          "linkLabel" : "link-1",
+          "mappings" : [ {
+            "stepTermName" : "out",
+            "direction" : "output",
+            "targetDecisionTermName" : "v_m1"
+          } ],
+          "name" : "m1"
+        }, {
+          "type" : "application/vnd.sas.decision.step.ruleset",
+          "id" : "r1",
+          "mappings" : [ {
+            "stepTermName" : "out",
+            "direction" : "output",
+            "targetDecisionTermName" : "v_r1"
+          } ],
+          "name" : "r1"
+        } ]
+      },
+      "name" : "s1"
+    } ]
+  },
+  "signature" : [ {
+    "name" : "Treatments",
+    "dataType" : "dataGrid",
+    "direction" : "output",
+    "dataGridExtension" : [ ]
+  }, {
+    "name" : "v_s1",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_m1",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_r1",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_pa",
+    "dataType" : "unknown",
+    "direction" : "none"
+  } ]
+}

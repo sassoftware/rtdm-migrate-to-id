@@ -131,7 +131,7 @@ class MultiSelectNodeConverterTest {
         List<Step> steps = new MultiSelectNodeConverter(commonProcessing)
                 .createConditionByFilter(multiSelectNode, decision);
 
-        assertEquals("eventsIntInput = ApplicationScore", steps.get(0).getConditionExpression());
+        assertEquals("RequestIntInput = ApplicationScore", steps.get(0).getConditionExpression());
         verify(commonProcessing).createGlobalVariableForDataPicker(
                 "globals.ApplicationScore", "ApplicationScore", NUMERIC_CONSTANT, decision);
     }
@@ -171,9 +171,9 @@ class MultiSelectNodeConverterTest {
         List<Step> steps = new MultiSelectNodeConverter(commonProcessing)
             .createConditionByFilter(multiSelectNode, new Decision());
 
-        assertEquals("eventsIntInput = 1 and eventsDoubleInput = 0.1"
-                + " and eventsBooleanInput = 1 and eventsDateInput = 2026-09-17"
-                + " and eventsStringInput = 'value'",
+        assertEquals("RequestIntInput = 1 and RequestDoubleInput = 0.1"
+                + " and RequestBooleanInput = 1 and DATEPART(RequestDateInput) = to_double(date '2026-09-17')"
+                + " and RequestStringInput = 'value'",
             steps.get(0).getConditionExpression());
         }
 
@@ -206,8 +206,9 @@ class MultiSelectNodeConverterTest {
             List<Step> steps = new MultiSelectNodeConverter(commonProcessing)
                 .createConditionByFilter(multiSelectNode, new Decision());
 
-            assertEquals("DAY(eventsDateInput) = 1 and MONTH(eventsDateInput) = 2"
-                    + " and YEAR(eventsDateInput) = 2026 and eventsDateInput = '2026-09-17'",
+            // RTDM dates are ID datetimes: date parts and whole-date comparisons work on DATEPART
+            assertEquals("DAY(DATEPART(RequestDateInput)) = 1 and MONTH(DATEPART(RequestDateInput)) = 2"
+                    + " and YEAR(DATEPART(RequestDateInput)) = 2026 and DATEPART(RequestDateInput) = to_double(date '2026-09-17')",
                 steps.get(0).getConditionExpression());
             }
 
@@ -231,7 +232,7 @@ class MultiSelectNodeConverterTest {
         List<Step> steps = new MultiSelectNodeConverter(commonProcessing)
                 .createConditionByFilter(multiSelectNode, new Decision());
 
-        assertEquals("eventsDoubleInput >= eventsBooleanInput and eventsDoubleInput <= eventsIntInput",
+        assertEquals("RequestDoubleInput >= RequestBooleanInput and RequestDoubleInput <= RequestIntInput",
                 steps.get(0).getConditionExpression());
     }
 
@@ -259,7 +260,7 @@ class MultiSelectNodeConverterTest {
         List<Step> steps = new MultiSelectNodeConverter(commonProcessing)
                 .createConditionByFilter(multiSelectNode, decision);
 
-        assertEquals("eventsDateInput <= TodaysDateAndTime", steps.get(0).getConditionExpression());
+        assertEquals("DATEPART(RequestDateInput) <= DATEPART(TodaysDateAndTime)", steps.get(0).getConditionExpression());
         assertEquals(2, decision.getSignature().size());
         assertTrue(decision.getSignature().stream()
             .anyMatch(signature -> "TodaysDateAndTime".equals(signature.getName())));
@@ -389,5 +390,202 @@ class MultiSelectNodeConverterTest {
         varRef.setVarName(NUMERIC_CONSTANT.equals(type) ? "DoubleInput" : "StringInput");
         varRef.setType(type);
         return varRef;
+    }
+    private MultiSelectNodeConverter passThroughConverter() {
+        CommonProcessing commonProcessing = mock(CommonProcessing.class);
+        when(commonProcessing.sanitizeVariableName(anyString())).thenAnswer(invocation -> invocation.getArgument(0));
+        doAnswer(invocation -> {
+            List<Step> steps = invocation.getArgument(0);
+            steps.add(invocation.getArgument(1));
+            return null;
+        }).when(commonProcessing).addStep(anyList(), any(Step.class), anyString());
+        return new MultiSelectNodeConverter(commonProcessing);
+    }
+
+    private String render(RootNode rootNode) {
+        MultiSelectNodeDataDO multiSelectNode = new MultiSelectNodeDataDO();
+        multiSelectNode.setNodeId("multi-select");
+        SQLExpression sqlExpression = new SQLExpression();
+        sqlExpression.setRootNode(rootNode);
+        multiSelectNode.setSqlExpression(sqlExpression);
+        return passThroughConverter().createConditionByFilter(multiSelectNode, new Decision()).get(0).getConditionExpression();
+    }
+
+    private RootNode andRoot(FilterNodeDO... filters) {
+        RootNode rootNode = new RootNode();
+        rootNode.setType("and");
+        Children children = new Children();
+        children.getFilterNodeDOs().addAll(java.util.Arrays.asList(filters));
+        rootNode.setChildren(children);
+        return rootNode;
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({
+        "equals, =", "notEquals, ^=", "lessThan, <", "lessThanEquals, <=", "greaterThan, >",
+        "greaterThanEquals, >="
+    })
+    void mapsComparisonOperatorsExplicitly(String operator, String expected) {
+        assertEquals("DoubleInput " + expected + " 5", render(andRoot(createFilter("f", operator, "5"))));
+    }
+
+    @Test
+    void mapsNegatedListLikeAndMissingOperators() {
+        assertEquals("StringInput NOT IN ('a','b')",
+            render(andRoot(createFilter("f", "notInList", "a,b", CHAR_CONSTANT))));
+        assertEquals("(StringInput NOT LIKE 'a%' and StringInput NOT LIKE 'b%')",
+            render(andRoot(createFilter("f", "notLike", "a%,b%", CHAR_CONSTANT))));
+        assertEquals("DoubleInput ^= .", render(andRoot(createFilter("f", "notMissing", null))));
+        assertEquals("StringInput ^= ''", render(andRoot(createFilter("f", "notMissing", null, CHAR_CONSTANT))));
+    }
+
+    @Test
+    void failsOnUnknownOperatorInsteadOfUsingEquality() {
+        IllegalArgumentException exception = org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+            () -> render(andRoot(createFilter("f", "contains", "5"))));
+        assertTrue(exception.getMessage().contains("'contains'"));
+    }
+
+    @Test
+    void quotesInListValuesByVariableType() {
+        assertEquals("DoubleInput IN (1,2,3)", render(andRoot(createFilter("f", "inList", "1, 2,3"))));
+        assertEquals("StringInput IN ('O''Brien','x')",
+            render(andRoot(createFilter("f", "inList", "O'Brien,x", CHAR_CONSTANT))));
+        assertEquals("DATEPART(StringInput) IN (to_double(date '2026-01-01'))",
+            render(andRoot(createFilter("f", "inList", "2026-01-01", DATE_CONSTANT))));
+    }
+
+    // The shapes below are taken from the RTDM sample extract filter_nodes.xml
+
+    @Test
+    void namesGlobalAndCalculatedFilterVariablesAsTheSignatureDeclaresThem() {
+        // Shapes from customer campaigns: the first filters test a global and a calculated item. The sanitizer is
+        // mocked as the identity here, so the source-qualified names keep their dot (the real one removes it).
+        FilterNodeDO testMode = createFilter("f", "equals", "true");
+        testMode.getVarRef().setVarInfoId("globals.TEST_MODE");
+        testMode.getVarRef().setVarName("TEST_MODE");
+        testMode.getVarRef().setSubType("Boolean");
+        FilterNodeDO interaction = createFilter("g", "equals", "true");
+        interaction.getVarRef().setVarInfoId("calculatedDataItems.checkInteractionID");
+        interaction.getVarRef().setVarName("checkInteractionID");
+        interaction.getVarRef().setSubType("Boolean");
+        FilterNodeDO processOutput = createFilter("h", "equals", "0.0");
+        processOutput.getVarRef().setVarInfoId("Valida Enriquecimento.Groovy_Validacao_v1cdRetorno");
+        processOutput.getVarRef().setVarName("cdRetorno");
+
+        assertEquals("Global.TEST_MODE = 1 and CalculatedDataItem.checkInteractionID = 1 and cdRetorno = 0.0",
+            render(andRoot(testMode, interaction, processOutput)));
+    }
+
+    @Test
+    void comparesBooleanFiltersAsNumbersUsingRawValues() {
+        FilterNodeDO inList = createFilter("f", "inList", "true,false");
+        inList.setFormattedValues("Yes,No");
+        inList.getVarRef().setSubType("Boolean");
+        FilterNodeDO equals = createFilter("g", "equals", "true");
+        equals.setFormattedValues("Yes");
+        equals.getVarRef().setSubType("Boolean");
+
+        assertEquals("DoubleInput IN (1,0) and DoubleInput = 1", render(andRoot(inList, equals)));
+    }
+
+    @Test
+    void readsListsFromRawValuesWithTheirDelimiter() {
+        FilterNodeDO numbers = createFilter("f", "inList", "1000.0,2000.0");
+        numbers.setFormattedValues("1,000,2,000");
+        numbers.getValues().setListDelimiter(",");
+
+        assertEquals("DoubleInput IN (1000.0,2000.0)", render(andRoot(numbers)));
+    }
+
+    @Test
+    void comparesWholeDatesByCalendarDay() {
+        FilterNodeDO from = createFilter("f", GREATER_THAN_OR_EQUALS_TO, "9/7/26, 7:25 AM", DATE_CONSTANT);
+        from.setFormattedValues("Sep 7, 2026");
+        from.getValues().setListDelimiter(",!");
+        from.setDateType("whole");
+        FilterNodeDO list = createFilter("g", "inList", "1/2/70, 7:25 AM,!9/11/26, 7:26 AM", DATE_CONSTANT);
+        list.setFormattedValues("Jan 2, 1970, Sep 11, 2026");
+        list.getValues().setListDelimiter(",!");
+        list.setDateType("whole");
+
+        assertEquals("DATEPART(StringInput) >= to_double(date '2026-09-07')"
+            + " and DATEPART(StringInput) IN (to_double(date '1970-01-02'),to_double(date '2026-09-11'))",
+            render(andRoot(from, list)));
+    }
+
+    @Test
+    void comparesWholeDatesWithTodaysDateByCalendarDay() {
+        FilterNodeDO today = createFilter("f", LESS_THAN_OR_EQUALS_TO, null, DATE_CONSTANT);
+        today.setFormattedValues("Today's Date and Time");
+        today.setValues(createValues(null));
+        today.setDateType("whole");
+
+        assertTrue(render(andRoot(today)).matches("DATEPART\\(StringInput\\) <= DATEPART\\([^)]+\\)"), render(andRoot(today)));
+    }
+
+    @Test
+    void appliesTheDateTypeOfASingleFilterRoot() {
+        RootNode root = new RootNode();
+        root.setOperator("equals");
+        root.setValues(createValues("3.0"));
+        root.setFormattedValues("3");
+        root.setVarRef(createVarRef(DATE_CONSTANT));
+        root.setDateType("month");
+
+        assertEquals("MONTH(DATEPART(StringInput)) = 3", render(root));
+    }
+
+    @Test
+    void failsOnUnreadableWholeDate() {
+        FilterNodeDO filter = createFilter("f", "equals", "not a date", DATE_CONSTANT);
+        filter.setDateType("whole");
+
+        IllegalArgumentException exception = org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+            () -> render(andRoot(filter)));
+        assertTrue(exception.getMessage().contains("not a date"), exception.getMessage());
+    }
+
+    @Test
+    void escapesSingleQuotesInStringLiterals() {
+        assertEquals("StringInput = 'O''Brien'", render(andRoot(createFilter("f", "equals", "O'Brien", CHAR_CONSTANT))));
+        assertEquals("StringInput LIKE 'O''B%'", render(andRoot(createFilter("f", LIKE, "O'B%", CHAR_CONSTANT))));
+    }
+
+    @Test
+    void usesNumericMissingValueForDates() {
+        assertEquals("StringInput = .", render(andRoot(createFilter("f", IS_MISSING, null, DATE_CONSTANT))));
+        assertEquals("StringInput = ''", render(andRoot(createFilter("f", IS_MISSING, null, "string"))));
+    }
+
+    @Test
+    void handlesLeafRootWithoutChildren() {
+        RootNode rootNode = new RootNode();
+        rootNode.setOperator("greaterThan");
+        rootNode.setValues(createValues("3"));
+        rootNode.setFormattedValues("3");
+        rootNode.setVarRef(createVarRef(NUMERIC_CONSTANT));
+        MultiSelectNodeDataDO multiSelectNode = new MultiSelectNodeDataDO();
+        SQLExpression sqlExpression = new SQLExpression();
+        sqlExpression.setRootNode(rootNode);
+        multiSelectNode.setSqlExpression(sqlExpression);
+
+        assertEquals(1, MultiSelectNodeConverter.getFilterNodesFromMultiSelectNode(multiSelectNode).size());
+        assertEquals("DoubleInput > 3", render(rootNode));
+    }
+
+    @Test
+    void handlesLogicNodeWithoutChildren() {
+        RootNode rootNode = andRoot(createFilter("f", "equals", "1"));
+        LogicNodeDO emptyLogicNode = new LogicNodeDO();
+        emptyLogicNode.setType("or");
+        rootNode.getChildren().getLogicNodeDOs().add(emptyLogicNode);
+        MultiSelectNodeDataDO multiSelectNode = new MultiSelectNodeDataDO();
+        SQLExpression sqlExpression = new SQLExpression();
+        sqlExpression.setRootNode(rootNode);
+        multiSelectNode.setSqlExpression(sqlExpression);
+
+        assertEquals(1, MultiSelectNodeConverter.getFilterNodesFromMultiSelectNode(multiSelectNode).size());
+        assertEquals("DoubleInput = 1", render(rootNode));
     }
 }

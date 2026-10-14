@@ -18,9 +18,12 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
+import org.springframework.web.util.UriUtils;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -55,16 +58,35 @@ public class ViyaApi {
             protocolPrefix = "https://";
         }
         String baseUrl = protocolPrefix + baseIp + contextPath;
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(baseUrl)
-                .queryParam("filter", "eq(" + parameter + ",'" + filter + "')");
-        return new URI(builder.toUriString());
+        URI base = new URI(UriComponentsBuilder.fromUriString(baseUrl).toUriString());
+        String filterExpression = "eq(" + parameter + "," + quoteFilterValue(filter) + ")";
+        return UriComponentsBuilder.fromUri(base)
+                .queryParam("filter", encodeQueryParam(filterExpression))
+                .build(true).toUri();
+    }
+
+    /**
+     * Quotes a value as a string literal in a SAS Viya filter expression. Embedded single quotes
+     * are doubled, matching the string literal escaping used by SegmentationTreeConverter.
+     */
+    public static String quoteFilterValue(String value) {
+        return "'" + String.valueOf(value).replace("'", "''") + "'";
+    }
+
+    /**
+     * Percent-encodes a single query parameter value. Unlike {@link UriUtils#encodeQueryParam},
+     * '+' is encoded as well so that the server does not decode it as a space.
+     */
+    public static String encodeQueryParam(String value) {
+        return UriUtils.encodeQueryParam(String.valueOf(value), StandardCharsets.UTF_8).replace("+", "%2B");
     }
 
     public static HttpEntity<String> createGetAccessTokenHTTPEntity(String login, String password) {
         HttpHeaders headers = new HttpHeaders();
         headers.add("Authorization", "Basic c2FzLmVjOg==");
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-        String valor = "grant_type=password&username=" + login + "&password=" + password;
+        String valor = "grant_type=password&username=" + URLEncoder.encode(login, StandardCharsets.UTF_8)
+                + "&password=" + URLEncoder.encode(password, StandardCharsets.UTF_8);
         return new HttpEntity<>(valor, headers);
     }
 

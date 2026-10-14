@@ -71,8 +71,9 @@ public class ReplyNodeConverter {
 
     }
 
-    private List<ReplyNodeDataDO.EventReply.ReplyVars.IBVariableDO> getIbVariableDOS(ReplyNodeDataDO replyNodeDataDO) {
-        if (replyNodeDataDO.getEventReply() != null) {
+    static List<ReplyNodeDataDO.EventReply.ReplyVars.IBVariableDO> getIbVariableDOS(ReplyNodeDataDO replyNodeDataDO) {
+        // Same selection as CommonProcessing.createRuleSets
+        if (replyNodeDataDO.getEventReply() != null && replyNodeDataDO.getEventReply().getReplyVars() != null) {
             return replyNodeDataDO.getEventReply().getReplyVars().getIbVariableDOs();
         } else {
             if (replyNodeDataDO.getTreatmentReplyVariables()!=null) {

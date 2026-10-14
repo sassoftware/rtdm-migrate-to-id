@@ -21,7 +21,7 @@ public class RestControllerAdvisor {
 
     @ExceptionHandler(value = {Rtdm2IdException.class})
     @ResponseStatus(value = HttpStatus.BAD_REQUEST)
-    public Rtdm2IdResponse<Void> handlePetHelperException(RuntimeException ex) {
+    public Rtdm2IdResponse<Void> handleRtdm2IdException(Rtdm2IdException ex) {
         return Rtdm2IdResponse.error(ex.getMessage(), null);
     }
 

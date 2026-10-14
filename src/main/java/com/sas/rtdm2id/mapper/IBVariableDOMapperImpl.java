@@ -212,6 +212,8 @@ public class IBVariableDOMapperImpl implements IBVariableDOMapper {
         iBVariableDO.setRequired( ibVariableDO.getRequired() );
         iBVariableDO.setSelected( ibVariableDO.getSelected() );
         iBVariableDO.setShared( ibVariableDO.getShared() );
+        // Extracts carry a Value on output variables of update-data processes (the new column value)
+        iBVariableDO.setValue( ibVariableDO.getValue() );
         iBVariableDO.setTestVarInfoId( ibVariableDO.getTestVarInfoId() );
         iBVariableDO.setType( ibVariableDO.getType() );
         iBVariableDO.setTypeDescription( ibVariableDO.getTypeDescription() );
@@ -422,7 +424,6 @@ public class IBVariableDOMapperImpl implements IBVariableDOMapper {
         value1.setDateValue(value.getDateValue());
         value1.setDateValueString(value.getDateValueString());
         value1.setListValue(value.getListValue());
-        value1.setType( value.getType() );
         value1.setType( value.getType() );
         value1.setValueTypeVarInfoDO( valueTypeVarInfoDOToValueTypeVarInfoDO( value.getValueTypeVarInfoDO() ) );
         value1.setVersionNumber( value.getVersionNumber() );

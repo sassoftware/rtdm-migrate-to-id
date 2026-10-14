@@ -1,0 +1,103 @@
+{
+  "name" : "characterization",
+  "description" : "campaign-id",
+  "flow" : {
+    "steps" : [ {
+      "type" : "application/vnd.sas.decision.step.condition",
+      "id" : "f1",
+      "mappings" : [ {
+        "stepTermName" : "out",
+        "direction" : "output",
+        "targetDecisionTermName" : "v_f1"
+      } ],
+      "onTrue" : {
+        "steps" : [ {
+          "type" : "application/vnd.sas.decision.step.custom.object",
+          "id" : "pt",
+          "mappings" : [ {
+            "stepTermName" : "out",
+            "direction" : "output",
+            "targetDecisionTermName" : "v_pt"
+          } ],
+          "name" : "pt"
+        }, {
+          "type" : "application/vnd.sas.decision.step.custom.object",
+          "id" : "m",
+          "mappings" : [ {
+            "stepTermName" : "out",
+            "direction" : "output",
+            "targetDecisionTermName" : "v_m"
+          } ],
+          "name" : "m"
+        }, {
+          "type" : "application/vnd.sas.decision.step.ruleset",
+          "id" : "r",
+          "mappings" : [ {
+            "stepTermName" : "out",
+            "direction" : "output",
+            "targetDecisionTermName" : "v_r"
+          } ],
+          "name" : "r"
+        } ]
+      },
+      "onFalse" : {
+        "steps" : [ {
+          "type" : "application/vnd.sas.decision.step.custom.object",
+          "id" : "pe",
+          "mappings" : [ {
+            "stepTermName" : "out",
+            "direction" : "output",
+            "targetDecisionTermName" : "v_pe"
+          } ],
+          "name" : "pe"
+        }, {
+          "type" : "application/vnd.sas.decision.step.custom.object",
+          "id" : "m",
+          "mappings" : [ {
+            "stepTermName" : "out",
+            "direction" : "output",
+            "targetDecisionTermName" : "v_m"
+          } ],
+          "name" : "m"
+        }, {
+          "type" : "application/vnd.sas.decision.step.ruleset",
+          "id" : "r",
+          "mappings" : [ {
+            "stepTermName" : "out",
+            "direction" : "output",
+            "targetDecisionTermName" : "v_r"
+          } ],
+          "name" : "r"
+        } ]
+      },
+      "conditionExpression" : "f1 = 1",
+      "name" : "f1"
+    } ]
+  },
+  "signature" : [ {
+    "name" : "Treatments",
+    "dataType" : "dataGrid",
+    "direction" : "output",
+    "dataGridExtension" : [ ]
+  }, {
+    "name" : "v_f1",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_pt",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_m",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_r",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_pe",
+    "dataType" : "unknown",
+    "direction" : "none"
+  } ]
+}

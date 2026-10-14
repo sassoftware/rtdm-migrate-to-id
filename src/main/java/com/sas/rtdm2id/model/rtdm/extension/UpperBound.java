@@ -4,21 +4,12 @@ SPDX-License-Identifier: Apache-2.0
 */
 package com.sas.rtdm2id.model.rtdm.extension;
 
-import lombok.Getter;
-import lombok.Setter;
+import jakarta.xml.bind.annotation.XmlAccessType;
+import jakarta.xml.bind.annotation.XmlAccessorType;
+import jakarta.xml.bind.annotation.XmlType;
 
-import jakarta.xml.bind.annotation.*;
-
+/** Literal value or variable reference; see {@link ReferenceableValue}. */
 @XmlAccessorType(XmlAccessType.FIELD)
-@XmlType(name = "", propOrder = {
-        "storedType",
-        "text"
-})
-@Getter
-@Setter
-public class UpperBound {
-    @XmlAttribute(name = "StoredType")
-    private String storedType;
-    @XmlValue
-    private String text;
+@XmlType(name = "")
+public class UpperBound extends ReferenceableValue {
 }

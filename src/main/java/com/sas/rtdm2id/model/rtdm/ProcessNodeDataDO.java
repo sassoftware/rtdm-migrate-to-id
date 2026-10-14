@@ -15,6 +15,7 @@ import jakarta.xml.bind.annotation.XmlAccessType;
 import jakarta.xml.bind.annotation.XmlAccessorType;
 import jakarta.xml.bind.annotation.XmlAttribute;
 import jakarta.xml.bind.annotation.XmlElement;
+import jakarta.xml.bind.annotation.XmlTransient;
 import jakarta.xml.bind.annotation.XmlType;
 import jakarta.xml.bind.annotation.XmlValue;
 
@@ -775,6 +776,10 @@ public class ProcessNodeDataDO implements Serializable {
                 protected Byte listpos;
                 @XmlAttribute(name = "objid")
                 protected Short objid;
+                // Not part of the extract: set by ProcessNodeConverter.normalizeUpdateDataProcesses on the SET
+                // parameters it derives from an update-data process's update columns (null for criteria inputs).
+                @XmlTransient
+                protected String updateColumn;
                    
                 @XmlAccessorType(XmlAccessType.FIELD)
                 @XmlType(name = "", propOrder = {
@@ -1086,6 +1091,7 @@ public class ProcessNodeDataDO implements Serializable {
                     "hidden",
                     "hideVariable",
                     "id",
+                    "identifier",
                     "level",
                     "loadedFromOldDavLocation",
                     "loading",
@@ -1109,6 +1115,7 @@ public class ProcessNodeDataDO implements Serializable {
                     "testVarInfoId",
                     "type",
                     "typeDescription",
+                    "value",
                     "versionNumber",
                     "whereClauseOp",
                     "whoModified"
@@ -1144,6 +1151,9 @@ public class ProcessNodeDataDO implements Serializable {
                 protected String hideVariable;
                 @XmlElement(name = "Id", required = true)
                 protected String id;
+                // The identifier this output is written to, if any (RTDM passes values between nodes through identifiers)
+                @XmlElement(name = "Identifier")
+                protected InputVariableList.IBVariableDO.Identifier identifier;
                 @XmlElement(name = "Level", required = true)
                 protected String level;
                 @XmlElement(name = "LoadedFromOldDavLocation", required = true)
@@ -1190,6 +1200,10 @@ public class ProcessNodeDataDO implements Serializable {
                 protected byte type;
                 @XmlElement(name = "TypeDescription", required = true)
                 protected String typeDescription;
+                // For update-data processes the output list holds the columns to update; Value is the new value
+                // (a literal or a variable reference), in the same form as an input variable's Value.
+                @XmlElement(name = "Value")
+                protected InputVariableList.IBVariableDO.Value value;
                 @XmlElement(name = "VersionNumber")
                 protected float versionNumber;
                 @XmlElement(name = "WhereClauseOp")

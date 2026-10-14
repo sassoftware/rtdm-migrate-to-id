@@ -17,6 +17,7 @@ import java.util.List;
         "children",
         "codeChangeUnpublished",
         "codeEverBeenPublished",
+        "dateType",
         "firstOccurrenceToPublish",
         "formattedValues",
         "loadedFromOldDavLocation",
@@ -52,6 +53,9 @@ public class RootNode implements Serializable {
     private String codeChangeUnpublished;
     @XmlElement(name = "CodeEverBeenPublished", required = true)
     private String codeEverBeenPublished;
+    // Present when a single-filter root filters on part of a date (day/month/year/whole), as on FilterNodeDO
+    @XmlElement(name = "DateType")
+    private String dateType;
     @XmlElement(name = "FirstOccurrenceToPublish", required = true)
     private String firstOccurrenceToPublish;
     @XmlElement(name = "FormattedValues", required = true)

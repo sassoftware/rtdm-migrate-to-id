@@ -13,6 +13,10 @@ public class OAuthTokenException extends Rtdm2IdException {
         super(message);
     }
 
+    public OAuthTokenException(String message, Throwable cause) {
+        super(message, cause);
+    }
+
     public OAuthTokenException(Exception e) {
         super("Could not get OAuth token", e);
     }

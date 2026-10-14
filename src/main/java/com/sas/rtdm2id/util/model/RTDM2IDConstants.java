@@ -7,6 +7,7 @@ package com.sas.rtdm2id.util.model;
 public class RTDM2IDConstants {
     public static final String OUTPUT_DIRECTION = "output";
     public static final String INPUT_DIRECTION = "input";
+    public static final String INOUT_DIRECTION = "inOut";
     public static final String NONE_DIRECTION = "none";
 
     public static final String IN_OUT_DIRECTION = "inOut";

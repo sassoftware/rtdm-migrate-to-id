@@ -16,6 +16,7 @@ import com.sas.rtdm2id.model.id.decision.RuleSetStep;
 import com.sas.rtdm2id.model.id.decision.SignatureTerm;
 import com.sas.rtdm2id.model.id.decision.SignatureTermExtension;
 import com.sas.rtdm2id.model.id.decision.Step;
+import com.sas.rtdm2id.model.id.files.CodeFileSignature;
 import com.sas.rtdm2id.model.id.files.CustomNodeRequest;
 import com.sas.rtdm2id.model.id.files.DecisionCodeFileResponse;
 import com.sas.rtdm2id.model.id.globals.GlobalVariable;
@@ -29,21 +30,28 @@ import com.sas.rtdm2id.model.rtdm.extension.VarRef;
 import com.sas.rtdm2id.util.ViyaApi;
 import com.sas.rtdm2id.util.model.IBVariableDO;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
 import java.lang.reflect.Field;
 import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -52,13 +60,31 @@ import static com.sas.rtdm2id.util.model.RTDM2IDConstants.*;
 
 @Component
 public class ProcessNodeConverter {
+    private static final Logger log = LoggerFactory.getLogger(ProcessNodeConverter.class);
+    /** Outputs mapped on every data process (SQL code file) step. */
+    private static final List<String> STANDARD_DATA_PROCESS_OUTPUTS = List.of("returnCode", "rowCount");
     private final RestTemplate restTemplate;
     private final CommonProcessing commonProcessing;
     private final MapStorage mapStorage;
     private final SegmentationTreeService segmentationTreeService;
 
-    private static final String PACKAGE_NAME_REGEX = "(\n\\s*package\\s+)([^\\s/;]+)(.*)";//"(?<!dcl\\s{1,1000}|declare\\s{1,1000}|returns\\s{1,1000}|in_out\\s{1,1000}|end|[,\\(]\\s{0,10000})package\\s+[^\\s/;]+";
-    private static final Pattern packageNamePattern = Pattern.compile(PACKAGE_NAME_REGEX,Pattern.CASE_INSENSITIVE);
+    // DS2 package declaration: "package <name>" at the start of a line (declarations such as "dcl package hash h"
+    // do not start with the keyword). Group 2 is the package name, optionally quoted.
+    private static final Pattern PACKAGE_DECLARATION_PATTERN = Pattern.compile(
+            "^(\\s*package\\s+)(\"[^\"]*\"|[^\\s/;(]+)", Pattern.CASE_INSENSITIVE | Pattern.MULTILINE);
+    private static final Pattern OVERWRITE_OPTION_PATTERN = Pattern.compile(
+            "/\\s*overwrite\\s*=\\s*yes\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern END_PACKAGE_PATTERN = Pattern.compile("\\bendpackage\\s*;", Pattern.CASE_INSENSITIVE);
+    private static final Pattern EXECUTE_METHOD_PATTERN = Pattern.compile("\\bmethod\\s+execute\\s*\\(", Pattern.CASE_INSENSITIVE);
+    private static final Pattern INT_TYPE_PATTERN = Pattern.compile("(?<![\\w.])int(?=\\s)", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TAP_DATETIME_PACKAGE_PATTERN = Pattern.compile("\\bpackage\\s+tap_datetime\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TAP_HASH_PACKAGE_PATTERN = Pattern.compile("\\bpackage\\s+tap_hash\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TAP_LOGGER_PACKAGE_PATTERN = Pattern.compile("\\bpackage\\s+tap_logger\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TAP_SQLTABLE_PACKAGE_PATTERN = Pattern.compile("\\bpackage\\s+tap_sqltable\\b", Pattern.CASE_INSENSITIVE);
+    private static final Pattern TAP_ARRAY_PATTERN = Pattern.compile("\\b(" + TAP_FLOAT_ARRAY_CONSTANT + "|" + TAP_STRING_ARRAY_CONSTANT
+            + "|" + TAP_INT_ARRAY_CONSTANT + "|" + TAP_DATETIME_ARRAY_CONSTANT + "|" + TAP_BOOLEAN_ARRAY_CONSTANT + ")\\b",
+            Pattern.CASE_INSENSITIVE);
+    private static final Pattern DATAGRID_WORD_PATTERN = Pattern.compile("\\b" + DS2_DATAGRID + "\\b", Pattern.CASE_INSENSITIVE);
 
     private static final String JAVA_COMMENT_TYPE_1_REGEX = "\\/\\*([\\S\\s]+?)\\*\\/";
     private static final Pattern javaComment1Pattern = Pattern.compile(JAVA_COMMENT_TYPE_1_REGEX,Pattern.CASE_INSENSITIVE);
@@ -111,31 +137,37 @@ public class ProcessNodeConverter {
         Step inputValuesStep = mapStorage.getRuleSetStepMap().get(nodeName + "_input_values");
         boolean hasInputs = process != null && process.getInputVariableList() != null
                 && !process.getInputVariableList().getIbVariableDOs().isEmpty();
+        boolean hasInputValues = hasInputs && CommonProcessing.hasInputValuesRuleSet(process);
         if (process != null) {
             if (hasInputs) {
                 processCustomObjectInputMapping(processNodeDataDO, decision, stepList, step);
-                updateRuleSet(process.getInputVariableList(), inputValuesStep, decision);
+            }
+            // In/out parameters are loaded into their output term by the _input_values RuleSet, so it must exist
+            Map<String, String> inOutTerms = hasInputValues && inputValuesStep != null
+                ? inOutOutputTerms(processNodeDataDO.getNodeName(), process) : Map.of();
+            if (hasInputValues) {
+                updateRuleSet(process.getInputVariableList(), inputValuesStep, decision, inOutTerms);
             }
             if (process.getOutputVariableList() != null) {
                 if (commonProcessing.isProcessNotDataProcess(process.getProcessTypeDescription()) || !isDataProcessReturnDataGrid(process)) {
-                    processCustomObjectMapping(process, step, decision);
+                    processCustomObjectMapping(processNodeDataDO.getNodeName(), process, step, decision, inOutTerms);
                 } else {
                     SignatureTerm signatureTermDatagrid
-                            = processDataProcessMapping(process.getOutputVariableList().getIbVariableDOs()
-                            , step, decision, process.getName());
+                            = processDataProcessMapping(processNodeDataDO.getNodeName(), process, step, decision);
 
                     extractDataStep = mapStorage.getRuleSetStepMap().get(nodeName + "_extract_values");
- 
-                    updateRuleSet(signatureTermDatagrid, extractDataStep, decision);
+
+                    updateRuleSet(signatureTermDatagrid, extractDataStep, decision, processNodeDataDO.getNodeName(), process.getName());
                 }
             }
         }
-        if (hasInputs && inputValuesStep != null) {
+        if (hasInputValues && inputValuesStep != null) {
             // Unsupported nodes are converted into DS2 code files but we don't create a ruleset node to
             // represent the custom node inputs so inputValuesStep is null in this scenario
             commonProcessing.addStep(stepList, inputValuesStep, processNodeDataDO.getNodeId());
         }
         step.setCustomObject(mapStorage.getCustomObjectStepHashMap().get(objId));
+        alignWithCodeFileSignature(step, mapStorage.getCodeFileSignatures().get(objId), decision, nodeName);
         commonProcessing.addStep(stepList, step, processNodeDataDO.getNodeId());
         if (extractDataStep != null) {
             commonProcessing.addStep(stepList, extractDataStep, processNodeDataDO.getNodeId());
@@ -143,17 +175,21 @@ public class ProcessNodeConverter {
         return stepList;
     }
 
-    public void updateRuleSet(SignatureTerm signatureTermDataGrid, Step step) {
-        updateRuleSet(signatureTermDataGrid, step, null);
-    }
-
-    public void updateRuleSet(SignatureTerm signatureTermDataGrid, Step step, Decision decision) {
+    /**
+     * Writes the extraction RuleSet that copies the first row of a data process's data grid into one Decision term per
+     * column. Each column is written under the name later nodes read it by: RTDM's output id
+     * {@code <NodeName>.<ProcessName><column>}, or the identifier the column is linked to (see
+     * CommonProcessing.registerNodeOutputs), which also keeps same-named columns of different nodes apart.
+     */
+    public void updateRuleSet(SignatureTerm signatureTermDataGrid, Step step, Decision decision, String nodeName, String processName) {
         RuleSet ruleSet = new RuleSet();
         RuleSetStep ruleSetForUpdate = step.getRuleSet();
 
+        // The RuleSet's own (at most 32 character) name for the grid; actions must use this name, not the Decision's
+        String gridTerm = commonProcessing.sanitizeAndReduceVariableName(signatureTermDataGrid.getName());
         List<Signature> signatureList = new ArrayList<>();
         Mapping mapping = new Mapping();
-        mapping.setStepTermName(commonProcessing.sanitizeAndReduceVariableName(signatureTermDataGrid.getName()));
+        mapping.setStepTermName(gridTerm);
         mapping.setTargetDecisionTermName(commonProcessing.sanitizeVariableName(signatureTermDataGrid.getName()));
         mapping.setDirection(Mapping.DirectionEnum.INPUT);
         commonProcessing.checkMappingForDuplicate(mapping, step);
@@ -161,37 +197,19 @@ public class ProcessNodeConverter {
         ruleSet.setName(ruleSetForUpdate.getName());
         Signature signature = new Signature();
         signature.setDataType(SignatureTerm.DataTypeEnum.DATAGRID.getValue());
-        signature.setName(commonProcessing.sanitizeAndReduceVariableName(signatureTermDataGrid.getName()));
+        signature.setName(gridTerm);
         signature.setDirection(INPUT_DIRECTION);
         signatureList.add(signature);
 
-        boolean updateActions = !Boolean.TRUE.equals(mapStorage.getRuleSetIsActionUpdated().get(ruleSetForUpdate.getName()));
-        for (SignatureTermExtension signatureTermExtension : signatureTermDataGrid.getDataGridExtension()) {
-            Mapping innerMapping = new Mapping();
-
-            innerMapping.setStepTermName(commonProcessing.sanitizeAndReduceVariableName(signatureTermExtension.getName()));
-            String targetName = commonProcessing.sanitizeVariableName(signatureTermExtension.getName());
-            if (decision != null) {
-                SignatureTerm.DataTypeEnum outputType = SignatureTerm.DataTypeEnum.fromValue(signatureTermExtension.getDataType().getValue());
-                SignatureTerm existingTerm = decision.getSignature().stream()
-                    .filter(term -> targetName.equalsIgnoreCase(term.getName())).findFirst().orElse(null);
-                String typedTargetName = existingTerm != null && !outputType.equals(existingTerm.getDataType())
-                    ? commonProcessing.sanitizeVariableName(signatureTermDataGrid.getName() + "_" + signatureTermExtension.getName())
-                    : targetName;
-                SignatureTerm outputTerm = new SignatureTerm();
-                outputTerm.setName(typedTargetName);
-                outputTerm.setDataType(outputType);
-                commonProcessing.checkSignatureTermForDuplicate(NONE_DIRECTION, decision, outputTerm);
-                innerMapping.setTargetDecisionTermName(typedTargetName);
-            } else {
-                innerMapping.setTargetDecisionTermName(targetName);
-            }
-            innerMapping.setDirection(Mapping.DirectionEnum.OUTPUT);
-            commonProcessing.checkMappingForDuplicate(innerMapping, step);
+        List<Rule> rules = new ArrayList<>();
+        for (SignatureTermExtension column : signatureTermDataGrid.getDataGridExtension()) {
+            String columnTerm = commonProcessing.sanitizeAndReduceVariableName(column.getName());
+            commonProcessing.addProducedOutput(CommonProcessing.nodeOutputId(nodeName, processName, column.getName()), column.getName(),
+                    SignatureTerm.DataTypeEnum.fromValue(column.getDataType().getValue()), null, step, decision);
 
             Signature innerSignature = new Signature();
-            innerSignature.setDataType(signatureTermExtension.getDataType().getValue());
-            innerSignature.setName(commonProcessing.sanitizeAndReduceVariableName(signatureTermExtension.getName()));
+            innerSignature.setDataType(column.getDataType().getValue());
+            innerSignature.setName(columnTerm);
             innerSignature.setDirection(OUTPUT_DIRECTION);
             commonProcessing.checkSignatureTermForDuplicate(OUTPUT_DIRECTION, signatureList, innerSignature);
 
@@ -199,22 +217,61 @@ public class ProcessNodeConverter {
             rule.setName(UUID.randomUUID().toString());
             rule.setConditional("if");
             rule.setRuleFiredTrackingEnabled(false);
-
-            rule.setActions(Collections.singletonList(addAction(signatureTermExtension.getName(),
-                    signatureTermDataGrid.getName(), signatureTermExtension.getDataType().getValue())));
-
-            if (updateActions) {
-                commonProcessing.addActionToRuleSet(ruleSetForUpdate, rule);
-            }
+            rule.setActions(Collections.singletonList(addAction(columnTerm, column.getName(), gridTerm, column.getDataType().getValue())));
+            rules.add(rule);
         }
         ruleSet.setSignature(signatureList);
 
+        // The signature must be in place before the rules that reference it are posted; a reused RuleSet keeps both
         if (Boolean.FALSE.equals(mapStorage.getRuleSetIsUpdated().get(ruleSetForUpdate.getName()))) {
             commonProcessing.callPutRuleSet(ruleSetForUpdate, ruleSet);
         }
+        if (!Boolean.TRUE.equals(mapStorage.getRuleSetIsActionUpdated().get(ruleSetForUpdate.getName()))) {
+            rules.forEach(rule -> commonProcessing.addActionToRuleSet(ruleSetForUpdate, rule));
+        }
+    }
+
+    /**
+     * Scalar outputs of a (non-data) process with the same name as one of its inputs, by name, with the Decision term
+     * the output is written under. The code file has a single in_out parameter for both (e.g. the rules group
+     * parameters VD11_ThmCheckDecisionCd, "in_out varchar" in its DS2), so the step maps it once, both ways, on the
+     * output term, and the _input_values RuleSet first copies the input value into that term.
+     */
+    private Map<String, String> inOutOutputTerms(String nodeName, ProcessNodeDataDO.Process process) {
+        Map<String, String> terms = new LinkedHashMap<>();
+        if (!commonProcessing.isProcessNotDataProcess(process.getProcessTypeDescription())
+                || process.getInputVariableList() == null || process.getOutputVariableList() == null) {
+            return terms;
+        }
+        Set<String> inputs = new HashSet<>();
+        process.getInputVariableList().getIbVariableDOs().stream()
+            .filter(input -> input.getName() != null && CommonProcessing.isAssignedInInputValues(input)
+                && !isGrid(input.getTypeDescription()))
+            .forEach(input -> inputs.add(input.getName()));
+        for (ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO output : process.getOutputVariableList().getIbVariableDOs()) {
+            if (output.getName() != null && inputs.contains(output.getName()) && !isGrid(output.getTypeDescription())) {
+                terms.put(output.getName(), commonProcessing.nodeOutputTermName(CommonProcessing.nodeOutputId(nodeName,
+                    CommonProcessing.outputReferencePrefix(process), output.getName())));
+            }
+        }
+        return terms;
+    }
+
+    private boolean isGrid(String typeDescription) {
+        return typeDescription == null || typeDescription.contains("list")
+            || SignatureTerm.DataTypeEnum.DATAGRID.equals(commonProcessing.getDatatypeOfVar(typeDescription));
     }
 
     public void updateRuleSet(ProcessNodeDataDO.Process.InputVariableList inputVariableList, Step step, Decision decision) {
+        updateRuleSet(inputVariableList, step, decision, Map.of());
+    }
+
+    /**
+     * @param inOutTerms in/out parameters (see {@link #inOutOutputTerms}): after its input is assigned, each is copied
+     *                   into {@code <name>_out}, which is written to the parameter's output term
+     */
+    private void updateRuleSet(ProcessNodeDataDO.Process.InputVariableList inputVariableList, Step step, Decision decision,
+            Map<String, String> inOutTerms) {
         RuleSet ruleSet = new RuleSet();
         Rule rule = new Rule();
 
@@ -229,6 +286,9 @@ public class ProcessNodeConverter {
             boolean ruleUpdated = false;
 
             for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO ibVariableDO : ibVariableDOs) {
+                if (!CommonProcessing.isAssignedInInputValues(ibVariableDO)) {
+                    continue;
+                }
                 Signature signature = new Signature();
                 signature.setDataType(commonProcessing.getDatatypeOfVar(ibVariableDO.getTypeDescription()).getValue());
 
@@ -237,6 +297,23 @@ public class ProcessNodeConverter {
                 commonProcessing.checkSignatureTermForDuplicate(IN_OUT_DIRECTION, signatureList, signature);
 
                 commonProcessing.addAction(mapper.ibVariableDoGet(ibVariableDO), actionList, signatureList, step, decision);
+                String inOutTerm = inOutTerms.get(ibVariableDO.getName());
+                if (inOutTerm != null) {
+                    Signature result = new Signature();
+                    result.setName(commonProcessing.sanitizeAndReduceVariableName(ibVariableDO.getName() + "_out"));
+                    result.setDataType(signature.getDataType());
+                    result.setDirection(OUTPUT_DIRECTION);
+                    commonProcessing.checkSignatureTermForDuplicate(OUTPUT_DIRECTION, signatureList, result);
+                    Action copy = new Action();
+                    copy.setType("complex");
+                    copy.setExpression(result.getName() + " = " + signature.getName());
+                    actionList.add(copy);
+                    Mapping resultMapping = new Mapping();
+                    resultMapping.setStepTermName(result.getName());
+                    resultMapping.setTargetDecisionTermName(inOutTerm);
+                    resultMapping.setDirection(Mapping.DirectionEnum.OUTPUT);
+                    commonProcessing.checkMappingForDuplicate(resultMapping, step);
+                }
                 ValueTypeVarInfoDO reference = ibVariableDO.getValue() == null ? null
                     : ibVariableDO.getValue().getValueTypeVarInfoDO();
                 boolean scalarAssignment = !ibVariableDO.getTypeDescription().contains("list")
@@ -283,15 +360,19 @@ public class ProcessNodeConverter {
         }
     }
 
-    private Action addAction(String variableName, String dataGridName, String type) {
+    private Action addAction(String variableName, String columnName, String dataGridName, String type) {
         Action action = new Action();
         action.setType("complex");
-        action.setExpression(variableName + " = " + getAppropriateDataGridGet(type) + "(" + dataGridName + ",'" + variableName + "', 0 )");
+        action.setExpression(variableName + " = " + getAppropriateDataGridGet(type) + "(" + dataGridName + ",'" + columnName + "', 0 )");
         return action;
     }
 
     private String getAppropriateDataGridGet(String type) {
-        if (DECIMAL_CONSTANT.equals(type)) {
+        // Data grid extension columns are only ever decimal, integer, datetime or string (see getDataTypeForExtension).
+        // Integer and datetime values are numeric in DS2, so they are read with the numeric getter rather than as text.
+        // TODO: the row index passed to the getter (0) has not been verified against the ID data grid functions,
+        // which may be 1-based.
+        if (DECIMAL_CONSTANT.equals(type) || INTEGER_CONSTANT.equals(type) || DATETIME_CONSTANT.equals(type)) {
             return "DATAGRID_GETDOUBLE";
         }
         return "DATAGRID_GETSTRING";
@@ -327,6 +408,8 @@ public class ProcessNodeConverter {
                         codeStep.setName(codeFile.getName());
                         codeStep.setType(codeFile.getType().getValue());
                         mapStorage.getCustomObjectStepHashMap().put(process.getObjid(), codeStep);
+                        // A reused code file may have been created from another campaign's version of the process
+                        recordCodeFileSignature(process.getObjid(), codeFile.getId());
                     }
                 }
             }
@@ -340,7 +423,7 @@ public class ProcessNodeConverter {
                 if (codeFileCollection != null) {
                     if (codeFileCollection.getCount() == 0) {
                         ProcessNodeDataDO process = createProcessNodeDataDO(commonProcessing.makeStagedTreatmentName(stagedTreatmentsNodeDataDO), stagedTreatmentsNodeDataDO.getObjid(), STAGED_TREATMENTS, stagedTreatmentsNodeDataDO.getSubjectVariables(),
-                                stagedTreatmentsNodeDataDO.getSubjectVariables().getIbVariableDO(), stagedTreatmentsNodeDataDO.getDateModified(), stagedTreatmentsNodeDataDO.getLabel(), stagedTreatmentsNodeDataDO.getNodeId(),
+                                stagedTreatmentsNodeDataDO.getSubjectVariables() == null ? null : stagedTreatmentsNodeDataDO.getSubjectVariables().getIbVariableDO(), stagedTreatmentsNodeDataDO.getDateModified(), stagedTreatmentsNodeDataDO.getLabel(), stagedTreatmentsNodeDataDO.getNodeId(),
                                 stagedTreatmentsNodeDataDO.getVersionNumber());
                         createNewCodeFile(baseIp, accessToken, process, codeStep);
                     } else {
@@ -360,7 +443,7 @@ public class ProcessNodeConverter {
                 if (codeFileCollection != null) {
                     if (codeFileCollection.getCount() == 0) {
                         ProcessNodeDataDO process = createProcessNodeDataDO(commonProcessing.makeRemoveStagedTreatmentName(removeStagedTreatmentsNodeDataDO), removeStagedTreatmentsNodeDataDO.getObjid(), REMOVE_STAGED_TREATMENTS, removeStagedTreatmentsNodeDataDO.getSubjectVariables(),
-                                removeStagedTreatmentsNodeDataDO.getSubjectVariables().getIbVariableDO(), removeStagedTreatmentsNodeDataDO.getDateModified(), removeStagedTreatmentsNodeDataDO.getLabel(), removeStagedTreatmentsNodeDataDO.getNodeId(),
+                                removeStagedTreatmentsNodeDataDO.getSubjectVariables() == null ? null : removeStagedTreatmentsNodeDataDO.getSubjectVariables().getIbVariableDO(), removeStagedTreatmentsNodeDataDO.getDateModified(), removeStagedTreatmentsNodeDataDO.getLabel(), removeStagedTreatmentsNodeDataDO.getNodeId(),
                                 removeStagedTreatmentsNodeDataDO.getVersionNumber());
                         createNewCodeFile(baseIp, accessToken, process, codeStep);
                     } else {
@@ -401,7 +484,7 @@ public class ProcessNodeConverter {
         ds2Code.append("/*").append(NEW_LINE_STRING);
         ds2Code.append(ds2NodeName).append(" Node migrated from RTDM").append(NEW_LINE_STRING);
 
-        if (variablesObject != null) {
+        if (variablesObject != null && variables != null) {
             ds2Code.append(">>> ").append(ds2NodeName).append(" Variables").append(NEW_LINE_STRING);
             for (com.sas.rtdm2id.model.rtdm.extension.IBVariableDO ibVariableDO : variables) {
                 ds2Code.append("    Description:").append(ibVariableDO.getDescription()).append(NEW_LINE_STRING);
@@ -504,7 +587,7 @@ public class ProcessNodeConverter {
             ResponseEntity<String> putResp = restTemplate.exchange(ViyaApi.createUri(baseIp, location, mapStorage.getProtocol()), HttpMethod.PUT,
                     ViyaApi.createPutFilesFiles(etag, accessToken, process.getProcess()), String.class);
             if (putResp.getStatusCode().value() == 200) {
-                ResponseEntity<DecisionCodeFileResponse> responseCodeFile = restTemplate.postForEntity(ViyaApi.createUri(baseIp, "/decisions/codeFiles?parentFolderUri=" + mapStorage.getParentFolderUri(), mapStorage.getProtocol()),
+                ResponseEntity<DecisionCodeFileResponse> responseCodeFile = restTemplate.postForEntity(ViyaApi.createUri(baseIp, "/decisions/codeFiles?parentFolderUri=" + ViyaApi.encodeQueryParam(mapStorage.getParentFolderUri()), mapStorage.getProtocol()),
                         ViyaApi.createDecisionCodeFiles(location, customNodeRequest.getType(), accessToken), DecisionCodeFileResponse.class);
                 if (responseCodeFile.getStatusCode().value() == 201
                         && responseCodeFile.getBody() != null) {
@@ -525,9 +608,96 @@ public class ProcessNodeConverter {
                         codeStep.setName(decisionCodeFileResponse.getName());
                         codeStep.setType(customNodeRequest.getType());
                         mapStorage.getCustomObjectStepHashMap().put(objId, codeStep);
+                        recordCodeFileSignature(objId, decisionCodeFileResponse.getId());
                     }
                 }
             }
+        }
+    }
+
+    /**
+     * Reads the signature ID derived for a code file, so the step can be aligned with it (see
+     * {@link #alignWithCodeFileSignature}). Without it the step keeps the mappings built from the extract.
+     */
+    private void recordCodeFileSignature(Short objId, String codeFileId) {
+        if (objId == null || codeFileId == null) {
+            return;
+        }
+        try {
+            ResponseEntity<CodeFileSignature> response = restTemplate.exchange(
+                ViyaApi.createUri(mapStorage.getBaseIp(), "/decisions/codeFiles/" + codeFileId, mapStorage.getProtocol()),
+                HttpMethod.GET, ViyaApi.createGetDecisionCollectionOrGlobalVariableRevision(mapStorage.getAccessToken()),
+                CodeFileSignature.class);
+            CodeFileSignature body = response == null ? null : response.getBody();
+            if (body != null && body.getSignature() != null && !body.getSignature().isEmpty()) {
+                mapStorage.getCodeFileSignatures().put(objId, body.getSignature());
+            }
+        } catch (RestClientException | URISyntaxException e) {
+            log.warn("Could not read the signature of code file {}; its step mappings are not checked against it: {}",
+                codeFileId, e.getMessage());
+        }
+    }
+
+    /**
+     * The name ID gives an SQL code file's output data grid: the code file's file name (the process name, see
+     * ViyaApi.createPutFilesFiles) with '.' and whitespace replaced by '_', plus {@code _dgo}
+     * (viya-decisions-framework CodeFileHelper.getAdjustedTermName). E.g. "READ - X" -> {@code READ_-_X_dgo}.
+     */
+    static String sqlOutputGridTerm(String processName) {
+        String fileName = processName.endsWith(".sql") ? processName.substring(0, processName.length() - ".sql".length())
+            : processName;
+        return fileName.replaceAll("[.\\s]", "_") + "_dgo";
+    }
+
+    /**
+     * Maps the code file inputs a step does not set. A code file is found by name, so it may have been created from
+     * another campaign's version of the same RTDM process that has more input columns; ID rejects a step that leaves a
+     * declared input unmapped ("Mapping ... is invalid"). Such an input is passed an unset value, as RTDM leaves an
+     * unmapped process input unset. Existing mappings are never changed or removed (returnCode and rowCount in
+     * particular are essential outputs); a mapping to a term the code file does not declare is only reported.
+     */
+    void alignWithCodeFileSignature(Step step, List<CodeFileSignature.Term> signature, Decision decision, String nodeName) {
+        if (signature == null || signature.isEmpty() || step.getMappings() == null) {
+            return;
+        }
+        Map<String, CodeFileSignature.Term> declared = new LinkedHashMap<>();
+        for (CodeFileSignature.Term term : signature) {
+            if (term.getName() != null) {
+                declared.putIfAbsent(term.getName().toLowerCase(Locale.ROOT), term);
+            }
+        }
+        Set<String> mapped = new HashSet<>();
+        for (Mapping mapping : step.getMappings()) {
+            String stepTerm = mapping.getStepTermName();
+            if (stepTerm == null) {
+                continue;
+            }
+            mapped.add(stepTerm.toLowerCase(Locale.ROOT));
+            if (!declared.containsKey(stepTerm.toLowerCase(Locale.ROOT)) && !STANDARD_DATA_PROCESS_OUTPUTS.contains(stepTerm)) {
+                log.warn("Node '{}': the code file does not declare '{}' (mapped to '{}')", nodeName, stepTerm,
+                    mapping.getTargetDecisionTermName());
+            }
+        }
+        for (CodeFileSignature.Term term : declared.values()) {
+            boolean input = INPUT_DIRECTION.equals(term.getDirection()) || IN_OUT_DIRECTION.equals(term.getDirection());
+            if (!input || mapped.contains(term.getName().toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            log.warn("Node '{}': code file input '{}' is not set by this campaign's version of the process; it is passed"
+                + " an unset value", nodeName, term.getName());
+            Mapping mapping = new Mapping();
+            mapping.setStepTermName(term.getName());
+            mapping.setTargetDecisionTermName(commonProcessing.sanitizeVariableName(term.getName()));
+            mapping.setDirection(Mapping.DirectionEnum.INPUT);
+            step.getMappings().add(mapping);
+            SignatureTerm unset = new SignatureTerm();
+            unset.setName(mapping.getTargetDecisionTermName());
+            SignatureTerm.DataTypeEnum type = SignatureTerm.DataTypeEnum.fromValue(term.getDataType());
+            unset.setDataType(type != null ? type : SignatureTerm.DataTypeEnum.UNKNOWN);
+            if (SignatureTerm.DataTypeEnum.DATAGRID.equals(unset.getDataType())) {
+                unset.setDataGridExtension(new ArrayList<>());
+            }
+            commonProcessing.checkSignatureTermForDuplicate(NONE_DIRECTION, decision, unset);
         }
     }
 
@@ -554,79 +724,124 @@ public class ProcessNodeConverter {
         String processTypeDescription = process.getProcess().getProcessTypeDescription();
         String modelName = process.getProcess().getName();
 
-        String originalPackageName = extractPackageNameFromDS2Code(ds2code);
-
-        ds2code = ds2code.replace(originalPackageName, "\"${PACKAGE_NAME}\"");
-        ds2code = ds2code.replace("/overwrite=yes", "/inline");
-
-        if (ds2code.contains("sqlstmt")) {
+        if (ds2code != null && ds2code.contains("sqlstmt")) {
             // Certain sqlstmt commands do not compile in ID
-            // For example: sqlstmt_pkg = _NEW_ sqlstmt(sqlQuery,[TEMP_TRX_P]);	
+            // For example: sqlstmt_pkg = _NEW_ sqlstmt(sqlQuery,[TEMP_TRX_P]);
             // For now enclose DS2 code in quotes to allow migration code to continue
             // Use of sqlstmt can be evaluated later in another story
             return processJavaCodeOrWebServiceOrBusinessRulesForId(process);
-        } else {
-            if (MODEL_CONSTANT.equals(processTypeDescription)) {
-                ds2code = "// Model from RTDM: " + modelName + NEW_LINE_STRING + ds2code;
-            }
-
-            ds2code = convertIntToDouble(ds2code);
-            ds2code = convertTapPackages(ds2code);
-
-            ds2code = convertExecuteListsToDatagrid(ds2code);
-            int lastIndexOf = ds2code.indexOf("endpackage;") + 11;
-            ds2code = ds2code.substring(0, lastIndexOf);
         }
 
+        ds2code = convertDs2PackageToIdFormat(ds2code, modelName);
+        if (MODEL_CONSTANT.equals(processTypeDescription)) {
+            ds2code = "// Model from RTDM: " + modelName + NEW_LINE_STRING + ds2code;
+        }
         return ds2code;
     }
 
-    private String convertExecuteListsToDatagrid(String ds2code) {
-        if (ds2code.contains(TAP_FLOAT_ARRAY_CONSTANT) || ds2code.contains(TAP_STRING_ARRAY_CONSTANT)
-                || ds2code.contains(TAP_INT_ARRAY_CONSTANT) || ds2code.contains(TAP_DATETIME_ARRAY_CONSTANT)
-                || ds2code.contains(TAP_BOOLEAN_ARRAY_CONSTANT)) {
-            ds2code = ds2code.replaceAll(TAP_FLOAT_ARRAY_CONSTANT, DS2_DATAGRID);
-            ds2code = ds2code.replaceAll(TAP_STRING_ARRAY_CONSTANT, DS2_DATAGRID);
-            ds2code = ds2code.replaceAll(TAP_INT_ARRAY_CONSTANT, DS2_DATAGRID);
-            ds2code = ds2code.replaceAll(TAP_DATETIME_ARRAY_CONSTANT, DS2_DATAGRID);
-            ds2code = ds2code.replaceAll(TAP_BOOLEAN_ARRAY_CONSTANT, DS2_DATAGRID);
-            int innerExecuteStartIndex = ds2code.indexOf("(") + 1;
-            int innerExecuteEndIndex = ds2code.indexOf(");");
-            String executeContent = ds2code.substring(innerExecuteStartIndex, innerExecuteEndIndex);
-            String[] splittedString = executeContent.split(",");
-            StringBuilder replacement = new StringBuilder();
-            for (String substring : splittedString) {
-                if (substring.contains("datagrid")) {
-                    substring += "_dgo";
+    /**
+     * Rewrites an RTDM DS2 package into the form ID expects for a DS2 code file: the package declaration is renamed to
+     * the ID placeholder and made inline, RTDM-only types are replaced, list parameters of the execute method become
+     * data grids, and anything after endpackage is dropped. Throws IllegalArgumentException when the code does not
+     * have the expected package structure.
+     */
+    static String convertDs2PackageToIdFormat(String ds2code, String processName) {
+        if (ds2code == null || ds2code.trim().isEmpty()) {
+            throw new IllegalArgumentException("DS2 code of process '" + processName + "' is empty");
+        }
+
+        Matcher packageMatcher = PACKAGE_DECLARATION_PATTERN.matcher(ds2code);
+        if (!packageMatcher.find()) {
+            throw new IllegalArgumentException("DS2 code of process '" + processName + "' has no package declaration");
+        }
+        int declarationEnd = ds2code.indexOf(';', packageMatcher.end());
+        if (declarationEnd < 0) {
+            throw new IllegalArgumentException("DS2 package declaration of process '" + processName + "' is not terminated by ';'");
+        }
+        String options = OVERWRITE_OPTION_PATTERN.matcher(ds2code.substring(packageMatcher.end(), declarationEnd))
+                .replaceAll("/inline");
+        ds2code = ds2code.substring(0, packageMatcher.start(2)) + "\"${PACKAGE_NAME}\"" + options
+                + ds2code.substring(declarationEnd);
+
+        Matcher endPackageMatcher = END_PACKAGE_PATTERN.matcher(ds2code);
+        if (!endPackageMatcher.find()) {
+            throw new IllegalArgumentException("DS2 code of process '" + processName + "' has no endpackage statement");
+        }
+        ds2code = ds2code.substring(0, endPackageMatcher.end());
+
+        ds2code = convertIntToDouble(ds2code);
+        ds2code = convertTapPackages(ds2code);
+        return convertExecuteListsToDatagrid(ds2code, processName);
+    }
+
+    private static String convertExecuteListsToDatagrid(String ds2code, String processName) {
+        if (!TAP_ARRAY_PATTERN.matcher(ds2code).find()) {
+            return ds2code;
+        }
+        ds2code = TAP_ARRAY_PATTERN.matcher(ds2code).replaceAll(DS2_DATAGRID);
+
+        Matcher executeMatcher = EXECUTE_METHOD_PATTERN.matcher(ds2code);
+        if (!executeMatcher.find()) {
+            throw new IllegalArgumentException("DS2 code of process '" + processName + "' has no execute method");
+        }
+        int parametersStart = executeMatcher.end();
+        int parametersEnd = findClosingParenthesis(ds2code, parametersStart - 1);
+        if (parametersEnd < 0) {
+            throw new IllegalArgumentException("Parameter list of the execute method of process '" + processName + "' is not closed");
+        }
+
+        // Split the parameter list on top-level commas only (types such as varchar(100) contain parentheses)
+        String parameters = ds2code.substring(parametersStart, parametersEnd);
+        StringBuilder replacement = new StringBuilder();
+        int depth = 0;
+        int parameterStart = 0;
+        for (int i = 0; i <= parameters.length(); i++) {
+            char c = i < parameters.length() ? parameters.charAt(i) : ',';
+            if (c == '(') {
+                depth++;
+            } else if (c == ')') {
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                String parameter = parameters.substring(parameterStart, i);
+                if (DATAGRID_WORD_PATTERN.matcher(parameter).find()) {
+                    String trimmed = parameter.replaceAll("\\s+$", "");
+                    parameter = trimmed + "_dgo" + parameter.substring(trimmed.length());
                 }
-                replacement.append(substring).append(",");
+                replacement.append(parameter);
+                if (i < parameters.length()) {
+                    replacement.append(',');
+                }
+                parameterStart = i + 1;
             }
-            replacement = new StringBuilder(replacement.substring(0, replacement.length() - 1));
-            ds2code = ds2code.replace(executeContent, replacement.toString());
         }
-        return ds2code;
+        return ds2code.substring(0, parametersStart) + replacement + ds2code.substring(parametersEnd);
     }
 
-    private String convertIntToDouble(String ds2code) {
-        if (ds2code.contains(DS2_INT_CONSTANT)) {
-            ds2code = ds2code.replaceAll(DS2_INT_CONSTANT, DS2_DOUBLE_CONSTANT);
+    private static int findClosingParenthesis(String text, int openIndex) {
+        int depth = 0;
+        for (int i = openIndex; i < text.length(); i++) {
+            if (text.charAt(i) == '(') {
+                depth++;
+            } else if (text.charAt(i) == ')') {
+                depth--;
+                if (depth == 0) {
+                    return i;
+                }
+            }
         }
-        return ds2code;
+        return -1;
     }
 
-    private String convertTapPackages(String ds2code) {
-        if (ds2code.contains(PACKAGE_TAP_DATETIME_CONSTANT)) {
-            ds2code = ds2code.replaceAll(PACKAGE_TAP_DATETIME_CONSTANT, DS2_DOUBLE_CONSTANT);
-        }
-        if (ds2code.contains(PACKAGE_TAP_HASH_CONSTANT)) {
-            ds2code = ds2code.replaceAll(PACKAGE_TAP_HASH_CONSTANT, DS2_HASH_CONSTANT);
-        }
-        if (ds2code.contains(PACKAGE_TAP_LOGGER_CONSTANT)) {
-            ds2code = ds2code.replaceAll(PACKAGE_TAP_LOGGER_CONSTANT, DS2_LOGGER_CONSTANT);
-        }
-        if (ds2code.contains(PACKAGE_TAP_SQLTABLE_CONSTANT)) {
-            ds2code = ds2code.replaceAll(PACKAGE_TAP_SQLTABLE_CONSTANT, DS2_DATAGRID);
-        }
+    private static String convertIntToDouble(String ds2code) {
+        // Only the stand-alone DS2 type keyword "int", not identifiers that merely end in "int" (e.g. print, myint)
+        return INT_TYPE_PATTERN.matcher(ds2code).replaceAll(DOUBLE_CONSTANT);
+    }
+
+    private static String convertTapPackages(String ds2code) {
+        ds2code = TAP_DATETIME_PACKAGE_PATTERN.matcher(ds2code).replaceAll(DOUBLE_CONSTANT);
+        ds2code = TAP_HASH_PACKAGE_PATTERN.matcher(ds2code).replaceAll(DS2_HASH_CONSTANT.trim());
+        ds2code = TAP_LOGGER_PACKAGE_PATTERN.matcher(ds2code).replaceAll(DS2_LOGGER_CONSTANT.trim());
+        ds2code = TAP_SQLTABLE_PACKAGE_PATTERN.matcher(ds2code).replaceAll(DS2_DATAGRID);
         return ds2code;
     }
 
@@ -650,11 +865,14 @@ public class ProcessNodeConverter {
         // select CLIENTID AS {:CLIENTID:decimal}, HHID AS {:HHID:decimal}, RANDNOM5000 AS {:RANDNOM5000:string:1000}
         // from "CUSTOMER"
         // where CLIENTID={?:CLIENTID:decimal}
+        if (outputVariables(process).isEmpty()) {
+            throw new IllegalArgumentException("Read data process '" + process.getName() + "' has no output variables to select");
+        }
         StringBuilder stb = new StringBuilder("/* include sqlReturnInfo */\n");
         stb.append("select ");
 
         for (ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO outputVars :
-                process.getOutputVariableList().getIbVariableDOs()) {
+                outputVariables(process)) {
             String datatypeOfVarForSQLNode = getDatatypeOfVarForSQLNode(outputVars.getTypeDescription());
             String var = outputVars.getName() + " AS {:" + outputVars.getName()
                     + ":" + datatypeOfVarForSQLNode + "}";
@@ -667,20 +885,22 @@ public class ProcessNodeConverter {
         stb.append(" from ");
         quoteTableName(stb, process.getTableName());
         
-        if (!process.getInputVariableList().getIbVariableDOs().isEmpty()) {
-            stb.append(" where ");
-            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVars : process.getInputVariableList().getIbVariableDOs()) {
-                String datatypeOfVarForSQLNode = getDatatypeOfVarForSQLNode(inputVars.getTypeDescription());
-                String var = inputVars.getName() + "={?:" + inputVars.getName() + ":"
-                        + datatypeOfVarForSQLNode + "}";
-                var = modifyIfStringDatatype(var, datatypeOfVarForSQLNode);
-                stb.append(var);
-                stb.append(" and ");
-            }
-            stb.delete(stb.length() - 5, stb.length());
-        }
-
+        appendWhereClause(stb, process, inputVariables(process));
         return stb.toString();
+    }
+
+    private static List<ProcessNodeDataDO.Process.InputVariableList.IBVariableDO> inputVariables(ProcessNodeDataDO.Process process) {
+        if (process.getInputVariableList() == null || process.getInputVariableList().getIbVariableDOs() == null) {
+            return Collections.emptyList();
+        }
+        return process.getInputVariableList().getIbVariableDOs();
+    }
+
+    private static List<ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO> outputVariables(ProcessNodeDataDO.Process process) {
+        if (process.getOutputVariableList() == null || process.getOutputVariableList().getIbVariableDOs() == null) {
+            return Collections.emptyList();
+        }
+        return process.getOutputVariableList().getIbVariableDOs();
     }
 
     private String buildInsertSql(ProcessNodeDataDO.Process process) {
@@ -691,8 +911,8 @@ public class ProcessNodeConverter {
         quoteTableName(stb, process.getTableName());
 
         stb.append(" (");
-        if (!process.getInputVariableList().getIbVariableDOs().isEmpty()) {
-            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVar : process.getInputVariableList().getIbVariableDOs()) {
+        if (!inputVariables(process).isEmpty()) {
+            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVar : inputVariables(process)) {
                 stb.append(inputVar.getName());
                 stb.append(", ");
             }
@@ -703,8 +923,8 @@ public class ProcessNodeConverter {
         stb.append(" values ");
         stb.append("(");
 
-        if (!process.getInputVariableList().getIbVariableDOs().isEmpty()) {
-            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVars : process.getInputVariableList().getIbVariableDOs()) {
+        if (!inputVariables(process).isEmpty()) {
+            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVars : inputVariables(process)) {
                 String datatypeOfVarForSQLNode = getDatatypeOfVarForSQLNode(inputVars.getTypeDescription());
                 String var = "{?:" + inputVars.getName() + ":" + datatypeOfVarForSQLNode + "}";
                 var = modifyIfStringDatatype(var, datatypeOfVarForSQLNode);
@@ -721,38 +941,119 @@ public class ProcessNodeConverter {
     private String buildUpdateSql(ProcessNodeDataDO.Process process) {
         // Example:
         // update "CUSTOMER"
-        // set HHID = {?:HHID:decimal}, RANDNOM5000={?:RANDNOM5000:string:1000}
+        // set AGE_UPDATABLE={?:AGE_UPDATABLE_set:decimal}, HHID={?:HHID_set:decimal}
         // where CLIENTID={?:CLIENTID:decimal}
+        //
+        // In an RTDM update-data process the input variables are the criteria (WHERE) columns and the output
+        // variables are the columns to update, each carrying its new value. normalizeUpdateDataProcesses turns the
+        // update columns into SET parameters (inputs marked with updateColumn) so their values flow in through the
+        // node's input-values RuleSet like any other input; a column may be both a criterion and updated.
+        normalizeUpdateDataProcess(process);
+        List<ProcessNodeDataDO.Process.InputVariableList.IBVariableDO> setVariables = inputVariables(process).stream()
+                .filter(variable -> variable.getUpdateColumn() != null).toList();
+        if (setVariables.isEmpty()) {
+            throw new IllegalArgumentException("Update data process '" + process.getName() + "' has no columns to update");
+        }
         StringBuilder stb = new StringBuilder("update ");
         quoteTableName(stb, process.getTableName());
 
         stb.append(" set ");
-
-        if (!process.getInputVariableList().getIbVariableDOs().isEmpty()) {
-            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVars : process.getInputVariableList().getIbVariableDOs()) {
-                String datatypeOfVarForSQLNode = getDatatypeOfVarForSQLNode(inputVars.getTypeDescription());
-                String var = inputVars.getName() + "={?:" + inputVars.getName() + ":" + datatypeOfVarForSQLNode + "}";
-                var = modifyIfStringDatatype(var, datatypeOfVarForSQLNode);
-                stb.append(var);
-                stb.append(", ");
-            }
-            stb.delete(stb.length() - 2, stb.length());
+        for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO setVariable : setVariables) {
+            String datatypeOfVarForSQLNode = getDatatypeOfVarForSQLNode(setVariable.getTypeDescription());
+            String var = setVariable.getUpdateColumn() + "={?:" + setVariable.getName() + ":" + datatypeOfVarForSQLNode + "}";
+            var = modifyIfStringDatatype(var, datatypeOfVarForSQLNode);
+            stb.append(var);
+            stb.append(", ");
         }
+        stb.delete(stb.length() - 2, stb.length());
 
-        if (!process.getInputVariableList().getIbVariableDOs().isEmpty()) {
-            stb.append(" where ");
-            for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO inputVars : process.getInputVariableList().getIbVariableDOs()) {
-                String datatypeOfVarForSQLNode = getDatatypeOfVarForSQLNode(inputVars.getTypeDescription());
-                String var = inputVars.getName() + "={?:" + inputVars.getName() + ":"
-                        + datatypeOfVarForSQLNode + "}";
-                var = modifyIfStringDatatype(var, datatypeOfVarForSQLNode);
-                stb.append(var);
-                stb.append(" and ");
-            }
-            stb.delete(stb.length() - 5, stb.length());
-        }
-
+        appendWhereClause(stb, process, inputVariables(process).stream()
+                .filter(variable -> variable.getUpdateColumn() == null).toList());
         return stb.toString();
+    }
+
+    /**
+     * WhereClauseOp (column op value) to SQL. RTDM does not document the encoding; it is inferred from customer
+     * extracts: 0 is equality almost everywhere, validity windows use VALID_FROM_DTTM 5 and VALID_TO_DTTM 3 (only
+     * "FROM <= date and TO >= date" makes sense, which fixes 5 as <= and 3 as >=), and a status-code exclusion uses 1
+     * (<>). That is the ordering =, <>, >, >=, <, <=; 2 and 4 follow from it but have not been seen.
+     */
+    private static final List<String> WHERE_CLAUSE_OPERATORS = List.of("=", "<>", ">", ">=", "<", "<=");
+
+    /**
+     * Appends {@code where COL={?:COL:type} and ...} for the criteria variables, using each criterion's WhereClauseOp.
+     * An operator outside the known range fails rather than being guessed.
+     */
+    private void appendWhereClause(StringBuilder stb, ProcessNodeDataDO.Process process,
+            List<ProcessNodeDataDO.Process.InputVariableList.IBVariableDO> criteria) {
+        if (criteria.isEmpty()) {
+            return;
+        }
+        stb.append(" where ");
+        for (ProcessNodeDataDO.Process.InputVariableList.IBVariableDO criterion : criteria) {
+            int op = criterion.getWhereClauseOp();
+            if (op < 0 || op >= WHERE_CLAUSE_OPERATORS.size()) {
+                throw new IllegalArgumentException("Data process '" + process.getName() + "' uses unsupported WhereClauseOp "
+                        + op + " for column " + criterion.getName() + "; known values are 0-5 (=, <>, >, >=, <, <=)");
+            }
+            String datatypeOfVarForSQLNode = getDatatypeOfVarForSQLNode(criterion.getTypeDescription());
+            String var = criterion.getName() + WHERE_CLAUSE_OPERATORS.get(op) + "{?:" + criterion.getName() + ":" + datatypeOfVarForSQLNode + "}";
+            var = modifyIfStringDatatype(var, datatypeOfVarForSQLNode);
+            stb.append(var);
+            stb.append(" and ");
+        }
+        stb.delete(stb.length() - 5, stb.length());
+    }
+
+    /**
+     * Rewrites every update-data process so its update columns become SET parameters in the input variable list.
+     * Must run before custom nodes, RuleSets and steps are created, so that the SQL, the input-values RuleSet, the
+     * step mappings and calculated-item scheduling all see the same inputs. Idempotent.
+     */
+    public static void normalizeUpdateDataProcesses(Batch batch) {
+        if (batch == null || batch.getLogicalUnit() == null || batch.getLogicalUnit().getProcessNodeDataDOs() == null) {
+            return;
+        }
+        for (ProcessNodeDataDO processNode : batch.getLogicalUnit().getProcessNodeDataDOs()) {
+            if (processNode.getProcess() != null) {
+                normalizeUpdateDataProcess(processNode.getProcess());
+            }
+        }
+    }
+
+    static void normalizeUpdateDataProcess(ProcessNodeDataDO.Process process) {
+        if (process.getProcessType() != PROCESS_TYPE_UPDATE_DATA
+                && !UPDATE_DATA_CONSTANT.equals(process.getProcessTypeDescription())) {
+            return;
+        }
+        if (outputVariables(process).isEmpty()) {
+            return;
+        }
+        if (process.getInputVariableList() == null) {
+            process.setInputVariableList(new ProcessNodeDataDO.Process.InputVariableList());
+        }
+        List<ProcessNodeDataDO.Process.InputVariableList.IBVariableDO> inputs = process.getInputVariableList().getIbVariableDOs();
+        Set<String> usedNames = new HashSet<>();
+        inputs.forEach(input -> usedNames.add(input.getName().toLowerCase(Locale.ROOT)));
+        outputVariables(process).forEach(output -> usedNames.add(output.getName().toLowerCase(Locale.ROOT)));
+        for (ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO column : outputVariables(process)) {
+            String parameterName = column.getName() + "_set";
+            while (!usedNames.add(parameterName.toLowerCase(Locale.ROOT))) {
+                parameterName = parameterName + "_";
+            }
+            ProcessNodeDataDO.Process.InputVariableList.IBVariableDO setVariable = new ProcessNodeDataDO.Process.InputVariableList.IBVariableDO();
+            setVariable.setName(parameterName);
+            setVariable.setPhysicalName(parameterName);
+            setVariable.setDescription(column.getDescription());
+            setVariable.setType(column.getType());
+            setVariable.setTypeDescription(column.getTypeDescription());
+            setVariable.setLevel(column.getLevel());
+            setVariable.setValue(column.getValue());
+            setVariable.setUpdateColumn(column.getName());
+            inputs.add(setVariable);
+        }
+        // The update columns are not outputs of the generated SQL (it only returns returnCode/rowCount)
+        process.getOutputVariableList().getIbVariableDOs().clear();
     }
 
     private StringBuilder quoteTableName(StringBuilder stb, String tableName) {
@@ -866,22 +1167,26 @@ public class ProcessNodeConverter {
         return query;
     }
 
-    private SignatureTerm processDataProcessMapping(List<ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO> ibVariableDOList
-            , Step step, Decision decision, String processName) {
+    /**
+     * Maps the data grid a data process returns. The grid is written under the name later nodes read it by: RTDM's
+     * output id {@code <NodeName>.<ProcessName><DatagridName>}, or the identifier it is copied to (DatagridIdentifier).
+     * The extraction RuleSet then copies its columns out (see {@link #updateRuleSet(SignatureTerm, Step, Decision, String, String)}).
+     */
+    private SignatureTerm processDataProcessMapping(String nodeName, ProcessNodeDataDO.Process process, Step step, Decision decision) {
         List<SignatureTermExtension> signatureTermExtensionList = new ArrayList<>();
+        String processName = process.getName();
 
         IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
 
         for (ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO ibVariableDO
-                : ibVariableDOList) {
+                : process.getOutputVariableList().getIbVariableDOs()) {
             if (!DATAGRID_CONSTANT.equals(ibVariableDO.getTypeDescription())) {
-                IBVariableDO ibVariableDOInner = mapper.ibVariableDoGet(ibVariableDO);
-                commonProcessing.addNewSignatureItemForDataGridExtension(ibVariableDOInner, "none", decision);
-                signatureTermExtensionList.add(createDataGridExtension(ibVariableDOInner));
+                signatureTermExtensionList.add(createDataGridExtension(mapper.ibVariableDoGet(ibVariableDO)));
             }
         }
+        String gridName = process.getDatagridName() == null || process.getDatagridName().isBlank() ? "_out" : process.getDatagridName();
         SignatureTerm signatureTerm = new SignatureTerm();
-        signatureTerm.setName(commonProcessing.sanitizeVariableName(processName + "_out"));
+        signatureTerm.setName(commonProcessing.nodeOutputTermName(CommonProcessing.nodeOutputId(nodeName, processName, gridName)));
         signatureTerm.setDataType(SignatureTerm.DataTypeEnum.DATAGRID);
         signatureTerm.setDirection(SignatureTerm.DirectionEnum.NONE);
         signatureTerm.setDataGridExtension(signatureTermExtensionList);
@@ -889,19 +1194,50 @@ public class ProcessNodeConverter {
         Mapping mapping = new Mapping();
         mapping.setTargetDecisionTermName(signatureTerm.getName());
         mapping.setDirection(Mapping.DirectionEnum.OUTPUT);
-        mapping.setStepTermName(commonProcessing.sanitizeVariableName(processName + "_dgo"));
+        // The SQL code file's output data grid, named by ID after the code file (see sqlOutputGridTerm)
+        mapping.setStepTermName(sqlOutputGridTerm(processName));
         commonProcessing.checkMappingForDuplicate(mapping, step);
-        addStandardDataProcessOutputMapping("returnCode", step, decision);
-        addStandardDataProcessOutputMapping("rowCount", step, decision);
+        STANDARD_DATA_PROCESS_OUTPUTS.forEach(output -> addStandardDataProcessOutputMapping(output, step, decision));
         return signatureTerm;
     }
 
-    private void addMapping(SignatureTerm signatureTerm, Step step) {
+
+    /**
+     * A list input is a one-column data grid parameter of the code file ({@code <var>_dgo}). It reads the data grid its
+     * value references (an upstream list or grid output, an identifier, a request or a global variable); without a
+     * reference it reads an (unset) term named after the parameter, as before.
+     */
+    private void addListInputMapping(ProcessNodeDataDO.Process.InputVariableList.IBVariableDO input, Step step, Decision decision) {
+        IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
+        String target = null;
+        ValueTypeVarInfoDO reference = input.getValue() == null ? null : input.getValue().getValueTypeVarInfoDO();
+        if (reference != null) {
+            String resolved = commonProcessing.resolveReference(reference.getVarInfoId());
+            if (resolved != null) {
+                target = commonProcessing.sanitizeVariableName(commonProcessing.changeVariableNameToFormat(resolved));
+            }
+        }
+        if (target == null) {
+            target = commonProcessing.sanitizeVariableName(input.getName() + "_dgo");
+            String literal = input.getValue() == null ? null : input.getValue().getListValue();
+            if (literal != null && !literal.isBlank()) {
+                // TODO: no verified ID expression builds a data grid from constants, so the RTDM literal is not migrated
+                log.warn("List input '{}' has the constant value '{}' in RTDM; set data grid '{}' manually in the migrated Decision",
+                    input.getName(), literal, target);
+            }
+        }
         Mapping mapping = new Mapping();
-        mapping.setTargetDecisionTermName(commonProcessing.sanitizeVariableName(signatureTerm.getName()));
-        mapping.setDirection(Mapping.DirectionEnum.OUTPUT);
-        mapping.setStepTermName(commonProcessing.sanitizeAndReduceVariableName(signatureTerm.getName().replace("_out", "_dgo")));
+        mapping.setStepTermName(commonProcessing.sanitizeAndReduceVariableName(input.getName() + "_dgo"));
+        mapping.setTargetDecisionTermName(target);
+        mapping.setDirection(Mapping.DirectionEnum.INPUT);
         commonProcessing.checkMappingForDuplicate(mapping, step);
+
+        SignatureTerm term = new SignatureTerm();
+        term.setName(target);
+        term.setDataType(SignatureTerm.DataTypeEnum.DATAGRID);
+        term.setDirection(SignatureTerm.DirectionEnum.NONE);
+        term.setDataGridExtension(new ArrayList<>(List.of(createDataGridExtension(mapper.ibVariableDoGet(input)))));
+        commonProcessing.checkSignatureTermForDuplicate("none", decision, term);
     }
 
     private void processCustomObjectInputMapping(ProcessNodeDataDO processNodeDataDO, Decision decision, List<Step> stepList, Step step) {
@@ -918,19 +1254,7 @@ public class ProcessNodeConverter {
                 final String varInfo = valueTypeVarInfoDO != null ? valueTypeVarInfoDO.getVarInfoId() : "";
                 if (!commonProcessing.checkForCalcVariable(varInfo,ibVariableDOMapped.getTypeDescription(), stepList, null, varOriginalName, processNodeDataDO.getNodeId())) {
                     if (ibVariableDO.getTypeDescription().contains("list")) {
-                        List<SignatureTermExtension> signatureTermExtensionList = new ArrayList<>();
-
-                        IBVariableDO ibVariableDOInner = mapper.ibVariableDoGet(ibVariableDO);
-                        commonProcessing.addNewSignatureItem(ibVariableDOInner, "none", decision, null);
-                        signatureTermExtensionList.add(createDataGridExtension(ibVariableDOInner));
-
-                        SignatureTerm signatureTerm = new SignatureTerm();
-                        signatureTerm.setName(commonProcessing.sanitizeVariableName(ibVariableDO.getName() + "_dgo"));
-                        signatureTerm.setDataType(SignatureTerm.DataTypeEnum.DATAGRID);
-                        signatureTerm.setDirection(SignatureTerm.DirectionEnum.NONE);
-                        signatureTerm.setDataGridExtension(signatureTermExtensionList);
-                        commonProcessing.checkSignatureTermForDuplicate("none", decision, signatureTerm);
-                        addMapping(signatureTerm, step);
+                        addListInputMapping(ibVariableDO, step, decision);
                     } else {
                         commonProcessing.addMapping(ibVariableDOMapped, INPUT_DIRECTION, step, false, decision);
                         commonProcessing.addNewSignatureItem(ibVariableDOMapped, "none", decision, null);
@@ -945,19 +1269,7 @@ public class ProcessNodeConverter {
             } else {
                 // Even if no value assigned we need the mappings and signature items
                 if (ibVariableDO.getTypeDescription().contains("list")) {
-                    List<SignatureTermExtension> signatureTermExtensionList = new ArrayList<>();
-
-                    IBVariableDO ibVariableDOInner = mapper.ibVariableDoGet(ibVariableDO);
-                    commonProcessing.addNewSignatureItem(ibVariableDOInner, "none", decision, null);
-                    signatureTermExtensionList.add(createDataGridExtension(ibVariableDOInner));
-
-                    SignatureTerm signatureTerm = new SignatureTerm();
-                    signatureTerm.setName(commonProcessing.sanitizeVariableName(ibVariableDO.getName() + "_dgo"));
-                    signatureTerm.setDataType(SignatureTerm.DataTypeEnum.DATAGRID);
-                    signatureTerm.setDirection(SignatureTerm.DirectionEnum.NONE);
-                    signatureTerm.setDataGridExtension(signatureTermExtensionList);
-                    commonProcessing.checkSignatureTermForDuplicate("none", decision, signatureTerm);
-                    addMapping(signatureTerm, step);
+                    addListInputMapping(ibVariableDO, step, decision);
                 } else {
                     commonProcessing.addMapping(ibVariableDOMapped, INPUT_DIRECTION, step, false, decision);
                     commonProcessing.addNewSignatureItem(ibVariableDOMapped, "none", decision, null);
@@ -966,41 +1278,43 @@ public class ProcessNodeConverter {
         }
     }
 
-    private void processCustomObjectMapping(ProcessNodeDataDO.Process process, Step step, Decision decision) {
+    private void processCustomObjectMapping(String nodeName, ProcessNodeDataDO.Process process, Step step, Decision decision,
+            Map<String, String> inOutTerms) {
         List<ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO> ibVariableDOList = process.getOutputVariableList().getIbVariableDOs();
 
         IBVariableDOMapperImpl mapper = new IBVariableDOMapperImpl();
+        String prefix = CommonProcessing.outputReferencePrefix(process);
 
         for (ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO ibVariableDO : ibVariableDOList) {
             if (ibVariableDO.getTypeDescription().contains("list")) {
-                List<SignatureTermExtension> signatureTermExtensionList = new ArrayList<>();
-
-                IBVariableDO ibVariableDOInner = mapper.ibVariableDoGet(ibVariableDO);
-                commonProcessing.addNewSignatureItem(ibVariableDOInner, "none", decision, null);
-                signatureTermExtensionList.add(createDataGridExtension(ibVariableDOInner));
-
-                SignatureTerm signatureTerm = new SignatureTerm();
-                signatureTerm.setName(commonProcessing.sanitizeVariableName(ibVariableDO.getName() + "_dgo"));
-                signatureTerm.setDataType(SignatureTerm.DataTypeEnum.DATAGRID);
-                signatureTerm.setDirection(SignatureTerm.DirectionEnum.NONE);
-                signatureTerm.setDataGridExtension(signatureTermExtensionList);
-                commonProcessing.checkSignatureTermForDuplicate("none", decision, signatureTerm);
-                addMapping(signatureTerm, step);
+                // A list output is a one-column data grid (the code file's <var>_dgo parameter), written like any other
+                // output under the name later nodes read it by: its identifier when linked to one, else the output id
+                commonProcessing.addProducedOutput(CommonProcessing.nodeOutputId(nodeName, prefix, ibVariableDO.getName()),
+                        ibVariableDO.getName() + "_dgo", SignatureTerm.DataTypeEnum.DATAGRID,
+                        List.of(createDataGridExtension(mapper.ibVariableDoGet(ibVariableDO))), step, decision);
             } else {
-                IBVariableDO ibVariableDOInner = mapper.ibVariableDoGet(ibVariableDO);
-                if (commonProcessing.isProcessDataProcess(process.getProcessTypeDescription()) && !isDataProcessReturnDataGrid(process)) {
-                    commonProcessing.addOutputMappingForProcess(ibVariableDOInner, OUTPUT_DIRECTION, step, false, decision, process.getName());
-                } else {
-                    commonProcessing.addMapping(ibVariableDOInner, OUTPUT_DIRECTION, step, false, decision);
+                // Written under the name later nodes read it by: its identifier when linked to one, otherwise the RTDM
+                // output id "<NodeName>.<ProcessName><var>", "<NodeName>.<var>" for a rules group (see
+                // CommonProcessing.registerNodeOutputs)
+                commonProcessing.addProducedOutput(CommonProcessing.nodeOutputId(nodeName, prefix, ibVariableDO.getName()),
+                        ibVariableDO.getName(), ibVariableDO.getTypeDescription(), step, decision);
+                String inOutTerm = inOutTerms.get(ibVariableDO.getName());
+                if (inOutTerm != null) {
+                    // The parameter's input mapping (which kept addProducedOutput from adding an output mapping) becomes
+                    // in/out on the output term, which the _input_values RuleSet loaded with the input value
+                    String stepTerm = commonProcessing.sanitizeAndReduceVariableName(ibVariableDO.getName());
+                    step.getMappings().stream().filter(mapping -> stepTerm.equalsIgnoreCase(mapping.getStepTermName()))
+                        .findFirst().ifPresent(mapping -> {
+                            mapping.setDirection(Mapping.DirectionEnum.INOUT);
+                            mapping.setTargetDecisionTermName(inOutTerm);
+                        });
                 }
-                commonProcessing.addNewSignatureItem(ibVariableDOInner, "none", decision, null);
             }
         }
 
         if (commonProcessing.isProcessDataProcess(process.getProcessTypeDescription())
                 && !isDataProcessReturnDataGrid(process)) {
-            addStandardDataProcessOutputMapping("returnCode", step, decision);
-            addStandardDataProcessOutputMapping("rowCount", step, decision);
+            STANDARD_DATA_PROCESS_OUTPUTS.forEach(output -> addStandardDataProcessOutputMapping(output, step, decision));
         }
     }
 
@@ -1044,16 +1358,5 @@ public class ProcessNodeConverter {
         }
 
         return isDataProcessReturnDataGrid;
-    }
-
-    private static String extractPackageNameFromDS2Code(String ds2Code)
-    {
-        //Add a new line in case the code starts with package on the first line.
-        Matcher m = packageNamePattern.matcher("\n"+ds2Code);
-        if (m.find())
-        {
-            return(m.group(2));
-        }
-        return null;
     }
 }

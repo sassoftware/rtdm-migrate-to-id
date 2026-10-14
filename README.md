@@ -7,6 +7,7 @@
   - [Getting Started](#getting-started)
   - [Running](#running)
     - [Examples](#examples)
+    - [Configuration](#configuration)
     - [Capabilities](#capabilities)
   - [Support](#support)
     - [SAS Communities](#sas-communities)
@@ -47,11 +48,11 @@ Migrating campaigns from RTDM to ID is a 3-step process.
 Run the migration tool from a command/shell window.
 
 ```shell script
-java -jar rtdm-migrate-to-id-0.14.4.jar
+java -jar rtdm-migrate-to-id-0.15.0.jar
 
 or
 # if port 8080 already in use
-java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.14.4.jar
+java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.15.0.jar
 ```
 
 This row inside command/shell will tell you that service successfully started
@@ -82,6 +83,32 @@ The parameter parentFolderUri is optional. The default value is /folders/folders
 
 The parameter useCrossBranchLinks is optional. The default value is "true".
 The use of cross-branch link nodes in the migration tool is an experimental feature. This feature is enabled by default. Cross-branch links will be created in the migrated Decision if the RTDM campaign contains a node with multiple input nodes. If the migration tool generates an error related to cross-branch links then set this parameter to "false".
+
+Calculated RuleSet consolidation is enabled by default to reduce Decision nodes: the calculated items an RTDM node uses are merged into one RuleSet placed before that node. The RuleSet computes the items the node references, and the calculated items those depend on, in dependency order with one assignment each. Like RTDM, which evaluates a calculated item where it is used, every node computes the items it uses itself, so an item used by several nodes is computed in each of them. No RuleSet is created for an individual calculated item. The process-input and extraction RuleSets remain separate.
+
+Disable consolidation when starting the service with `--rtdm2id.consolidate-calculated-rulesets=false`, or set `rtdm2id.consolidate-calculated-rulesets=false` in application configuration. Each calculated item then gets its own RuleSet and step, inserted once, before the first node that uses it.
+
+Merged RuleSet names (`Calculated_<node id>_<fingerprint>`) include a content fingerprint. An existing RuleSet with that name is checked for a complete signature and the same ordered actions before reuse. An empty, partial, or incompatible one stops the migration rather than being silently reused or overwritten. As with other migration errors, the endpoint still responds with HTTP 201 and the error message in the response body, and RuleSets created earlier in that run are left in place. Inspect or delete the reported RuleSet before retrying. Existing Decisions are still not overwritten.
+
+To register a new OAuth client on the target Viya environment using a Consul token:
+
+```shell script
+POST: localhost:8080/api/rtdm2id/register-client?baseIp={{ID environment}}&protocol={protocol}&consulToken={consulToken}&clientId={clientId}&clientSecret={clientSecret}
+```
+
+### Configuration
+
+The following properties can be set in `application.properties` or on the command line (for example `--rtdm2id.http.read-timeout=20m`):
+
+| Property | Default | Description |
+|---|---|---|
+| `rtdm2id.http.connect-timeout` | `30s` | Connect timeout for REST calls to Viya. |
+| `rtdm2id.http.read-timeout` | `10m` | Read timeout for REST calls to Viya. Some Viya calls can be slow, so keep this generous. |
+| `rtdm2id.cors.allowed-origins` | empty | Comma-separated list of browser origins allowed to call the API cross-origin. Empty means no cross-origin access; command-line and server-side clients are not affected. |
+| `rtdm2id.debug.write-decision-json` | `false` | Write the generated Decision JSON to a file before posting it to Viya. Failures to write the file are logged as warnings and do not fail the migration. |
+| `rtdm2id.debug.decision-json-path` | `decision.json` | File used when `rtdm2id.debug.write-decision-json` is enabled, relative to the working directory unless absolute. |
+
+OAuth tokens are cached per Viya host, protocol, user and password and are refreshed shortly before they expire.
 
 ### Capabilities
 

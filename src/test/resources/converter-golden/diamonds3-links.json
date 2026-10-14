@@ -1,0 +1,221 @@
+{
+  "name" : "characterization",
+  "description" : "campaign-id",
+  "flow" : {
+    "steps" : [ {
+      "type" : "application/vnd.sas.decision.step.branch",
+      "id" : "s1",
+      "branchCases" : [ {
+        "label" : "Node a1",
+        "onTrue" : {
+          "steps" : [ {
+            "type" : "application/vnd.sas.decision.step.custom.object",
+            "id" : "pa1",
+            "mappings" : [ {
+              "stepTermName" : "out",
+              "direction" : "output",
+              "targetDecisionTermName" : "v_pa1"
+            } ],
+            "name" : "pa1"
+          }, {
+            "type" : "application/vnd.sas.decision.step.custom.object",
+            "id" : "m1",
+            "linkLabel" : "link-1",
+            "mappings" : [ {
+              "stepTermName" : "out",
+              "direction" : "output",
+              "targetDecisionTermName" : "v_m1"
+            } ],
+            "name" : "m1"
+          }, {
+            "type" : "application/vnd.sas.decision.step.branch",
+            "id" : "s2",
+            "branchCases" : [ {
+              "label" : "Node a2",
+              "onTrue" : {
+                "steps" : [ {
+                  "type" : "application/vnd.sas.decision.step.custom.object",
+                  "id" : "pa2",
+                  "mappings" : [ {
+                    "stepTermName" : "out",
+                    "direction" : "output",
+                    "targetDecisionTermName" : "v_pa2"
+                  } ],
+                  "name" : "pa2"
+                }, {
+                  "type" : "application/vnd.sas.decision.step.custom.object",
+                  "id" : "m2",
+                  "linkLabel" : "link-2",
+                  "mappings" : [ {
+                    "stepTermName" : "out",
+                    "direction" : "output",
+                    "targetDecisionTermName" : "v_m2"
+                  } ],
+                  "name" : "m2"
+                }, {
+                  "type" : "application/vnd.sas.decision.step.branch",
+                  "id" : "s3",
+                  "branchCases" : [ {
+                    "label" : "Node a3",
+                    "onTrue" : {
+                      "steps" : [ {
+                        "type" : "application/vnd.sas.decision.step.custom.object",
+                        "id" : "pa3",
+                        "mappings" : [ {
+                          "stepTermName" : "out",
+                          "direction" : "output",
+                          "targetDecisionTermName" : "v_pa3"
+                        } ],
+                        "name" : "pa3"
+                      }, {
+                        "type" : "application/vnd.sas.decision.step.custom.object",
+                        "id" : "m3",
+                        "linkLabel" : "link-3",
+                        "mappings" : [ {
+                          "stepTermName" : "out",
+                          "direction" : "output",
+                          "targetDecisionTermName" : "v_m3"
+                        } ],
+                        "name" : "m3"
+                      }, {
+                        "type" : "application/vnd.sas.decision.step.ruleset",
+                        "id" : "r",
+                        "mappings" : [ {
+                          "stepTermName" : "out",
+                          "direction" : "output",
+                          "targetDecisionTermName" : "v_r"
+                        } ],
+                        "name" : "r"
+                      } ]
+                    }
+                  } ],
+                  "mappings" : [ {
+                    "stepTermName" : "out",
+                    "direction" : "output",
+                    "targetDecisionTermName" : "v_s3"
+                  } ],
+                  "defaultCase" : {
+                    "steps" : [ {
+                      "type" : "application/vnd.sas.decision.step.custom.object",
+                      "id" : "pb3",
+                      "mappings" : [ {
+                        "stepTermName" : "out",
+                        "direction" : "output",
+                        "targetDecisionTermName" : "v_pb3"
+                      } ],
+                      "name" : "pb3"
+                    }, {
+                      "type" : "application/vnd.sas.decision.step.node.link",
+                      "decisionNodeLinkTarget" : "link-3"
+                    } ]
+                  },
+                  "name" : "s3"
+                } ]
+              }
+            } ],
+            "mappings" : [ {
+              "stepTermName" : "out",
+              "direction" : "output",
+              "targetDecisionTermName" : "v_s2"
+            } ],
+            "defaultCase" : {
+              "steps" : [ {
+                "type" : "application/vnd.sas.decision.step.custom.object",
+                "id" : "pb2",
+                "mappings" : [ {
+                  "stepTermName" : "out",
+                  "direction" : "output",
+                  "targetDecisionTermName" : "v_pb2"
+                } ],
+                "name" : "pb2"
+              }, {
+                "type" : "application/vnd.sas.decision.step.node.link",
+                "decisionNodeLinkTarget" : "link-2"
+              } ]
+            },
+            "name" : "s2"
+          } ]
+        }
+      } ],
+      "mappings" : [ {
+        "stepTermName" : "out",
+        "direction" : "output",
+        "targetDecisionTermName" : "v_s1"
+      } ],
+      "defaultCase" : {
+        "steps" : [ {
+          "type" : "application/vnd.sas.decision.step.custom.object",
+          "id" : "pb1",
+          "mappings" : [ {
+            "stepTermName" : "out",
+            "direction" : "output",
+            "targetDecisionTermName" : "v_pb1"
+          } ],
+          "name" : "pb1"
+        }, {
+          "type" : "application/vnd.sas.decision.step.node.link",
+          "decisionNodeLinkTarget" : "link-1"
+        } ]
+      },
+      "name" : "s1"
+    } ]
+  },
+  "signature" : [ {
+    "name" : "Treatments",
+    "dataType" : "dataGrid",
+    "direction" : "output",
+    "dataGridExtension" : [ ]
+  }, {
+    "name" : "v_s1",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_pb1",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_pa1",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_m1",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_s2",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_pb2",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_pa2",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_m2",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_s3",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_pb3",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_pa3",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_m3",
+    "dataType" : "unknown",
+    "direction" : "none"
+  }, {
+    "name" : "v_r",
+    "dataType" : "unknown",
+    "direction" : "none"
+  } ]
+}

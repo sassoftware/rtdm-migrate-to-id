@@ -529,6 +529,7 @@ public class StartNodeDataDO implements Serializable {
                     "hidden",
                     "hideVariable",
                     "id",
+                    "identifier",
                     "level",
                     "loadedFromOldDavLocation",
                     "loading",
@@ -588,6 +589,9 @@ public class StartNodeDataDO implements Serializable {
                 protected String hideVariable;
                 @XmlElement(name = "Id", required = true)
                 protected String id;
+                // The identifier this request variable is copied to, if any
+                @XmlElement(name = "Identifier")
+                protected ProcessNodeDataDO.Process.InputVariableList.IBVariableDO.Identifier identifier;
                 @XmlElement(name = "Level", required = true)
                 protected String level;
                 @XmlElement(name = "LoadedFromOldDavLocation", required = true)

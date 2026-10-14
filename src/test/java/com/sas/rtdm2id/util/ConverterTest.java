@@ -11,8 +11,12 @@ import com.sas.rtdm2id.model.id.decision.Mapping;
 import com.sas.rtdm2id.model.id.decision.SignatureTerm;
 import com.sas.rtdm2id.model.id.decision.Step;
 import com.sas.rtdm2id.model.rtdm.Batch;
+import com.sas.rtdm2id.model.rtdm.CHandRHNodeDataDO;
+import com.sas.rtdm2id.model.rtdm.MultiSelectNodeDataDO;
 import com.sas.rtdm2id.model.rtdm.ProcessNodeDataDO;
+import com.sas.rtdm2id.model.rtdm.RemoveStagedTreatmentsNodeDataDO;
 import com.sas.rtdm2id.model.rtdm.SplitNodeDataDO;
+import com.sas.rtdm2id.model.rtdm.extension.CalculatedItemDO;
 import com.sas.rtdm2id.util.model.RTDMObject;
 import com.sas.rtdm2id.util.object.processing.AssignmentNodeConverter;
 import com.sas.rtdm2id.util.object.processing.CommonProcessing;
@@ -28,11 +32,13 @@ import com.sas.rtdm2id.util.tree.impl.GenericTreeNode;
 import com.sas.rtdm2id.util.tree.impl.TreeUtil;
 import jakarta.xml.bind.JAXBContext;
 import org.junit.jupiter.api.Test;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.client.RestTemplate;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.io.File;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -40,17 +46,89 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 class ConverterTest {
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void insertsTheNodesCalculatedStepOnceBeforeProcessInputs(boolean links) throws Exception {
+        MapStorage storage = new MapStorage();
+        storage.setUseCrossBranchLinks(links);
+        RestTemplate template = mock(RestTemplate.class);
+        TreeUtil tree = new TreeUtil();
+        tree.getNodeIdInputNodesMap().put("consumer", "left,right");
+        CommonProcessing processing = new CommonProcessing(template, storage, tree);
+        ProcessNodeDataDO node = new ProcessNodeDataDO();
+        node.setNodeId("consumer");
+        node.setProcess(new ProcessNodeDataDO.Process());
+        node.getProcess().setInputVariableList(new ProcessNodeDataDO.Process.InputVariableList());
+        @SuppressWarnings("unchecked")
+        Map<String, CalculatedItemDO> calculatedItems =
+            (Map<String, CalculatedItemDO>) ReflectionTestUtils.getField(processing, "calculatedItemsByName");
+        Decision decision = new Decision();
+        for (String name : List.of("first", "second")) {
+            CalculatedItemDO item = new CalculatedItemDO();
+            item.setName(name);
+            item.setCalculatedItemType("4");
+            item.setExpression("1");
+            calculatedItems.put(name, item);
+            storage.getCalculatedVariableMap().put(name, name + "-node");
+            storage.getCalculatedVariableDataTypeMap().put("calculatedDataItems." + name, "decimal");
+            String resultName = processing.sanitizeVariableName("CalculatedDataItem." + name);
+            SignatureTerm result = new SignatureTerm();
+            result.setName(resultName);
+            result.setDataType(SignatureTerm.DataTypeEnum.DECIMAL);
+            result.setDirection(SignatureTerm.DirectionEnum.NONE);
+            decision.addSignatureItem(result);
+            ProcessNodeDataDO.Process.InputVariableList.IBVariableDO input =
+                new ProcessNodeDataDO.Process.InputVariableList.IBVariableDO();
+            input.setName(name);
+            input.setTypeDescription("double");
+            input.setValue(new ProcessNodeDataDO.Process.InputVariableList.IBVariableDO.Value());
+            com.sas.rtdm2id.model.rtdm.ValueTypeVarInfoDO reference = new com.sas.rtdm2id.model.rtdm.ValueTypeVarInfoDO();
+            reference.setVarInfoId("calculatedDataItems." + name);
+            reference.setVarName(name);
+            reference.setVarInfoSource("CalculatedDataItem");
+            input.getValue().setValueTypeVarInfoDO(reference);
+            node.getProcess().getInputVariableList().getIbVariableDOs().add(input);
+        }
+        Step assignments = new Step();
+        assignments.setRuleSet(new com.sas.rtdm2id.model.id.decision.RuleSetStep());
+        assignments.getRuleSet().setName("node_input_values");
+        storage.getRuleSetStepMap().put("node_input_values", assignments);
+        storage.getRuleSetIsUpdated().put("node_input_values", true);
+        storage.getRuleSetIsActionUpdated().put("node_input_values", true);
+
+        List<Step> steps = new ProcessNodeConverter(template, processing, storage)
+            .addCustomObjectStep(node, decision, (short) 1, "node");
+        assertEquals(3, steps.size());
+        MapStorage.CalculatedNodeGroup calculated = storage.getCalculatedNodeGroups().get("consumer");
+        assertSame(calculated.step(), steps.get(0));
+        assertEquals(List.of("first", "second"), List.copyOf(calculated.items()));
+        assertSame(assignments, steps.get(1));
+        assertEquals(links, calculated.step().getLinkLabel() != null);
+        assertEquals(2, steps.get(2).getMappings().size());
+        ConditionDecisionStep flow = new ConditionDecisionStep();
+        flow.setFlow(steps);
+        decision.setFlow(flow);
+        invokeAddMissingVars(createConverter(tree, storage, processing), decision);
+        assertTrue(decision.getSignature().stream().allMatch(term -> SignatureTerm.DataTypeEnum.DECIMAL.equals(term.getDataType())));
+        verifyNoInteractions(template);
+    }
 
     @Test
     void declaresCalculatedResultTypesBeforeFinalSignatureAssembly() throws Exception {
@@ -162,6 +240,8 @@ class ConverterTest {
         MapStorage storage = new MapStorage();
         RestTemplate restTemplate = mock(RestTemplate.class);
         CommonProcessing processing = new CommonProcessing(restTemplate, storage, new TreeUtil());
+        // One RuleSet per calculated item, as with rtdm2id.consolidate-calculated-rulesets=false
+        ReflectionTestUtils.setField(processing, "consolidateCalculatedRuleSets", false);
         ProcessNodeConverter converter = new ProcessNodeConverter(restTemplate, processing, storage);
         ProcessNodeDataDO node = new ProcessNodeDataDO();
         node.setNodeId("process-node");
@@ -205,7 +285,7 @@ class ConverterTest {
         calculatedRuleSet.setName("calculated");
         calculatedStep.setRuleSet(calculatedRuleSet);
         storage.getCalculatedVariableMap().put("sourceValue", "calculated-node");
-        storage.getRuleSetStepMap().put("sourceValue_calculated-node", calculatedStep);
+        storage.getRuleSetStepMap().put(processing.makeCalculatedDataItemRuleSetName("sourceValue", "calculated-node"), calculatedStep);
         storage.getRuleSetIsUpdated().put("calculated", true);
         Step assignedStep = new Step();
         com.sas.rtdm2id.model.id.decision.RuleSetStep assignedRuleSet =
@@ -242,7 +322,7 @@ class ConverterTest {
         assertTrue(decision.getSignature().stream().anyMatch(term ->
             assignedName.equals(term.getName()) && SignatureTerm.DataTypeEnum.STRING.equals(term.getDataType())
                 && SignatureTerm.DirectionEnum.INOUT.equals(term.getDirection())));
-        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+        verifyNoInteractions(restTemplate);
     }
 
     @ParameterizedTest
@@ -283,7 +363,7 @@ class ConverterTest {
                             && Mapping.DirectionEnum.OUTPUT.equals(mapping.getDirection())));
             assertTrue(decision.getSignature().stream().anyMatch(term -> name.equals(term.getName())));
         }
-        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+        verifyNoInteractions(restTemplate);
     }
 
     @ParameterizedTest
@@ -347,7 +427,7 @@ class ConverterTest {
         assertTrue(decision.getSignature().stream().anyMatch(term ->
             "RequestTransactionID".equals(term.getName()) && SignatureTerm.DataTypeEnum.STRING.equals(term.getDataType())));
         assertEquals(SignatureTerm.DataTypeEnum.DECIMAL, numericTransaction.getDataType());
-        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+        verifyNoInteractions(restTemplate);
     }
 
     @Test
@@ -386,7 +466,7 @@ class ConverterTest {
         ProcessNodeConverter converter = new ProcessNodeConverter(restTemplate, processing, storage);
         Decision decision = new Decision();
         Method processMapping = ProcessNodeConverter.class.getDeclaredMethod("processDataProcessMapping",
-            List.class, Step.class, Decision.class, String.class);
+            String.class, ProcessNodeDataDO.Process.class, Step.class, Decision.class);
         processMapping.setAccessible(true);
         Map<SignatureTerm.DataTypeEnum, String> targets = new HashMap<>();
         for (boolean numeric : new boolean[] {numericFirst, !numericFirst}) {
@@ -395,9 +475,12 @@ class ConverterTest {
                 new ProcessNodeDataDO.Process.OutputVariableList.IBVariableDO();
             output.setName("SMS_SZOLGALTATO");
             output.setTypeDescription(numeric ? "double list" : "string list");
+            ProcessNodeDataDO.Process process = new ProcessNodeDataDO.Process();
+            process.setName(processName);
+            process.setOutputVariableList(new ProcessNodeDataDO.Process.OutputVariableList());
+            process.getOutputVariableList().getIbVariableDOs().add(output);
             Step processStep = new Step();
-            SignatureTerm grid = (SignatureTerm) processMapping.invoke(converter,
-                Collections.singletonList(output), processStep, decision, processName);
+            SignatureTerm grid = (SignatureTerm) processMapping.invoke(converter, "Load", process, processStep, decision);
             Step extractStep = new Step();
             com.sas.rtdm2id.model.id.decision.RuleSetStep ruleSet =
                 new com.sas.rtdm2id.model.id.decision.RuleSetStep();
@@ -406,7 +489,7 @@ class ConverterTest {
             storage.getRuleSetIsUpdated().put(ruleSet.getName(), true);
             storage.getRuleSetIsActionUpdated().put(ruleSet.getName(), true);
 
-            converter.updateRuleSet(grid, extractStep, decision);
+            converter.updateRuleSet(grid, extractStep, decision, "Load", processName);
 
             Mapping mapping = extractStep.getMappings().stream()
                 .filter(item -> "SMS_SZOLGALTATO".equals(item.getStepTermName())).findFirst().orElseThrow();
@@ -418,11 +501,9 @@ class ConverterTest {
             assertEquals("SMS_SZOLGALTATO", grid.getDataGridExtension().get(0).getName());
             assertEquals(expectedType.getValue(), grid.getDataGridExtension().get(0).getDataType().getValue());
             targets.put(expectedType, target.getName());
-            if (numeric == numericFirst) {
-                assertEquals("SMS_SZOLGALTATO", target.getName());
-            } else {
-                assertEquals(processName + "_out_SMS_SZOLGALTATO", target.getName());
-            }
+            // Each node's column is written under RTDM's output id <NodeName>.<ProcessName><column>, so same-named
+            // columns of different processes (and types) never share a term
+            assertEquals("Load" + processName + "SMS_SZOLGALTATO", target.getName());
         }
         org.junit.jupiter.api.Assertions.assertNotEquals(targets.get(SignatureTerm.DataTypeEnum.DECIMAL),
             targets.get(SignatureTerm.DataTypeEnum.STRING));
@@ -430,7 +511,7 @@ class ConverterTest {
             assertEquals(target.getKey(), decision.getSignature().stream()
                 .filter(term -> target.getValue().equals(term.getName())).findFirst().orElseThrow().getDataType());
         }
-        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+        verifyNoInteractions(restTemplate);
     }
 
     @Test
@@ -481,6 +562,7 @@ class ConverterTest {
         }
         ProcessNodeDataDO processNode = new ProcessNodeDataDO();
         processNode.setNodeId("read-data-node");
+        processNode.setNodeName("Read Data");
         processNode.setProcess(process);
         Decision decision = new Decision();
 
@@ -496,7 +578,8 @@ class ConverterTest {
             Mapping mapping = customObjectStep.getMappings().stream()
                 .filter(item -> name.equals(item.getStepTermName()))
                 .findFirst().orElseThrow();
-            assertEquals("Process" + processName + name, mapping.getTargetDecisionTermName());
+            // Written under RTDM's output id "<NodeName>.<ProcessName><var>", the name later nodes reference it by
+            assertEquals("ReadData" + processName + name, mapping.getTargetDecisionTermName());
             assertEquals(Mapping.DirectionEnum.OUTPUT, mapping.getDirection());
             SignatureTerm signatureTerm = decision.getSignature().stream()
                 .filter(item -> mapping.getTargetDecisionTermName().equals(item.getName()))
@@ -528,11 +611,14 @@ class ConverterTest {
         Step step = new Step();
         Decision decision = new Decision();
         Method processMapping = ProcessNodeConverter.class.getDeclaredMethod(
-                "processDataProcessMapping", List.class, Step.class, Decision.class, String.class);
+                "processDataProcessMapping", String.class, ProcessNodeDataDO.Process.class, Step.class, Decision.class);
         processMapping.setAccessible(true);
+        ProcessNodeDataDO.Process process = new ProcessNodeDataDO.Process();
+        process.setName(processName);
+        process.setOutputVariableList(new ProcessNodeDataDO.Process.OutputVariableList());
 
-        SignatureTerm datagrid = (SignatureTerm) processMapping.invoke(
-                processNodeConverter, Collections.emptyList(), step, decision, processName);
+        // Without a node name or DatagridName the grid keeps its process-based name
+        SignatureTerm datagrid = (SignatureTerm) processMapping.invoke(processNodeConverter, null, process, step, decision);
 
         assertEquals(3, step.getMappings().size());
         Mapping mapping = step.getMappings().get(0);
@@ -551,7 +637,7 @@ class ConverterTest {
             assertEquals(SignatureTerm.DataTypeEnum.INTEGER, signatureTerm.getDataType());
             assertEquals(SignatureTerm.DirectionEnum.OUTPUT, signatureTerm.getDirection());
         }
-        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+        verifyNoInteractions(restTemplate);
     }
 
     @Test
@@ -1119,7 +1205,7 @@ class ConverterTest {
             assertTrue(targets.stream().noneMatch(JsonNode::isTextual));
             assertTrue(labels.stream().noneMatch(JsonNode::isTextual));
         }
-        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+        verifyNoInteractions(restTemplate);
     }
 
     private Converter createConverter(TreeUtil treeUtil, MapStorage mapStorage, CommonProcessing processing) {
@@ -1136,6 +1222,91 @@ class ConverterTest {
                 mock(StagedTreatmentConverter.class),
                 treeUtil,
                 mapStorage);
+    }
+
+    @Test
+    void convertsRemoveStagedTreatmentWithoutFallingThroughToCrossTable() throws Exception {
+        MapStorage mapStorage = new MapStorage();
+        TreeUtil treeUtil = new TreeUtil();
+        CommonProcessing processing = new CommonProcessing(mock(RestTemplate.class), mapStorage, treeUtil);
+        CrossTableNodeConverter crossTable = mock(CrossTableNodeConverter.class);
+        Converter converter = new Converter(
+                mock(ProcessNodeConverter.class),
+                mock(SubDiagramNodeConverter.class),
+                mock(ReplyNodeConverter.class),
+                mock(MultiSelectNodeConverter.class),
+                mock(SplitNodeConverter.class),
+                mock(ConfirmContactNodeConverter.class),
+                processing,
+                mock(AssignmentNodeConverter.class),
+                crossTable,
+                new StagedTreatmentConverter(mapStorage, processing),
+                treeUtil,
+                mapStorage);
+        RemoveStagedTreatmentsNodeDataDO node = new RemoveStagedTreatmentsNodeDataDO();
+        node.setNodeId("remove");
+        node.setNodeName("Remove");
+        Method process = Converter.class.getDeclaredMethod("processRTDMObject", RTDMObject.class, Decision.class, Short.class);
+        process.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        List<Step> steps = (List<Step>) process.invoke(converter, new RTDMObject("removeStagedTreatment", node),
+                new Decision(), (short) 1);
+
+        assertEquals(1, steps.size());
+        assertEquals(Step.TypeEnum.CUSTOM_OBJECT, steps.get(0).getType());
+        verifyNoInteractions(crossTable);
+    }
+
+    @Test
+    void omitsMissingConfirmContactInputStepInsteadOfAddingNull() throws Exception {
+        MapStorage mapStorage = new MapStorage();
+        TreeUtil treeUtil = new TreeUtil();
+        CommonProcessing processing = new CommonProcessing(mock(RestTemplate.class), mapStorage, treeUtil);
+        ConfirmContactNodeConverter confirmContact = mock(ConfirmContactNodeConverter.class);
+        Step recordContact = new Step().type(Step.TypeEnum.RECORD_CONTACT);
+        when(confirmContact.createRecordContactStep(any(), any())).thenReturn(recordContact);
+        Converter converter = new Converter(
+                mock(ProcessNodeConverter.class),
+                mock(SubDiagramNodeConverter.class),
+                mock(ReplyNodeConverter.class),
+                mock(MultiSelectNodeConverter.class),
+                mock(SplitNodeConverter.class),
+                confirmContact,
+                processing,
+                mock(AssignmentNodeConverter.class),
+                mock(CrossTableNodeConverter.class),
+                mock(StagedTreatmentConverter.class),
+                treeUtil,
+                mapStorage);
+        CHandRHNodeDataDO node = new CHandRHNodeDataDO();
+        node.setNodeId("contact");
+        node.setNodeName("Contact");
+        Method process = Converter.class.getDeclaredMethod("processRTDMObject", RTDMObject.class, Decision.class, Short.class);
+        process.setAccessible(true);
+
+        @SuppressWarnings("unchecked")
+        List<Step> steps = (List<Step>) process.invoke(converter, new RTDMObject("cHandRH", node), new Decision(), (short) 1);
+
+        assertEquals(List.of(recordContact), steps);
+    }
+
+    @Test
+    void rejectsFilterNodeWithMoreThanOneSelectedOutput() throws Exception {
+        TreeUtil treeUtil = new TreeUtil();
+        MultiSelectNodeDataDO filter = new MultiSelectNodeDataDO();
+        filter.setNodeName("Filter");
+        filter.setRemainderOutputCellID("remainder");
+        treeUtil.getNodeIdObjectHashMap().put("filter", new RTDMObject("multiSelect", filter));
+        Converter converter = createConverter(treeUtil, new MapStorage());
+        Method fill = Converter.class.getDeclaredMethod("fillConditionStepWithInnerSteps", Step.class, String.class, List.class);
+        fill.setAccessible(true);
+
+        InvocationTargetException thrown = assertThrows(InvocationTargetException.class,
+                () -> fill.invoke(converter, new Step(), "filter", List.of("first", "second", "remainder")));
+
+        assertTrue(thrown.getCause() instanceof IllegalStateException);
+        assertTrue(thrown.getCause().getMessage().contains("2 selected outputs"));
     }
 
     @Test
@@ -1175,21 +1346,22 @@ class ConverterTest {
                 && "GlobalGV_STATUS_MSG_SUCCESS".equals(mapping.getTargetDecisionTermName())));
         ProcessNodeConverter converter = new ProcessNodeConverter(restTemplate, processing, storage);
         Method processMapping = ProcessNodeConverter.class.getDeclaredMethod("processDataProcessMapping",
-            List.class, Step.class, Decision.class, String.class);
+            String.class, ProcessNodeDataDO.Process.class, Step.class, Decision.class);
         processMapping.setAccessible(true);
         Decision decision = new Decision();
+        Set<String> targetNames = new HashSet<>();
         for (String nodeId : new String[] {"numeric", "AFHBMLJN3VD2XCT5"}) {
             ProcessNodeDataDO node = batch.getLogicalUnit().getProcessNodeDataDOs().stream()
                 .filter(item -> "numeric".equals(nodeId) ? "DP_get_S_OCA_PRELAK_LOAD_v2".equals(item.getProcess().getName())
                     : nodeId.equals(item.getNodeId())).findFirst().orElseThrow();
-            SignatureTerm grid = (SignatureTerm) processMapping.invoke(converter,
-                node.getProcess().getOutputVariableList().getIbVariableDOs(), new Step(), decision, node.getProcess().getName());
+            SignatureTerm grid = (SignatureTerm) processMapping.invoke(converter, node.getNodeName(), node.getProcess(),
+                new Step(), decision);
             String ruleSetName = processing.makeProcessNodeRuleSetName(node) + "_extract_values";
             Step extractStep = storage.getRuleSetStepMap().get(ruleSetName);
             storage.getRuleSetIsUpdated().put(ruleSetName, true);
             storage.getRuleSetIsActionUpdated().put(ruleSetName, true);
 
-            converter.updateRuleSet(grid, extractStep, decision);
+            converter.updateRuleSet(grid, extractStep, decision, node.getNodeName(), node.getProcess().getName());
 
             Mapping sms = extractStep.getMappings().stream()
                 .filter(mapping -> "SMS_SZOLGALTATO".equals(mapping.getStepTermName())).findFirst().orElseThrow();
@@ -1197,13 +1369,13 @@ class ConverterTest {
                 .filter(term -> sms.getTargetDecisionTermName().equals(term.getName())).findFirst().orElseThrow();
             assertEquals("numeric".equals(nodeId) ? SignatureTerm.DataTypeEnum.DECIMAL : SignatureTerm.DataTypeEnum.STRING,
                 target.getDataType());
-            if (!"numeric".equals(nodeId)) {
-                assertEquals("DP_get_S_OCA_PRELAK_LOAD_SUBSIDY_v2_out_SMS_SZOLGALTATO", target.getName());
-            }
+            // Written under the name later nodes read the column by (its identifier or <Node>.<Process><column>)
+            assertEquals(processing.nodeOutputTermName(CommonProcessing.nodeOutputId(node.getNodeName(),
+                node.getProcess().getName(), "SMS_SZOLGALTATO")), target.getName());
+            targetNames.add(target.getName());
         }
-        assertEquals(SignatureTerm.DataTypeEnum.DECIMAL, decision.getSignature().stream()
-            .filter(term -> "SMS_SZOLGALTATO".equals(term.getName())).findFirst().orElseThrow().getDataType());
-        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+        assertEquals(2, targetNames.size());
+        verifyNoInteractions(restTemplate);
     }
 
     private void invokeFinalConnection(Converter converter, GenericTreeNode<Short> node,
