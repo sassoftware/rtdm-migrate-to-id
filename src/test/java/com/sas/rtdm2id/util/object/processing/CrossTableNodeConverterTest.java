@@ -50,6 +50,8 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -57,6 +59,269 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 
 class CrossTableNodeConverterTest {
+
+    @Test
+    void convertsColumnOnlyDiscreteCriteriaInCellOrder() {
+        CrossTableNodeDataDO node = columnOnlyNode();
+
+        SegmentationTree tree = new SegmentationTreeConverter(mockCommonProcessing(node)).convert(node);
+
+        assertEquals(List.of("ColumnInput", "Result"),
+                tree.getSignature().stream().map(SegmentationTree.SignatureTerm::getName).toList());
+        assertEquals("input", tree.getSignature().get(0).getDirection());
+        assertEquals("string", tree.getSignature().get(0).getDataType());
+        assertEquals("output", tree.getSignature().get(1).getDirection());
+        assertTrue(tree.getMatrices().isEmpty());
+        assertTrue(tree.getLocalValueLists().isEmpty());
+        assertEquals(List.of("ColumnInput = 'foo'", "ColumnInput = 'bar'"),
+                tree.getBooleanExpressions().stream().map(SegmentationTree.BooleanExpression::getExpression).toList());
+        assertSingleAxisOutcomes(tree, List.of("a", "b"));
+    }
+
+    @Test
+    void convertsColumnOnlyMissingPatternsAndDefaultOutput() {
+        CrossTableNodeDataDO node = columnOnlyNode();
+        node.getColumnCriteria().setLike(true);
+        node.getColumnCriteria().getLineItems().setCrossTableLineItemDOs(
+                List.of(missingCriterion(), discreteItem("AB%"), remainderCriterion()));
+        IBVariableValueDO useDefault = new IBVariableValueDO();
+        useDefault.setType(14);
+        ListOfValues row = values("missing", "pattern");
+        row.getValues().add(useDefault);
+        node.getCrossTable().setLists(List.of(row));
+        node.getOutputVariable().setDefaultValue(cell("default"));
+
+        SegmentationTree tree = new SegmentationTreeConverter(mockCommonProcessing(node)).convert(node);
+
+        assertEquals(List.of("missing(ColumnInput)", "ColumnInput LIKE 'AB%'", "true"),
+                tree.getBooleanExpressions().stream().map(SegmentationTree.BooleanExpression::getExpression).toList());
+        assertSingleAxisOutcomes(tree, List.of("missing", "pattern", "default"));
+    }
+
+    @Test
+    void convertsColumnOnlyRangesWithInfiniteBounds() {
+        CrossTableNodeDataDO node = columnOnlyNode();
+        node.getColumnCriteria().getVarRefDO().setType("Numeric");
+        CrossTableLineItemDO lower = new CrossTableLineItemDO();
+        lower.setMinValue(endpoint("String", "infinite"));
+        lower.setMaxValue(maxEndpoint("Double", "10.5"));
+        lower.setMaxInclusive(true);
+        CrossTableLineItemDO upper = new CrossTableLineItemDO();
+        upper.setMinValue(endpoint("Double", "10.5"));
+        upper.setMaxValue(maxEndpoint("String", "infinite"));
+        node.getColumnCriteria().getLineItems().setCrossTableLineItemDOs(List.of(lower, upper));
+
+        SegmentationTree tree = new SegmentationTreeConverter(mockCommonProcessing(node)).convert(node);
+
+        assertEquals("decimal", tree.getSignature().get(0).getDataType());
+        assertEquals(List.of("ColumnInput <= 10.5", "ColumnInput > 10.5"),
+                tree.getBooleanExpressions().stream().map(SegmentationTree.BooleanExpression::getExpression).toList());
+        assertSingleAxisOutcomes(tree, List.of("a", "b"));
+    }
+
+    @Test
+    void rejectsMalformedColumnOnlyTablesAndExplicitEmptyRowCriteria() {
+        CrossTableNodeDataDO node = columnOnlyNode();
+        SegmentationTreeConverter converter = new SegmentationTreeConverter(mockCommonProcessing(node));
+        node.getCrossTable().setLists(List.of(values("a", "b"), values("c", "d")));
+        assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
+        node.getCrossTable().setLists(List.of(singleValue("a")));
+        assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
+        ListOfValues extraCells = values("a", "b");
+        extraCells.getValues().add(cell("c"));
+        node.getCrossTable().setLists(List.of(extraCells));
+        assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
+        node.getCrossTable().setLists(List.of(values("a", "b")));
+        node.setRowCriteria(new RowCriteria());
+        assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
+        node.setRowCriteria(null);
+        node.getColumnCriteria().getLineItems().setCrossTableLineItemDOs(List.of());
+        assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
+    }
+
+    private CrossTableNodeDataDO columnOnlyNode() {
+        CrossTableNodeDataDO node = createNode(false, false);
+        node.setRowCriteria(null);
+        node.getCrossTable().setLists(List.of(values("a", "b")));
+        return node;
+    }
+
+    private void assertSingleAxisOutcomes(SegmentationTree tree, List<String> expectedValues) {
+        SegmentationTree.Node current = tree.getNode();
+        for (String expected : expectedValues) {
+            SegmentationTree.ValueNode match = current.getValueNodes().get(0);
+            assertNull(match.getNext());
+            assertEquals(expected, tree.getOutcomes().stream()
+                    .filter(outcome -> match.getOutcomeName().equals(outcome.getName()))
+                    .findFirst().orElseThrow().getActions().get(0).getValue());
+            current = current.getValueNodes().size() == 2
+                    ? current.getValueNodes().get(1).getNext() : null;
+        }
+        assertNull(current);
+    }
+
+    @Test
+    void convertsRowOnlyRangesWithRemainderAndDefaultOutput() {
+        CrossTableNodeDataDO node = rowOnlyNode();
+        node.getRowCriteria().getVarRefDO().setType("Numeric");
+        CrossTableLineItemDO bounded = new CrossTableLineItemDO();
+        bounded.setMinValue(endpoint("Double", "22.4999"));
+        bounded.setMaxValue(maxEndpoint("Double", "35.4999"));
+        bounded.setMinInclusive(true);
+        bounded.setMaxInclusive(true);
+        CrossTableLineItemDO unbounded = new CrossTableLineItemDO();
+        unbounded.setMinValue(endpoint("Double", "35.4999"));
+        unbounded.setMaxValue(maxEndpoint("String", "infinite"));
+        unbounded.setMaxInclusive(true);
+        node.getRowCriteria().getLineItems().setCrossTableLineItemDOs(
+                Arrays.asList(bounded, unbounded, remainderCriterion()));
+        IBVariableValueDO useDefault = new IBVariableValueDO();
+        useDefault.setType(14);
+        ListOfValues remainder = new ListOfValues();
+        remainder.setValues(Collections.singletonList(useDefault));
+        node.getOutputVariable().setDefaultValue(cell("&&&&"));
+        node.getCrossTable().setLists(Arrays.asList(
+                singleValue("ABCF"), singleValue("BCDE"), remainder));
+
+        SegmentationTree tree = new SegmentationTreeConverter(mockCommonProcessing(node)).convert(node);
+
+        assertEquals(2, tree.getSignature().size());
+        assertEquals("RowInput", tree.getSignature().get(0).getName());
+        assertEquals("decimal", tree.getSignature().get(0).getDataType());
+        assertEquals("output", tree.getSignature().get(1).getDirection());
+        assertTrue(tree.getMatrices().isEmpty());
+        assertTrue(tree.getLocalValueLists().isEmpty());
+        assertEquals(Arrays.asList(
+                "RowInput >= 22.4999 and RowInput <= 35.4999",
+                "RowInput > 35.4999", "true"),
+                tree.getBooleanExpressions().stream().map(SegmentationTree.BooleanExpression::getExpression).toList());
+        SegmentationTree.Node current = tree.getNode();
+        for (String expected : Arrays.asList("ABCF", "BCDE", "&&&&")) {
+            SegmentationTree.ValueNode match = current.getValueNodes().get(0);
+            assertNull(match.getNext());
+            String outcomeName = match.getOutcomeName();
+            assertEquals(expected, tree.getOutcomes().stream()
+                    .filter(outcome -> outcomeName.equals(outcome.getName()))
+                    .findFirst().orElseThrow().getActions().get(0).getValue());
+            current = current.getValueNodes().size() == 2
+                    ? current.getValueNodes().get(1).getNext() : null;
+        }
+        assertNull(current);
+    }
+
+    @Test
+    void convertsRowOnlyInfiniteLowerBound() {
+        CrossTableNodeDataDO node = rowOnlyNode();
+        CrossTableLineItemDO range = new CrossTableLineItemDO();
+        range.setMinValue(endpoint("String", "infinite"));
+        range.setMaxValue(maxEndpoint("Integer", "10"));
+        range.setMaxInclusive(true);
+        node.getRowCriteria().getLineItems().setCrossTableLineItemDOs(
+                Arrays.asList(range, remainderCriterion()));
+
+        SegmentationTree tree = new SegmentationTreeConverter(mockCommonProcessing(node)).convert(node);
+
+        assertEquals("RowInput <= 10", tree.getBooleanExpressions().get(0).getExpression());
+    }
+
+    @Test
+    void convertsRowOnlyMissingAndPatternCriteria() {
+        CrossTableNodeDataDO node = rowOnlyNode();
+        node.getRowCriteria().getVarRefDO().setType("String");
+        node.getRowCriteria().setLike(true);
+        node.getRowCriteria().getLineItems().setCrossTableLineItemDOs(
+                Arrays.asList(missingCriterion(), discreteItem("AB%"), remainderCriterion()));
+        node.getCrossTable().setLists(Arrays.asList(
+                singleValue("missing"), singleValue("pattern"), singleValue("other")));
+
+        SegmentationTree tree = new SegmentationTreeConverter(mockCommonProcessing(node)).convert(node);
+
+        assertEquals(Arrays.asList("missing(RowInput)", "RowInput LIKE 'AB%'", "true"),
+                tree.getBooleanExpressions().stream().map(SegmentationTree.BooleanExpression::getExpression).toList());
+        assertEquals(3, tree.getOutcomes().size());
+    }
+
+    @Test
+    void rejectsMalformedRowOnlyTablesAndExplicitEmptyColumnCriteria() {
+        CrossTableNodeDataDO node = rowOnlyNode();
+        node.getCrossTable().getLists().get(0).getValues().add(cell("extra"));
+        SegmentationTreeConverter converter = new SegmentationTreeConverter(mockCommonProcessing(node));
+        assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
+        node.getCrossTable().setLists(Collections.singletonList(singleValue("a")));
+        assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
+        node.getCrossTable().setLists(Arrays.asList(singleValue("a"), singleValue("b")));
+        node.setColumnCriteria(new ColumnCriteria());
+        node.getColumnCriteria().setVarRefDO(varRef("ColumnInput", "events.ColumnInput", "String"));
+        assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
+        node.setColumnCriteria(null);
+        node.setRowCriteria(null);
+        assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
+    }
+
+    private CrossTableNodeDataDO rowOnlyNode() {
+        CrossTableNodeDataDO node = createNode(false, false);
+        node.setColumnCriteria(null);
+        node.getCrossTable().setLists(new ArrayList<>(Arrays.asList(singleValue("a"), singleValue("b"))));
+        return node;
+    }
+
+    private ListOfValues singleValue(String value) {
+        ListOfValues row = new ListOfValues();
+        row.setValues(new ArrayList<>(Collections.singletonList(cell(value))));
+        return row;
+    }
+
+    @Test
+    @EnabledIfSystemProperty(named = "rowOnlyCrossTableExtract", matches = ".+")
+    void convertsRowOnlyNodesInSuppliedExtract() throws Exception {
+        javax.xml.stream.XMLInputFactory factory = javax.xml.stream.XMLInputFactory.newFactory();
+        factory.setProperty(javax.xml.stream.XMLInputFactory.SUPPORT_DTD, false);
+        factory.setProperty(javax.xml.stream.XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
+        Unmarshaller unmarshaller = JAXBContext.newInstance(CrossTableNodeDataDO.class).createUnmarshaller();
+        int converted = 0;
+        try (java.io.InputStream input = java.nio.file.Files.newInputStream(
+                java.nio.file.Path.of(System.getProperty("rowOnlyCrossTableExtract")))) {
+            javax.xml.stream.XMLStreamReader reader = factory.createXMLStreamReader(input);
+            try {
+                while (reader.hasNext()) {
+                    if (reader.isStartElement() && "CrossTableNodeDataDO".equals(reader.getLocalName())) {
+                        CrossTableNodeDataDO source = unmarshaller.unmarshal(reader, CrossTableNodeDataDO.class).getValue();
+                        if (source.getColumnCriteria() != null) {
+                            continue;
+                        }
+                        SegmentationTree tree = new SegmentationTreeConverter(mockCommonProcessing(source)).convert(source);
+                        assertTrue(tree.getMatrices().isEmpty(), source.getNodeName());
+                        assertEquals(2, tree.getSignature().size(), source.getNodeName());
+                        SegmentationTree.Node current = tree.getNode();
+                        for (ListOfValues row : source.getCrossTable().getLists()) {
+                            SegmentationTree.ValueNode match = current.getValueNodes().get(0);
+                            String outcomeName = match.getOutcomeName();
+                            IBVariableValueDO value = row.getValues().get(0);
+                            String expected = value.getType() == 14
+                                    ? source.getOutputVariable().getDefaultValue().getStringValue()
+                                    : value.getStringValue();
+                            assertEquals(expected, tree.getOutcomes().stream()
+                                    .filter(outcome -> outcomeName.equals(outcome.getName())).findFirst()
+                                    .orElseThrow().getActions().get(0).getValue(), source.getNodeName());
+                            current = current.getValueNodes().size() == 2
+                                    ? current.getValueNodes().get(1).getNext() : null;
+                        }
+                        assertNull(current, source.getNodeName());
+                        assertTrue(tree.getBooleanExpressions().stream()
+                                .noneMatch(expression -> expression.getExpression().contains("infinite")),
+                                source.getNodeName());
+                        converted++;
+                        continue;
+                    }
+                    reader.next();
+                }
+            } finally {
+                reader.close();
+            }
+        }
+        assertTrue(converted > 0);
+        System.out.println("Converted and checked all row outcomes in " + converted + " row-only Cross-Table nodes");
+    }
 
     @Test
     void mapsSegmentationTreeSignatureToDecisionStep() {

@@ -48,11 +48,11 @@ Migrating campaigns from RTDM to ID is a 3-step process.
 Run the migration tool from a command/shell window.
 
 ```shell script
-java -jar rtdm-migrate-to-id-0.15.0.jar
+java -jar rtdm-migrate-to-id-0.15.1.jar
 
 or
 # if port 8080 already in use
-java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.15.0.jar
+java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.15.1.jar
 ```
 
 This row inside command/shell will tell you that service successfully started
@@ -118,6 +118,7 @@ OAuth tokens are cached per Viya host, protocol, user and password and are refre
 * Creation of Assignment Rule Set in ID from RTDM Reply Node
 * Creation of Assignment Rule Set in ID from RTDM calculated variables
 * Conversion of RTDM Cross-Table nodes to ID segmentation trees with matrices and local value lists for discrete values, numeric ranges, whole-date ranges, and day/time criteria. Day/time criteria use a preceding RuleSet to derive calendar-day numbers and seconds since midnight from datetime inputs; these internal values feed numeric matrix ranges. Missing values and character `LIKE` patterns use boolean operators; remaining cells use matrices.
+  Row-only and column-only Cross-Table nodes become boolean decision trees without a synthetic input for the absent axis. Row-only tables require one result cell per row; column-only tables require one row with one result cell per column. Conditions, remainder criteria, and output defaults are preserved; malformed table dimensions and nodes with neither axis are rejected.
 * RTDM Subdiagrams must be migrated before migrating parent diagram
   ![img.png](readmeimages/img.png)
 

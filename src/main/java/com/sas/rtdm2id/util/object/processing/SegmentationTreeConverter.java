@@ -57,12 +57,19 @@ public class SegmentationTreeConverter {
             throw new IllegalArgumentException("Cross-Table node is required");
         }
 
-        Axis rowAxis = createAxis(crossTableNodeDataDO.getRowCriteria());
-        Axis columnAxis = createAxis(crossTableNodeDataDO.getColumnCriteria());
+        if (crossTableNodeDataDO.getRowCriteria() == null && crossTableNodeDataDO.getColumnCriteria() == null) {
+            throw new IllegalArgumentException("Cross-Table row or column criteria is required");
+        }
+        Axis rowAxis = crossTableNodeDataDO.getRowCriteria() == null
+                ? null : createAxis(crossTableNodeDataDO.getRowCriteria());
+        Axis columnAxis = crossTableNodeDataDO.getColumnCriteria() == null
+                ? null : createAxis(crossTableNodeDataDO.getColumnCriteria());
+        int rowCount = rowAxis == null ? 1 : rowAxis.items.size();
+        int columnCount = columnAxis == null ? 1 : columnAxis.items.size();
         List<ListOfValues> tableRows = crossTableNodeDataDO.getCrossTable() == null
                 ? Collections.<ListOfValues>emptyList()
                 : crossTableNodeDataDO.getCrossTable().getLists();
-        validateTable(rowAxis.items.size(), columnAxis.items.size(), tableRows);
+        validateTable(rowCount, columnCount, tableRows);
 
         SegmentationTree tree = new SegmentationTree();
         tree.setName(commonProcessing.makeCrossTableNodeName(crossTableNodeDataDO));
@@ -72,7 +79,7 @@ public class SegmentationTreeConverter {
         tree.setMatrices(new ArrayList<SegmentationTree.Matrix>());
         tree.setBooleanExpressions(new ArrayList<SegmentationTree.BooleanExpression>());
 
-        if (rowAxis.matrixCompatible && columnAxis.matrixCompatible) {
+        if (rowAxis != null && columnAxis != null && rowAxis.matrixCompatible && columnAxis.matrixCompatible) {
             Set<String> localValueListNames = new LinkedHashSet<>();
             addAxisLocalValueList(tree, rowAxis, "down", localValueListNames);
             addAxisLocalValueList(tree, columnAxis, "across", localValueListNames);
@@ -80,8 +87,8 @@ public class SegmentationTreeConverter {
         tree.setSignature(createSignature(rowAxis, columnAxis, crossTableNodeDataDO.getOutputVariable()));
 
         CellTable cellTable = createCellTable(crossTableNodeDataDO.getOutputVariable(), tableRows,
-                rowAxis.items.size(), columnAxis.items.size(), tree.getOutcomes());
-        if (rowAxis.matrixCompatible && columnAxis.matrixCompatible) {
+                rowCount, columnCount, tree.getOutcomes());
+        if (rowAxis != null && columnAxis != null && rowAxis.matrixCompatible && columnAxis.matrixCompatible) {
             tree.setNode(rowAxis.like || columnAxis.like
                 ? createPatternMatrixTree(rowAxis, columnAxis, cellTable, tree,
                     allIndexes(rowAxis), allIndexes(columnAxis), false, false)
@@ -155,12 +162,16 @@ public class SegmentationTreeConverter {
             OutputVariable outputVariable) {
         List<SegmentationTree.SignatureTerm> signature = new ArrayList<>();
         Set<String> names = new LinkedHashSet<>();
-        addSignature(signature, names, rowAxis.variableName, rowAxis.dataType, "input",
-                rowAxis.localValueListName);
-        addSignature(signature, names, columnAxis.variableName, columnAxis.dataType, "input",
-                columnAxis.localValueListName);
+        if (rowAxis != null) {
+            addSignature(signature, names, rowAxis.variableName, rowAxis.dataType, "input",
+                    rowAxis.localValueListName);
+        }
+        if (columnAxis != null) {
+            addSignature(signature, names, columnAxis.variableName, columnAxis.dataType, "input",
+                    columnAxis.localValueListName);
+        }
         for (SegmentationTree.SignatureTerm term : signature) {
-            Axis axis = term.getName().equals(rowAxis.variableName) ? rowAxis : columnAxis;
+            Axis axis = rowAxis != null && term.getName().equals(rowAxis.variableName) ? rowAxis : columnAxis;
             term.setSourceVariableName(axis.sourceVariableName);
             term.setSourceDataType(axis.sourceDataType);
             term.setDerivationExpression(axis.derivationExpression);
@@ -615,6 +626,9 @@ public class SegmentationTreeConverter {
 
     private SegmentationTree.Node createBooleanTree(Axis rowAxis, Axis columnAxis, CellTable cellTable,
             SegmentationTree tree) {
+        if (rowAxis == null) {
+            return createColumnNode(columnAxis, cellTable, tree, 0, 0);
+        }
         return createRowNode(rowAxis, columnAxis, cellTable, tree, 0);
     }
 
@@ -635,7 +649,11 @@ public class SegmentationTreeConverter {
         SegmentationTree.ValueNode match = new SegmentationTree.ValueNode();
         match.setValue("true");
         match.setLabel(criterionLabel(criterion));
-        match.setNext(createColumnNode(rowAxis, columnAxis, cellTable, tree, rowIndex, 0));
+        if (columnAxis == null) {
+            match.setOutcomeName(cellTable.outcomeNames.get(rowIndex).get(0));
+        } else {
+            match.setNext(createColumnNode(columnAxis, cellTable, tree, rowIndex, 0));
+        }
         node.setValueNodes(new ArrayList<SegmentationTree.ValueNode>());
         node.getValueNodes().add(match);
 
@@ -650,7 +668,7 @@ public class SegmentationTreeConverter {
         return node;
     }
 
-    private SegmentationTree.Node createColumnNode(Axis rowAxis, Axis columnAxis, CellTable cellTable,
+    private SegmentationTree.Node createColumnNode(Axis columnAxis, CellTable cellTable,
             SegmentationTree tree, int rowIndex, int columnIndex) {
         if (columnIndex >= columnAxis.items.size()) {
             return null;
@@ -672,7 +690,7 @@ public class SegmentationTreeConverter {
         node.setValueNodes(new ArrayList<SegmentationTree.ValueNode>());
         node.getValueNodes().add(match);
 
-        SegmentationTree.Node next = createColumnNode(rowAxis, columnAxis, cellTable, tree, rowIndex,
+        SegmentationTree.Node next = createColumnNode(columnAxis, cellTable, tree, rowIndex,
                 columnIndex + 1);
         if (next != null) {
             SegmentationTree.ValueNode noMatch = new SegmentationTree.ValueNode();
@@ -826,13 +844,14 @@ public class SegmentationTreeConverter {
         }
 
         List<String> conditions = new ArrayList<>();
-        if (criterion.minValue != null) {
+        if (criterion.minValue != null && !"infinite".equalsIgnoreCase(criterion.minValue)
+                && !"-infinite".equalsIgnoreCase(criterion.minValue)) {
             String boundType = isWholeDateAxis(axis.dateType)
                     ? dataType(criterion.minStoredType) : expressionDataType;
             conditions.add(expressionVariable + (criterion.minInclusive ? " >= " : " > ")
                     + criterionLiteral(axis, criterion.minValue, criterion.minStoredType, boundType));
         }
-        if (criterion.maxValue != null) {
+        if (criterion.maxValue != null && !"infinite".equalsIgnoreCase(criterion.maxValue)) {
             String boundType = isWholeDateAxis(axis.dateType)
                     ? dataType(criterion.maxStoredType) : expressionDataType;
             conditions.add(expressionVariable + (criterion.maxInclusive ? " <= " : " < ")

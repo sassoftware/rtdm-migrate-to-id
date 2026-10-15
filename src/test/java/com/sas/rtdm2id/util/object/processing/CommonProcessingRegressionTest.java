@@ -273,6 +273,29 @@ class CommonProcessingRegressionTest {
     }
 
     @Test
+    void checksEachDistinctSubdiagramOnceAndPreservesMissingNameOrder() throws Exception {
+        RestTemplate template = mock(RestTemplate.class);
+        CommonProcessing processing = new CommonProcessing(template, remoteStorage(), new TreeUtil());
+        Batch batch = batch(
+            "<SubDiagramNodeDataDO><NodeId>one</NodeId><SubdiagramName>Child B</SubdiagramName></SubDiagramNodeDataDO>"
+            + "<SubDiagramNodeDataDO><NodeId>two</NodeId><SubdiagramName>Existing Child</SubdiagramName></SubDiagramNodeDataDO>"
+            + "<SubDiagramNodeDataDO><NodeId>three</NodeId><SubdiagramName>Child B</SubdiagramName></SubDiagramNodeDataDO>"
+            + "<SubDiagramNodeDataDO><NodeId>four</NodeId><SubdiagramName>Child A</SubdiagramName></SubDiagramNodeDataDO>"
+            + "<SubDiagramNodeDataDO><NodeId>five</NodeId><SubdiagramName>Existing Child</SubdiagramName></SubDiagramNodeDataDO>"
+            + "<SubDiagramNodeDataDO><NodeId>six</NodeId><SubdiagramName>Child A</SubdiagramName></SubDiagramNodeDataDO>");
+        CodeFileCollection missing = new CodeFileCollection();
+        missing.setCount(0L);
+        CodeFileCollection existing = new CodeFileCollection();
+        existing.setCount(1L);
+        when(template.exchange(any(URI.class), eq(HttpMethod.GET), any(HttpEntity.class), eq(CodeFileCollection.class)))
+            .thenReturn(ResponseEntity.ok(missing), ResponseEntity.ok(existing), ResponseEntity.ok(missing));
+
+        assertEquals(List.of("Child B", "Child A"), processing.getSubDiagramNodeNames(batch));
+        verify(template, times(3)).exchange(any(URI.class), eq(HttpMethod.GET),
+            any(HttpEntity.class), eq(CodeFileCollection.class));
+    }
+
+    @Test
     void propagatesDecisionLookupFailures() throws Exception {
         RestTemplate template = mock(RestTemplate.class);
         CommonProcessing processing = new CommonProcessing(template, remoteStorage(), new TreeUtil());

@@ -2213,6 +2213,7 @@ public class CommonProcessing {
     public List<String> getSubDiagramNodeNames(final Batch batch) {
         return batch.getLogicalUnit().getSubDiagramNodeDataDOs().stream()
                 .map(SubDiagramNodeDataDO::getSubdiagramName)
+                .distinct()
                 .map(subDiagramName -> !findDecision(subDiagramName) ? subDiagramName : null)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toList());
