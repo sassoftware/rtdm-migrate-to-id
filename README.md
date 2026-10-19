@@ -48,11 +48,11 @@ Migrating campaigns from RTDM to ID is a 3-step process.
 Run the migration tool from a command/shell window.
 
 ```shell script
-java -jar rtdm-migrate-to-id-0.15.1.jar
+java -jar rtdm-migrate-to-id-0.15.2.jar
 
 or
 # if port 8080 already in use
-java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.15.1.jar
+java -Dserver.port=8086 -jar rtdm-migrate-to-id-0.15.2.jar
 ```
 
 This row inside command/shell will tell you that service successfully started
@@ -117,8 +117,9 @@ OAuth tokens are cached per Viya host, protocol, user and password and are refre
 * Creation of Decision input/output variables in ID from RTDM event variables
 * Creation of Assignment Rule Set in ID from RTDM Reply Node
 * Creation of Assignment Rule Set in ID from RTDM calculated variables
+* Data-item interval splits keep RTDM's missing groups, inclusive/exclusive bounds, open-ended (`infinite`) intervals and "all values" groups. ID range branches only allow inclusive bounds, so a split that needs more is preceded by a RuleSet (`<split>_<nodeId>_interval`) that computes the number of the matching RTDM interval, and becomes an equals branch on that number. Missing values match the missing group, or the remainder when there is none.
 * Conversion of RTDM Cross-Table nodes to ID segmentation trees with matrices and local value lists for discrete values, numeric ranges, whole-date ranges, and day/time criteria. Day/time criteria use a preceding RuleSet to derive calendar-day numbers and seconds since midnight from datetime inputs; these internal values feed numeric matrix ranges. Missing values and character `LIKE` patterns use boolean operators; remaining cells use matrices.
-  Row-only and column-only Cross-Table nodes become boolean decision trees without a synthetic input for the absent axis. Row-only tables require one result cell per row; column-only tables require one row with one result cell per column. Conditions, remainder criteria, and output defaults are preserved; malformed table dimensions and nodes with neither axis are rejected.
+  Row-only and column-only Cross-Table nodes become boolean decision trees without a synthetic input for the absent axis. Row-only tables require one result cell per row; column-only tables require one row with one result cell per column. Conditions, remainder criteria, and output defaults are preserved. RTDM leaves out trailing empty cells and rows; an empty cell assigns nothing, so the output keeps the value it had before the node (the tree's output is then input/output). Tables with more cells than their criteria, with no cells at all, or with neither axis are rejected. An output linked to an identifier is written to the identifier's term, which is where later nodes read it.
 * RTDM Subdiagrams must be migrated before migrating parent diagram
   ![img.png](readmeimages/img.png)
 

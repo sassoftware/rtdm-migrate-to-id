@@ -45,6 +45,14 @@ public class SegmentationTreeConverter {
     private static final String ACTION_VARIABLE_ASSIGNMENT = "variableAssignment";
     private static final String MISSING_MARKER = "__&MISSING&__";
     private static final String OTHER_MARKER = "__&OTHER&__";
+    private static final String NO_ASSIGNMENT_OUTCOME = "no_assignment";
+    /** Outcome value of empty cells; its text is the matrix result of those cells. */
+    private static final Object NO_ASSIGNMENT_VALUE = new Object() {
+        @Override
+        public String toString() {
+            return "rtdm2id_no_assignment";
+        }
+    };
 
     private final CommonProcessing commonProcessing;
 
@@ -70,6 +78,7 @@ public class SegmentationTreeConverter {
                 ? Collections.<ListOfValues>emptyList()
                 : crossTableNodeDataDO.getCrossTable().getLists();
         validateTable(rowCount, columnCount, tableRows);
+        boolean unassignedCells = hasOmittedCells(rowCount, columnCount, tableRows);
 
         SegmentationTree tree = new SegmentationTree();
         tree.setName(commonProcessing.makeCrossTableNodeName(crossTableNodeDataDO));
@@ -84,7 +93,7 @@ public class SegmentationTreeConverter {
             addAxisLocalValueList(tree, rowAxis, "down", localValueListNames);
             addAxisLocalValueList(tree, columnAxis, "across", localValueListNames);
         }
-        tree.setSignature(createSignature(rowAxis, columnAxis, crossTableNodeDataDO.getOutputVariable()));
+        tree.setSignature(createSignature(rowAxis, columnAxis, crossTableNodeDataDO.getOutputVariable(), unassignedCells));
 
         CellTable cellTable = createCellTable(crossTableNodeDataDO.getOutputVariable(), tableRows,
                 rowCount, columnCount, tree.getOutcomes());
@@ -158,8 +167,12 @@ public class SegmentationTreeConverter {
         return axis.dataType;
     }
 
+    /**
+     * The output is "inOut" when some cells assign nothing: the tree then receives the output's current value and
+     * returns it unchanged for those cells.
+     */
     private List<SegmentationTree.SignatureTerm> createSignature(Axis rowAxis, Axis columnAxis,
-            OutputVariable outputVariable) {
+            OutputVariable outputVariable, boolean unassignedCells) {
         List<SegmentationTree.SignatureTerm> signature = new ArrayList<>();
         Set<String> names = new LinkedHashSet<>();
         if (rowAxis != null) {
@@ -179,7 +192,8 @@ public class SegmentationTreeConverter {
 
         if (outputVariable != null) {
             String outputName = outputVariableName(outputVariable);
-            addSignature(signature, names, outputName, dataType(outputVariable.getTypeDescription()), "output", null);
+            addSignature(signature, names, outputName, dataType(outputVariable.getTypeDescription()),
+                    unassignedCells ? "inOut" : "output", null);
         }
         return signature;
     }
@@ -298,10 +312,19 @@ public class SegmentationTreeConverter {
         cellTable.outcomeNames = new ArrayList<>();
         cellTable.outcomeValues = new LinkedHashMap<>();
 
+        String noAssignment = null;
         for (int row = 0; row < rowCount; row++) {
-            List<IBVariableValueDO> values = tableRows.get(row).getValues();
+            List<IBVariableValueDO> values = row < tableRows.size() ? tableRows.get(row).getValues() : null;
             List<String> rowOutcomes = new ArrayList<>();
             for (int column = 0; column < columnCount; column++) {
+                if (values == null || column >= values.size()) {
+                    // RTDM omits trailing empty cells (and rows); an empty cell assigns nothing
+                    if (noAssignment == null) {
+                        noAssignment = createNoAssignmentOutcome(outcomes, cellTable.outcomeValues);
+                    }
+                    rowOutcomes.add(noAssignment);
+                    continue;
+                }
                 Object value = scalarValue(values.get(column));
                 if (values.get(column).getType() == VALUE_TYPE_DEFAULT) {
                     value = defaultValue(outputVariable);
@@ -312,6 +335,22 @@ public class SegmentationTreeConverter {
             cellTable.outcomeNames.add(rowOutcomes);
         }
         return cellTable;
+    }
+
+    /** Outcome for empty cells: no actions, so the output keeps the value it had before the node. */
+    private String createNoAssignmentOutcome(List<SegmentationTree.Outcome> outcomes, Map<String, Object> outcomeValues) {
+        String outcomeName = NO_ASSIGNMENT_OUTCOME;
+        int duplicateSuffix = 2;
+        while (containsOutcomeName(outcomeValues, outcomeName)) {
+            outcomeName = NO_ASSIGNMENT_OUTCOME + "_" + duplicateSuffix++;
+        }
+        SegmentationTree.Outcome outcome = new SegmentationTree.Outcome();
+        outcome.setName(outcomeName);
+        outcome.setActions(new ArrayList<>());
+        outcomes.add(outcome);
+        // A value of its own class, so findOrCreateOutcome never matches it to a cell value
+        outcomeValues.put(outcomeName, NO_ASSIGNMENT_VALUE);
+        return outcomeName;
     }
 
     private String findOrCreateOutcome(Object value, OutputVariable outputVariable,
@@ -1085,14 +1124,20 @@ public class SegmentationTreeConverter {
         if (rowCount == 0 || columnCount == 0) {
             throw new IllegalArgumentException("Cross-Table criteria must contain row and column items");
         }
-        if (tableRows == null || tableRows.size() != rowCount) {
+        // RTDM omits trailing empty cells and rows, so fewer is allowed; more cells than the criteria is malformed
+        if (tableRows == null || tableRows.isEmpty() || tableRows.size() > rowCount) {
             throw new IllegalArgumentException("Cross-Table matrix row count does not match row criteria");
         }
         for (ListOfValues row : tableRows) {
-            if (row == null || row.getValues() == null || row.getValues().size() != columnCount) {
+            if (row == null || row.getValues() == null || row.getValues().size() > columnCount) {
                 throw new IllegalArgumentException("Cross-Table matrix column count does not match column criteria");
             }
         }
+    }
+
+    private static boolean hasOmittedCells(int rowCount, int columnCount, List<ListOfValues> tableRows) {
+        return tableRows.size() < rowCount
+                || tableRows.stream().anyMatch(row -> row.getValues().size() < columnCount);
     }
 
     private static class Axis {

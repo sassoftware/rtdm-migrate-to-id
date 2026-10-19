@@ -749,6 +749,7 @@ public class ProcessNodeConverter {
         if (ds2code == null || ds2code.trim().isEmpty()) {
             throw new IllegalArgumentException("DS2 code of process '" + processName + "' is empty");
         }
+        ds2code = splitNestedCommentOpeners(ds2code);
 
         Matcher packageMatcher = PACKAGE_DECLARATION_PATTERN.matcher(ds2code);
         if (!packageMatcher.find()) {
@@ -772,6 +773,45 @@ public class ProcessNodeConverter {
         ds2code = convertIntToDouble(ds2code);
         ds2code = convertTapPackages(ds2code);
         return convertExecuteListsToDatagrid(ds2code, processName);
+    }
+
+    /**
+     * DS2 block comments end at the first "*&#47;", but ID's DS2 parser (MAS StrippedDS2PreLexer, used by the codeFiles
+     * API) treats "/*" inside a comment as a nested comment. A banner such as "/* ***" followed by "/*****&#47;" then
+     * never closes for ID, which hides endpackage and fails with 'The package with the name "${PACKAGE_NAME}" was not
+     * found'. Each "/*" inside a comment becomes "/ *" (and a comment ending in "/" gets a space before its "*&#47;"),
+     * so ID ends every comment where DS2 does. String literals and code outside comments are unchanged.
+     */
+    static String splitNestedCommentOpeners(String ds2code) {
+        StringBuilder result = new StringBuilder(ds2code.length());
+        int length = ds2code.length();
+        int i = 0;
+        while (i < length) {
+            char c = ds2code.charAt(i);
+            if (c == '/' && i + 1 < length && ds2code.charAt(i + 1) == '*') {
+                int close = ds2code.indexOf("*/", i + 2);
+                if (close < 0) {
+                    result.append(ds2code, i, length);
+                    break;
+                }
+                String body = ds2code.substring(i + 2, close).replace("/*", "/ *");
+                if (body.endsWith("/")) {
+                    body += " ";
+                }
+                result.append("/*").append(body).append("*/");
+                i = close + 2;
+            } else if (c == '\'' || c == '"') {
+                // A quote inside a literal is written twice, which this scan reads as two adjacent literals
+                int close = ds2code.indexOf(c, i + 1);
+                int end = close < 0 ? length : close + 1;
+                result.append(ds2code, i, end);
+                i = end;
+            } else {
+                result.append(c);
+                i++;
+            }
+        }
+        return result.toString();
     }
 
     private static String convertExecuteListsToDatagrid(String ds2code, String processName) {

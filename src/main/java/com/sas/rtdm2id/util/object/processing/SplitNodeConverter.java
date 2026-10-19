@@ -33,6 +33,10 @@ public class SplitNodeConverter {
     static final int PERCENT_BUCKETS = 100;
 
     private static final String UNSET_BOUND = "unset";
+    private static final String INFINITE_BOUND = "infinite";
+
+    /** RuleSet term holding the 1-based number of the RTDM interval a value falls in (see createIntervalNumberStep). */
+    static final String INTERVAL_NUMBER_VARIABLE = "interval_number";
 
     private final CommonProcessing commonProcessing;
     private final MapStorage mapStorage;
@@ -80,6 +84,16 @@ public class SplitNodeConverter {
             String intervalBranchType = intervalLineItemDOs.stream()
                 .allMatch(interval -> Boolean.parseBoolean(interval.getMissingGroup()) || isSingleValueInterval(interval, dataType))
                 ? EQUALS_BRANCH_TYPE : RANGE_BRANCH_TYPE;
+            // ID range branches only accept ">=" and "<=" (DecisionValidateStructureVisitor.validateRangeBranch), so missing
+            // groups, "all values" groups and exclusive bounds cannot be range cases. Such splits get a RuleSet that computes
+            // the number of the matching RTDM interval and an equals branch on that number.
+            String intervalNumberTerm = null;
+            if (RANGE_BRANCH_TYPE.equals(intervalBranchType)
+                    && !intervalLineItemDOs.stream().allMatch(SplitNodeConverter::isNativeRangeInterval)) {
+                intervalBranchType = EQUALS_BRANCH_TYPE;
+                intervalNumberTerm = commonProcessing.sanitizeVariableName(
+                    INTERVAL_NUMBER_VARIABLE + "_" + splitNodeDataDO.getNodeId());
+            }
             String variableName = commonProcessing.buildVariableName(varRefDO);
             ReferenceContext references = new ReferenceContext(stepList, step, decision, splitNodeDataDO.getNodeId());
 
@@ -96,15 +110,20 @@ public class SplitNodeConverter {
                 branchCase.setLabel(splitNodeLineItemDOs.get(i).getCellId());
                 if (!intervalLineItemDOs.isEmpty()) {
                     IntervalLineItemDO interval = lineItem(intervalLineItemDOs, i, splitNodeDataDO);
-                    if (Boolean.parseBoolean(interval.getMissingGroup())) {
+                    if (intervalNumberTerm != null) {
+                        Term2 lhsTerm = new Term2();
+                        lhsTerm.setName(intervalNumberTerm);
+                        branchCase.setSimpleCondition(new SimpleBranchCondition().lhsTerm(lhsTerm).operator("=")
+                            .rhsConstant(String.valueOf(i + 1)));
+                    } else if (Boolean.parseBoolean(interval.getMissingGroup())) {
                         branchCase.setSimpleCondition(createMissingBranchCondition(variableName, dataType));
-                    } else if (isSingleValueInterval(interval, dataType)) {
+                    } else if (EQUALS_BRANCH_TYPE.equals(intervalBranchType) && isSingleValueInterval(interval, dataType)) {
                         Term2 lhsTerm = new Term2();
                         lhsTerm.setName(commonProcessing.sanitizeVariableName(variableName));
                         branchCase.setSimpleCondition(createSimpleBranchCondition(lhsTerm,
                             interval.getLowerBoundObject().getText(), "false", "=", dataType));
                     } else {
-                        // RTDM bound inclusivity is preserved: ID branch conditions support < and > as well as <= and >=
+                        // Only inclusive bounds reach here (isNativeRangeInterval)
                         setIntervalCondition(branchCase, interval, variableName, dataType, splitNodeDataDO, references);
                     }
                     step.setBranchType(intervalBranchType);
@@ -138,6 +157,11 @@ public class SplitNodeConverter {
             }
         }
         step.setBranchCases(branchCases);
+        if (intervalNumberTerm != null) {
+            // Built after the cases so calculated items referenced by bounds are scheduled before the RuleSet
+            commonProcessing.addStep(stepList, createIntervalNumberStep(splitNodeDataDO, splitNodeLineItemDOs,
+                intervalLineItemDOs, variableName, dataType, intervalNumberTerm, references), splitNodeDataDO.getNodeId());
+        }
         commonProcessing.addStep(stepList, step, splitNodeDataDO.getNodeId());
         return stepList;
         }
@@ -324,7 +348,19 @@ public class SplitNodeConverter {
 
     private static boolean hasBound(ReferenceableValue bound, String text) {
         return bound != null && (bound.getReferenceId() != null
-                || text != null && !text.trim().isEmpty() && !UNSET_BOUND.equalsIgnoreCase(text.trim()));
+                || text != null && !text.trim().isEmpty() && !UNSET_BOUND.equalsIgnoreCase(text.trim())
+                && !isInfinite(bound, text));
+    }
+
+    private static boolean isInfinite(ReferenceableValue bound, String text) {
+        return bound != null && bound.getReferenceId() == null && text != null
+                && (INFINITE_BOUND.equalsIgnoreCase(text.trim()) || ("-" + INFINITE_BOUND).equalsIgnoreCase(text.trim()));
+    }
+
+    /** Both bounds infinite: RTDM's "all values" group, i.e. any value that is not missing. */
+    private static boolean isAllValuesInterval(IntervalLineItemDO interval) {
+        return isInfinite(interval.getLowerBoundObject(), lowerText(interval))
+                && isInfinite(interval.getUpperBoundObject(), upperText(interval));
     }
 
     private static boolean isReference(ReferenceableValue bound) {
@@ -433,6 +469,147 @@ public class SplitNodeConverter {
             .lhsConditionExpressionType(SignatureTerm.DataTypeEnum.DECIMAL.getValue())
             .operator("=")
             .rhsConstant("1");
+    }
+
+    /** A range branch case can express the interval: not a missing or "all values" group and only inclusive bounds. */
+    private static boolean isNativeRangeInterval(IntervalLineItemDO interval) {
+        if (Boolean.parseBoolean(interval.getMissingGroup()) || isAllValuesInterval(interval)) {
+            return false;
+        }
+        boolean hasLower = hasBound(interval.getLowerBoundObject(), lowerText(interval));
+        boolean hasUpper = hasBound(interval.getUpperBoundObject(), upperText(interval));
+        return (!hasLower || Boolean.parseBoolean(interval.getLowerBoundInclusive()))
+                && (!hasUpper || Boolean.parseBoolean(interval.getUpperBoundInclusive()));
+    }
+
+    /**
+     * RuleSet that sets the split's interval number term to the 1-based position of the first RTDM line item whose
+     * interval matches the split value: the missing group for a missing value, otherwise the first matching interval
+     * in RTDM order. 0 (no case, so the remainder) when nothing matches.
+     */
+    private Step createIntervalNumberStep(SplitNodeDataDO splitNodeDataDO,
+            List<SplitNodeDataDO.LineItems.SplitNodeLineItemDO> lineItems, List<IntervalLineItemDO> intervals,
+            String variableName, String dataType, String intervalNumberTerm, ReferenceContext references) {
+        String ruleSetName = commonProcessing.makeSplitNodeRuleSetName(splitNodeDataDO) + "_interval";
+        commonProcessing.findOrAddRuleSet(ruleSetName, "RTDM interval number for split node " + splitNodeDataDO.getNodeName());
+        Step step = mapStorage.getRuleSetStepMap().get(ruleSetName);
+        if (step == null || step.getRuleSet() == null) {
+            throw new IllegalStateException("Interval RuleSet '" + ruleSetName + "' was not created for split node '"
+                    + splitNodeDataDO.getNodeName() + "' (" + splitNodeDataDO.getNodeId() + ")");
+        }
+        Map<String, Signature> signature = new LinkedHashMap<>();
+        String value = addIntervalRuleSetInput(step, signature, commonProcessing.sanitizeVariableName(variableName),
+                datatypeOf(dataType));
+
+        String missingNumber = "0";
+        List<String[]> cases = new ArrayList<>();
+        for (int i = 0; i < lineItems.size(); i++) {
+            if (RTDM2IDConstants.REMAINDER_VALUE.equals(lineItems.get(i).getValue())) {
+                continue;
+            }
+            IntervalLineItemDO interval = lineItem(intervals, i, splitNodeDataDO);
+            String number = String.valueOf(i + 1);
+            if (Boolean.parseBoolean(interval.getMissingGroup())) {
+                if ("0".equals(missingNumber)) {
+                    missingNumber = number;
+                }
+            } else {
+                cases.add(new String[] {intervalExpression(interval, value, dataType, step, signature, splitNodeDataDO,
+                        lineItems.get(i).getCellId(), references), number});
+            }
+        }
+        String expression = "0";
+        for (int i = cases.size() - 1; i >= 0; i--) {
+            expression = "ifn(" + cases.get(i)[0] + ", " + cases.get(i)[1] + ", " + expression + ")";
+        }
+        expression = "ifn(missing(" + value + "), " + missingNumber + ", " + expression + ")";
+
+        Signature output = new Signature();
+        output.setName(INTERVAL_NUMBER_VARIABLE);
+        output.setDataType(SignatureTerm.DataTypeEnum.INTEGER.getValue());
+        output.setDirection(OUTPUT_DIRECTION);
+        signature.put(INTERVAL_NUMBER_VARIABLE, output);
+        Mapping outputMapping = new Mapping();
+        outputMapping.setStepTermName(INTERVAL_NUMBER_VARIABLE);
+        outputMapping.setTargetDecisionTermName(intervalNumberTerm);
+        outputMapping.setDirection(Mapping.DirectionEnum.OUTPUT);
+        commonProcessing.checkMappingForDuplicate(outputMapping, step);
+        SignatureTerm decisionTerm = new SignatureTerm();
+        decisionTerm.setName(intervalNumberTerm);
+        decisionTerm.setDataType(SignatureTerm.DataTypeEnum.INTEGER);
+        decisionTerm.setDirection(SignatureTerm.DirectionEnum.NONE);
+        commonProcessing.checkSignatureTermForDuplicate(NONE_DIRECTION, references.decision(), decisionTerm);
+
+        RuleSet ruleSet = new RuleSet();
+        ruleSet.setName(ruleSetName);
+        ruleSet.setSignature(new ArrayList<>(signature.values()));
+        // Like the other per-node RuleSets: leave an existing (reused) RuleSet alone so re-running does not add rules
+        if (!Boolean.TRUE.equals(mapStorage.getRuleSetIsUpdated().get(ruleSetName))) {
+            commonProcessing.callPutRuleSet(step.getRuleSet(), ruleSet);
+        }
+        if (!Boolean.TRUE.equals(mapStorage.getRuleSetIsActionUpdated().get(ruleSetName))) {
+            Action action = new Action();
+            action.setType("complex");
+            action.setStatus("valid");
+            action.setExpression(INTERVAL_NUMBER_VARIABLE + " = " + expression);
+            Rule rule = new Rule();
+            rule.setName("assign_interval_number");
+            rule.setConditional("if");
+            rule.setRuleFiredTrackingEnabled(false);
+            rule.setActions(Collections.singletonList(action));
+            commonProcessing.addActionToRuleSet(step.getRuleSet(), rule);
+        }
+        return step;
+    }
+
+    /** DS2 condition for one non-missing interval, e.g. "DPD >= 0 and DPD < 31"; bounds may be constants or variables. */
+    private String intervalExpression(IntervalLineItemDO interval, String value, String dataType, Step step,
+            Map<String, Signature> signature, SplitNodeDataDO splitNodeDataDO, String cellId, ReferenceContext references) {
+        if (isAllValuesInterval(interval)) {
+            return "1";
+        }
+        List<String> parts = new ArrayList<>();
+        if (hasBound(interval.getLowerBoundObject(), lowerText(interval))) {
+            parts.add(value + " >" + (Boolean.parseBoolean(interval.getLowerBoundInclusive()) ? "= " : " ")
+                    + intervalOperand(interval.getLowerBoundObject(), lowerText(interval), dataType, step, signature, references));
+        }
+        if (hasBound(interval.getUpperBoundObject(), upperText(interval))) {
+            parts.add(value + " <" + (Boolean.parseBoolean(interval.getUpperBoundInclusive()) ? "= " : " ")
+                    + intervalOperand(interval.getUpperBoundObject(), upperText(interval), dataType, step, signature, references));
+        }
+        if (parts.isEmpty()) {
+            throw new IllegalArgumentException("Split node '" + splitNodeDataDO.getNodeName() + "' (" + splitNodeDataDO.getNodeId()
+                    + ") has an interval without lower or upper bound for cell " + cellId);
+        }
+        return String.join(" and ", parts);
+    }
+
+    private String intervalOperand(ReferenceableValue bound, String text, String dataType, Step step,
+            Map<String, Signature> signature, ReferenceContext references) {
+        if (isReference(bound)) {
+            return addIntervalRuleSetInput(step, signature, referenceTerm(bound, references).getName(),
+                    datatypeOf(bound.getReferenceType()));
+        }
+        return modifyRhsConstantByType(dataType, text);
+    }
+
+    /** Declares a Decision term as RuleSet input (mapped by name) and returns the RuleSet term name. */
+    private String addIntervalRuleSetInput(Step step, Map<String, Signature> signature, String decisionTermName,
+            SignatureTerm.DataTypeEnum dataType) {
+        String name = commonProcessing.sanitizeAndReduceVariableName(decisionTermName);
+        if (!signature.containsKey(name)) {
+            Signature input = new Signature();
+            input.setName(name);
+            input.setDataType(dataType.getValue());
+            input.setDirection(INPUT_DIRECTION);
+            signature.put(name, input);
+            Mapping mapping = new Mapping();
+            mapping.setStepTermName(name);
+            mapping.setTargetDecisionTermName(decisionTermName);
+            mapping.setDirection(Mapping.DirectionEnum.INPUT);
+            commonProcessing.checkMappingForDuplicate(mapping, step);
+        }
+        return name;
     }
 
     private SimpleBranchCondition createSimpleBranchCondition(Term2 lhsTerm, String rhsConstant, String inclusive, String operator

@@ -60,6 +60,60 @@ class ProcessNodeConverterTest {
         assertTrue(converted.contains("h.call('MyPkg');"), converted);
     }
 
+    // Banner from FMCC US_Optimal_Extension_Model ("Get optimal extension number"): DS2 ends the comment at the first
+    // "*/", but ID's DS2 parser nests "/*", so the comment never closed and ID reported that the package
+    // "${PACKAGE_NAME}" was not found.
+    @Test
+    void endsCommentsWhereDs2DoesForIdsNestingCommentParser() {
+        String ds2 = "package get_optimal_extension_nb_priv /overwrite=yes;\n"
+            + "   method execute(double apr, in_out double extension_nb);\n"
+            + "      declare varchar(200) key;\n"
+            + "      /* *****************************************************\n"
+            + "      Data cleaning and preparation\n"
+            + "      /********************************************************/\n"
+            + "      extension_nb = apr;\n"
+            + "   end;\n"
+            + "endpackage;\n";
+
+        String converted = ProcessNodeConverter.convertDs2PackageToIdFormat(ds2, "Get optimal extension number");
+
+        String asIdReadsIt = stripCommentsWithNesting(converted);
+        assertTrue(asIdReadsIt.contains("extension_nb = apr;"), asIdReadsIt);
+        assertTrue(asIdReadsIt.contains("endpackage;"), asIdReadsIt);
+        assertTrue(converted.contains("Data cleaning and preparation\n      / *******"), converted);
+        assertTrue(stripCommentsWithNesting(ds2).trim().endsWith("declare varchar(200) key;"),
+            "the original code hides endpackage from a nesting parser");
+    }
+
+    @Test
+    void splitsNestedCommentOpenersOnlyInsideComments() {
+        assertEquals("x = '/*'; /* a / * b */ y = \"/*\"; /* c / */ z;",
+            ProcessNodeConverter.splitNestedCommentOpeners("x = '/*'; /* a /* b */ y = \"/*\"; /* c /*/ z;"));
+        assertEquals("x = 'it''s'; /* a / * b */",
+            ProcessNodeConverter.splitNestedCommentOpeners("x = 'it''s'; /* a /* b */"));
+        String plain = "package p;\n /* note */ method execute(); end;\nendpackage;\n";
+        assertEquals(plain, ProcessNodeConverter.splitNestedCommentOpeners(plain));
+        assertEquals("/* never closed /* ", ProcessNodeConverter.splitNestedCommentOpeners("/* never closed /* "));
+    }
+
+    /** Comment stripping as ID's DS2 parser does it (MAS StrippedDS2PreLexer): "/*" inside a comment nests. */
+    private static String stripCommentsWithNesting(String code) {
+        StringBuilder out = new StringBuilder();
+        int depth = 0;
+        for (int i = 0; i < code.length(); i++) {
+            if (code.startsWith("/*", i)) {
+                depth++;
+                i++;
+            } else if (depth > 0 && code.startsWith("*/", i)) {
+                depth--;
+                i++;
+            } else if (depth == 0) {
+                out.append(code.charAt(i));
+            }
+        }
+        return out.toString();
+    }
+
     @Test
     void truncatesAfterEndpackageRegardlessOfCaseAndSpacing() {
         String ds2 = "package p / overwrite = yes ;\n method execute();\n end;\nENDPACKAGE ;\nrun;\nquit;\n";

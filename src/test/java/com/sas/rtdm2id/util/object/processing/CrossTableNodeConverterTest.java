@@ -125,7 +125,7 @@ class CrossTableNodeConverterTest {
         SegmentationTreeConverter converter = new SegmentationTreeConverter(mockCommonProcessing(node));
         node.getCrossTable().setLists(List.of(values("a", "b"), values("c", "d")));
         assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
-        node.getCrossTable().setLists(List.of(singleValue("a")));
+        node.getCrossTable().setLists(List.of());
         assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
         ListOfValues extraCells = values("a", "b");
         extraCells.getValues().add(cell("c"));
@@ -137,6 +137,89 @@ class CrossTableNodeConverterTest {
         node.setRowCriteria(null);
         node.getColumnCriteria().getLineItems().setCrossTableLineItemDOs(List.of());
         assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
+    }
+
+    // Shape of the FMCC GCS_BNKRP_BTCH_RUL_LOGIC flag tables (e.g. NEW_ACCT_STAT_1001_CRTBL): columns Yes / No /
+    // (Missing) but RTDM stores only the first cell, leaving out the trailing empty ones, which assign nothing
+    @Test
+    void omittedTrailingCellsOfAColumnOnlyTableAssignNothing() {
+        CrossTableNodeDataDO node = columnOnlyNode();
+        node.getColumnCriteria().getLineItems().setCrossTableLineItemDOs(
+                Arrays.asList(discreteItem("true"), discreteItem("false"), missingCriterion()));
+        ListOfValues onlyYes = new ListOfValues();
+        onlyYes.setValues(new ArrayList<>(List.of(cell("1001"))));
+        node.getCrossTable().setLists(List.of(onlyYes));
+
+        SegmentationTree tree = new SegmentationTreeConverter(mockCommonProcessing(node)).convert(node);
+
+        assertEquals(List.of("set_1001", "no_assignment", "no_assignment"), referencedOutcomes(tree.getNode()));
+        assertEquals("1001", outcome(tree, "set_1001").getActions().get(0).getValue());
+        assertTrue(outcome(tree, "no_assignment").getActions().isEmpty());
+        SegmentationTree.SignatureTerm output = tree.getSignature().get(tree.getSignature().size() - 1);
+        assertEquals("Result", output.getName());
+        assertEquals("inOut", output.getDirection());
+    }
+
+    // Shape of FMCC NEW_GCS_ACCT_STAT_2203: three rows, two columns, only the first row stored
+    @Test
+    void omittedTrailingRowsOfAMatrixAssignNothingAndPassTheOutputThrough() {
+        CrossTableNodeDataDO node = createNode(false, false);
+        node.getRowCriteria().getLineItems().getCrossTableLineItemDOs().add(missingCriterion());
+        node.getCrossTable().setLists(List.of(values("a", "b")));
+        CommonProcessing processing = mockCommonProcessing(node);
+        when(processing.nodeOutputTermName(anyString())).thenReturn("NEW_GCS_ACCT_STAT_CD");
+
+        SegmentationTree tree = new SegmentationTreeConverter(processing).convert(node);
+
+        assertTrue(outcome(tree, "no_assignment").getActions().isEmpty());
+        assertEquals("inOut", tree.getSignature().get(tree.getSignature().size() - 1).getDirection());
+        assertTrue(referencedOutcomes(tree.getNode()).containsAll(List.of("set_a", "set_b", "no_assignment")),
+                referencedOutcomes(tree.getNode()).toString());
+        if (!tree.getMatrices().isEmpty()) {
+            assertEquals(List.of(List.of("a", "b"), List.of("rtdm2id_no_assignment", "rtdm2id_no_assignment")),
+                    tree.getMatrices().get(0).getOutcomes());
+        }
+
+        MapStorage storage = new MapStorage();
+        storage.getSegmentationTreeSignatureMap().put((short) 8, tree.getSignature());
+        storage.getCustomObjectStepHashMap().put((short) 8, new CustomObjectStep());
+        Decision decision = new Decision();
+        Step step = new CrossTableNodeConverter(storage, processing)
+                .addSegmentationTreeStep(node, decision, (short) 8, "Cross Table").get(0);
+        Mapping outputMapping = step.getMappings().get(step.getMappings().size() - 1);
+        assertEquals("Result", outputMapping.getStepTermName());
+        assertEquals(Mapping.DirectionEnum.INOUT, outputMapping.getDirection());
+        // The registered term, i.e. the identifier's when the output is linked to one
+        assertEquals("NEW_GCS_ACCT_STAT_CD", outputMapping.getTargetDecisionTermName());
+    }
+
+    @Test
+    void completeTablesKeepAnOutputOnlyTerm() {
+        CrossTableNodeDataDO node = createNode(false, false);
+
+        SegmentationTree tree = new SegmentationTreeConverter(mockCommonProcessing(node)).convert(node);
+
+        assertEquals("output", tree.getSignature().get(tree.getSignature().size() - 1).getDirection());
+        assertTrue(tree.getOutcomes().stream().noneMatch(outcome -> outcome.getName().startsWith("no_assignment")));
+    }
+
+    /** Outcome names reached from a tree node, in order, through value nodes and their next nodes. */
+    private static List<String> referencedOutcomes(SegmentationTree.Node node) {
+        List<String> names = new ArrayList<>();
+        if (node == null || node.getValueNodes() == null) {
+            return names;
+        }
+        for (SegmentationTree.ValueNode valueNode : node.getValueNodes()) {
+            if (valueNode.getOutcomeName() != null) {
+                names.add(valueNode.getOutcomeName());
+            }
+            names.addAll(referencedOutcomes(valueNode.getNext()));
+        }
+        return names;
+    }
+
+    private static SegmentationTree.Outcome outcome(SegmentationTree tree, String name) {
+        return tree.getOutcomes().stream().filter(outcome -> name.equals(outcome.getName())).findFirst().orElseThrow();
     }
 
     private CrossTableNodeDataDO columnOnlyNode() {
@@ -247,7 +330,7 @@ class CrossTableNodeConverterTest {
         node.getCrossTable().getLists().get(0).getValues().add(cell("extra"));
         SegmentationTreeConverter converter = new SegmentationTreeConverter(mockCommonProcessing(node));
         assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
-        node.getCrossTable().setLists(Collections.singletonList(singleValue("a")));
+        node.getCrossTable().setLists(Arrays.asList(singleValue("a"), singleValue("b"), singleValue("c")));
         assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
         node.getCrossTable().setLists(Arrays.asList(singleValue("a"), singleValue("b")));
         node.setColumnCriteria(new ColumnCriteria());
@@ -1044,6 +1127,9 @@ class CrossTableNodeConverterTest {
         when(processing.buildVariableName(source.getColumnCriteria().getVarRefDO()))
             .thenReturn("Event_Boolean_Date.OutputBoolean");
         when(processing.changeVariableNameToFormat(anyString()))
+            .thenAnswer(invocation -> ((String) invocation.getArgument(0)).replace('.', '_'));
+        // Not linked to an identifier: written as <NodeName>.<Output>
+        when(processing.nodeOutputTermName(anyString()))
             .thenAnswer(invocation -> ((String) invocation.getArgument(0)).replace('.', '_'));
 
         SegmentationTree tree = new SegmentationTreeConverter(processing).convert(source);

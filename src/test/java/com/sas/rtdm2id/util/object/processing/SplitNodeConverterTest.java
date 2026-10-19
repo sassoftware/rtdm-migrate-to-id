@@ -110,7 +110,9 @@ class SplitNodeConverterTest {
         "Char, '', true, false",
         "string, '', true, false",
         "Numeric, 1, true, true",
-        "Numeric, 1, false, true"
+        "Numeric, 1, false, true",
+        "integer, 1, true, true",
+        "Char, '', true, true"
     }, quoteCharacter = '"')
     void convertsMissingIntervalsToEqualityWithoutUsingUnsetBounds(String type, String expectedMissing,
             boolean missingFirst, boolean includeRange) throws Exception {
@@ -137,34 +139,42 @@ class SplitNodeConverterTest {
         MapStorage storage = new MapStorage();
         CommonProcessing processing = spy(new CommonProcessing(mock(RestTemplate.class), storage, new TreeUtil()));
         doReturn(new ConditionBranch()).when(processing).createConditionBranch("other", true);
+        stubRuleSetWrites(processing, storage);
         Decision decision = new Decision();
 
-        Step branch = new SplitNodeConverter(processing, storage).createBranch(source, decision, "PartnerCheck").get(0);
+        lastSteps = new SplitNodeConverter(processing, storage).createBranch(source, decision, "PartnerCheck");
+        Step branch = lastSteps.get(lastSteps.size() - 1);
 
-        int missingIndex = includeRange && !missingFirst ? 1 : 0;
-        com.sas.rtdm2id.model.id.decision.BranchCase missingCase = branch.getBranchCases().get(missingIndex);
+        assertBranchOperatorContract(branch);
+        assertNotNull(branch.getDefaultCase());
+        if (includeRange) {
+            // A missing group cannot be a range case, so the matching interval is numbered by a RuleSet
+            String missingNumber = missingFirst ? "1" : "2";
+            String rangeNumber = missingFirst ? "2" : "1";
+            assertIntervalNumberBranch(branch, "missingsplit", missingFirst ? "missing" : "range",
+                missingFirst ? missingNumber : rangeNumber, missingFirst ? "range" : "missing",
+                missingFirst ? rangeNumber : missingNumber);
+            String bound = "Char".equals(type) ? "'%s'" : "%s";
+            assertEquals("ifn(missing(RequestPartnerId), " + missingNumber + ", ifn(RequestPartnerId >= "
+                + String.format(bound, "0") + " and RequestPartnerId <= " + String.format(bound, "10") + ", "
+                + rangeNumber + ", 0))", intervalNumberExpression("missingsplit"));
+            return;
+        }
+        assertEquals(1, lastSteps.size());
+        com.sas.rtdm2id.model.id.decision.BranchCase missingCase = branch.getBranchCases().get(0);
         assertEquals("missing", missingCase.getLabel());
         assertNull(missingCase.getCompoundCondition());
-        assertEquals("=", missingCase.getSimpleCondition().getOperator());
-        assertEquals(expectedMissing, missingCase.getSimpleCondition().getRhsConstant());
         if (decision.getSignature().get(0).getDataType() == SignatureTerm.DataTypeEnum.STRING) {
+            assertEquals("=", missingCase.getSimpleCondition().getOperator());
+            assertEquals(expectedMissing, missingCase.getSimpleCondition().getRhsConstant());
             assertEquals(decision.getSignature().get(0).getName(), missingCase.getSimpleCondition().getLhsTerm().getName());
             assertNull(missingCase.getSimpleCondition().getLhsConditionExpression());
         } else {
             assertNumericMissingCondition(missingCase.getSimpleCondition(), decision.getSignature().get(0).getName());
         }
-        assertEquals(includeRange ? "range" : "equals", branch.getBranchType());
-        assertEquals("false", source.getSplitOnNodeDataDO().getLineItems().getIntervalLineItemDOs().get(missingIndex).getLowerBoundInclusive());
-        assertEquals("false", source.getSplitOnNodeDataDO().getLineItems().getIntervalLineItemDOs().get(missingIndex).getUpperBoundInclusive());
-        assertNotNull(branch.getDefaultCase());
-        if (includeRange) {
-            com.sas.rtdm2id.model.id.decision.CompoundBranchCondition range =
-                branch.getBranchCases().get(1 - missingIndex).getCompoundCondition();
-            assertEquals(">=", range.getLhsSimpleCondition().getOperator());
-            assertEquals("0", range.getLhsSimpleCondition().getRhsConstant());
-            assertEquals("<=", range.getRhsSimpleCondition().getOperator());
-            assertEquals("10", range.getRhsSimpleCondition().getRhsConstant());
-        }
+        assertEquals("equals", branch.getBranchType());
+        assertEquals("false", source.getSplitOnNodeDataDO().getLineItems().getIntervalLineItemDOs().get(0).getLowerBoundInclusive());
+        assertEquals("false", source.getSplitOnNodeDataDO().getLineItems().getIntervalLineItemDOs().get(0).getUpperBoundInclusive());
     }
 
     @ParameterizedTest
@@ -215,7 +225,8 @@ class SplitNodeConverterTest {
         treeUtil.createTree(batch.getLogicalUnit());
         MapStorage storage = new MapStorage();
         RestTemplate restTemplate = mock(RestTemplate.class);
-        CommonProcessing processing = new CommonProcessing(restTemplate, storage, treeUtil);
+        CommonProcessing processing = spy(new CommonProcessing(restTemplate, storage, treeUtil));
+        stubRuleSetWrites(processing, storage);
         SplitNodeConverter converter = new SplitNodeConverter(processing, storage);
         int missingGroups = 0;
         for (SplitNodeDataDO source : batch.getLogicalUnit().getSplitNodeDataDOs()) {
@@ -226,6 +237,10 @@ class SplitNodeConverterTest {
             }
             List<Step> steps = converter.createBranch(source, new Decision(), source.getNodeName());
             Step branch = steps.get(steps.size() - 1);
+            assertBranchOperatorContract(branch);
+            assertTrue(new ObjectMapper().valueToTree(branch).findValuesAsText("rhsConstant").stream()
+                .noneMatch(value -> "infinite".equalsIgnoreCase(value.trim()) || "-infinite".equalsIgnoreCase(value.trim())),
+                source.getNodeName());
             int caseIndex = 0;
             for (int sourceIndex = 0; sourceIndex < source.getLineItems().getSplitNodeLineItemDOs().size(); sourceIndex++) {
                 SplitNodeDataDO.LineItems.SplitNodeLineItemDO line = source.getLineItems().getSplitNodeLineItemDOs().get(sourceIndex);
@@ -238,9 +253,16 @@ class SplitNodeConverterTest {
                     missingGroups++;
                     assertEquals(line.getCellId(), branchCase.getLabel());
                     assertNull(branchCase.getCompoundCondition(), source.getNodeName());
-                    assertEquals("=", branchCase.getSimpleCondition().getOperator(), source.getNodeName());
-                    if (SignatureTerm.DataTypeEnum.STRING.equals(
+                    assertEquals("equals", branch.getBranchType(), source.getNodeName());
+                    if (branchCase.getSimpleCondition().getLhsTerm() != null
+                            && branchCase.getSimpleCondition().getLhsTerm().getName().startsWith("interval_number_")) {
+                        // Numbered by the interval RuleSet preceding the branch
+                        assertEquals(String.valueOf(sourceIndex + 1), branchCase.getSimpleCondition().getRhsConstant(),
+                            source.getNodeName());
+                        assertEquals(Step.TypeEnum.RULESET, steps.get(steps.size() - 2).getType(), source.getNodeName());
+                    } else if (SignatureTerm.DataTypeEnum.STRING.equals(
                             processing.getDatatypeOfVar(source.getSplitOnNodeDataDO().getVarRefDO().getType()))) {
+                        assertEquals("=", branchCase.getSimpleCondition().getOperator(), source.getNodeName());
                         assertEquals("''", branchCase.getSimpleCondition().getRhsConstant(), source.getNodeName());
                     } else {
                         assertNumericMissingCondition(branchCase.getSimpleCondition(), processing.sanitizeVariableName(
@@ -248,7 +270,9 @@ class SplitNodeConverterTest {
                     }
                 }
             }
-            assertNotNull(branch.getDefaultCase(), source.getNodeName());
+            assertEquals(source.getLineItems().getSplitNodeLineItemDOs().stream()
+                .anyMatch(line -> "(Remainder)".equals(line.getValue())),
+                branch.getDefaultCase() != null, source.getNodeName());
         }
         assertTrue(missingGroups > 0, "Expected at least one missing interval group in the extract");
         org.mockito.Mockito.verifyNoInteractions(restTemplate);
@@ -311,6 +335,26 @@ class SplitNodeConverterTest {
         assertEquals("decimal", json.get("lhsConditionExpressionType").asText());
         assertEquals("1", json.get("rhsConstant").asText());
         assertEquals(condition, new ObjectMapper().treeToValue(json, SimpleBranchCondition.class));
+    }
+
+    /**
+     * What ID accepts (viya-decisions-framework DecisionValidateStructureVisitor): range cases are ">=" and/or "<="
+     * (AND-ed when both) with no condition expression; equals cases use "=".
+     */
+    private void assertBranchOperatorContract(Step branch) {
+        boolean range = "range".equals(branch.getBranchType());
+        Set<String> allowedOperators = range ? Set.of("<=", ">=") : Set.of("=");
+        JsonNode json = new ObjectMapper().valueToTree(branch);
+        for (JsonNode branchCase : json.get("branchCases")) {
+            for (String operator : branchCase.findValuesAsText("operator")) {
+                assertTrue(allowedOperators.contains(operator),
+                    branch.getName() + ": " + branch.getBranchType() + " branch contains operator " + operator);
+            }
+            if (range) {
+                assertTrue(branchCase.findValues("lhsConditionExpression").stream().allMatch(JsonNode::isNull),
+                    branch.getName() + ": range branch case uses a condition expression");
+            }
+        }
     }
     private static List<int[]> ranges(String... percentages) {
         List<BigDecimal> values = new java.util.ArrayList<>();
@@ -467,7 +511,69 @@ class SplitNodeConverterTest {
         MapStorage storage = new MapStorage();
         CommonProcessing processing = spy(new CommonProcessing(mock(RestTemplate.class), storage, new TreeUtil()));
         doReturn(new ConditionBranch()).when(processing).createConditionBranch("other", true);
-        return new SplitNodeConverter(processing, storage).createBranch(source, new Decision(), "Bands").get(0);
+        stubRuleSetWrites(processing, storage);
+        lastSteps = new SplitNodeConverter(processing, storage).createBranch(source, new Decision(), "Bands");
+        return lastSteps.get(lastSteps.size() - 1);
+    }
+
+    private List<Step> lastSteps;
+    private com.sas.rtdm2id.model.id.rules.RuleSet writtenRuleSet;
+    private com.sas.rtdm2id.model.id.rules.Rule writtenRule;
+
+    /** Stands in for Viya: findOrAddRuleSet registers a new RuleSet step; the signature and rule writes are captured. */
+    private void stubRuleSetWrites(CommonProcessing processing, MapStorage storage) {
+        org.mockito.Mockito.doAnswer(invocation -> {
+            String name = invocation.getArgument(0);
+            com.sas.rtdm2id.model.id.decision.RuleSetStep ruleSet = new com.sas.rtdm2id.model.id.decision.RuleSetStep();
+            ruleSet.setName(name);
+            ruleSet.setId("id-" + name);
+            Step step = new Step();
+            step.setType(Step.TypeEnum.RULESET);
+            step.setMappings(new java.util.ArrayList<>());
+            step.setRuleSet(ruleSet);
+            storage.getRuleSetStepMap().put(name, step);
+            return null;
+        }).when(processing).findOrAddRuleSet(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.doAnswer(invocation -> {
+            writtenRuleSet = invocation.getArgument(1);
+            return null;
+        }).when(processing).callPutRuleSet(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        org.mockito.Mockito.doAnswer(invocation -> {
+            writtenRule = invocation.getArgument(1);
+            return null;
+        }).when(processing).addActionToRuleSet(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+    }
+
+    /** Asserts an equals branch on the interval number term with one case per RTDM cell, numbered by line position. */
+    private void assertIntervalNumberBranch(Step branch, String nodeId, String... cellsAndNumbers) {
+        assertEquals("equals", branch.getBranchType());
+        assertBranchOperatorContract(branch);
+        assertEquals(cellsAndNumbers.length / 2, branch.getBranchCases().size());
+        for (int i = 0; i < cellsAndNumbers.length; i += 2) {
+            com.sas.rtdm2id.model.id.decision.BranchCase branchCase = branch.getBranchCases().get(i / 2);
+            assertEquals(cellsAndNumbers[i], branchCase.getLabel());
+            assertNull(branchCase.getCompoundCondition());
+            assertEquals("interval_number_" + nodeId, branchCase.getSimpleCondition().getLhsTerm().getName());
+            assertEquals("=", branchCase.getSimpleCondition().getOperator());
+            assertEquals(cellsAndNumbers[i + 1], branchCase.getSimpleCondition().getRhsConstant());
+        }
+    }
+
+    /** Asserts the interval RuleSet step precedes the branch and maps its terms, and returns the written expression. */
+    private String intervalNumberExpression(String nodeId) {
+        Step ruleSetStep = lastSteps.get(lastSteps.size() - 2);
+        assertEquals(Step.TypeEnum.RULESET, ruleSetStep.getType());
+        assertTrue(ruleSetStep.getRuleSet().getName().endsWith("_interval"), ruleSetStep.getRuleSet().getName());
+        assertTrue(ruleSetStep.getMappings().stream().anyMatch(mapping -> "interval_number".equals(mapping.getStepTermName())
+            && ("interval_number_" + nodeId).equals(mapping.getTargetDecisionTermName())
+            && mapping.getDirection() == com.sas.rtdm2id.model.id.decision.Mapping.DirectionEnum.OUTPUT));
+        assertTrue(writtenRuleSet.getSignature().stream().anyMatch(term -> "interval_number".equals(term.getName())
+            && "integer".equals(term.getDataType()) && "output".equals(term.getDirection())));
+        assertEquals(1, writtenRule.getActions().size());
+        assertEquals("complex", writtenRule.getActions().get(0).getType());
+        String expression = writtenRule.getActions().get(0).getExpression();
+        assertTrue(expression.startsWith("interval_number = "), expression);
+        return expression.substring("interval_number = ".length());
     }
 
     private static String interval(String lower, String lowerInclusive, String upper, String upperInclusive) {
@@ -483,33 +589,125 @@ class SplitNodeConverterTest {
     }
 
     @Test
-    void preservesRtdmBoundInclusivityForEveryInterval() throws Exception {
+    void numbersIntervalsWithExclusiveBoundsInARuleSet() throws Exception {
         Step branch = intervalSplit("Numeric",
             interval("0", "true", "10", "false") + interval("10", "true", "20", "false") + interval("20", "false", "30", "true"),
             cell("low") + cell("mid") + cell("high"));
 
-        assertEquals("range", branch.getBranchType());
-        for (int i = 0; i < 2; i++) {
-            com.sas.rtdm2id.model.id.decision.CompoundBranchCondition condition = branch.getBranchCases().get(i).getCompoundCondition();
-            assertEquals(">=", condition.getLhsSimpleCondition().getOperator());
-            assertEquals("<", condition.getRhsSimpleCondition().getOperator());
-        }
-        com.sas.rtdm2id.model.id.decision.CompoundBranchCondition last = branch.getBranchCases().get(2).getCompoundCondition();
-        assertEquals(">", last.getLhsSimpleCondition().getOperator());
-        assertEquals("<=", last.getRhsSimpleCondition().getOperator());
+        // ID range cases only accept >= and <=, so RTDM's exclusive bounds are evaluated by the RuleSet
+        assertIntervalNumberBranch(branch, "intervalsplit", "low", "1", "mid", "2", "high", "3");
+        assertEquals("ifn(missing(RequestScore), 0, ifn(RequestScore >= 0 and RequestScore < 10, 1, "
+            + "ifn(RequestScore >= 10 and RequestScore < 20, 2, ifn(RequestScore > 20 and RequestScore <= 30, 3, 0))))",
+            intervalNumberExpression("intervalsplit"));
+        assertNotNull(branch.getDefaultCase());
     }
 
     @Test
-    void convertsOpenEndedIntervalsToOneSidedConditions() throws Exception {
+    void keepsInclusiveIntervalsAsNativeRangeBranches() throws Exception {
+        Step branch = intervalSplit("Numeric",
+            interval(null, "false", "0", "true") + interval("0", "true", "10", "true") + interval("10", "true", "infinite", "false"),
+            cell("negative") + cell("low") + cell("high"));
+
+        assertEquals(1, lastSteps.size());
+        assertNull(writtenRule);
+        assertEquals("range", branch.getBranchType());
+        assertBranchOperatorContract(branch);
+        assertEquals("<=", branch.getBranchCases().get(0).getSimpleCondition().getOperator());
+        assertEquals("0", branch.getBranchCases().get(0).getSimpleCondition().getRhsConstant());
+        com.sas.rtdm2id.model.id.decision.CompoundBranchCondition low = branch.getBranchCases().get(1).getCompoundCondition();
+        assertEquals(">=", low.getLhsSimpleCondition().getOperator());
+        assertEquals("<=", low.getRhsSimpleCondition().getOperator());
+        assertNull(branch.getBranchCases().get(2).getCompoundCondition());
+        assertEquals(">=", branch.getBranchCases().get(2).getSimpleCondition().getOperator());
+        assertEquals("10", branch.getBranchCases().get(2).getSimpleCondition().getRhsConstant());
+    }
+
+    @Test
+    void numbersOpenEndedExclusiveIntervalsInARuleSet() throws Exception {
         Step branch = intervalSplit("Numeric",
             interval(null, "false", "10", "false") + interval("10", "true", null, "false"),
             cell("below") + cell("above"));
 
-        assertNull(branch.getBranchCases().get(0).getCompoundCondition());
-        assertEquals("<", branch.getBranchCases().get(0).getSimpleCondition().getOperator());
-        assertEquals("10", branch.getBranchCases().get(0).getSimpleCondition().getRhsConstant());
-        assertEquals(">=", branch.getBranchCases().get(1).getSimpleCondition().getOperator());
-        assertEquals("10", branch.getBranchCases().get(1).getSimpleCondition().getRhsConstant());
+        assertIntervalNumberBranch(branch, "intervalsplit", "below", "1", "above", "2");
+        assertEquals("ifn(missing(RequestScore), 0, ifn(RequestScore < 10, 1, ifn(RequestScore >= 10, 2, 0)))",
+            intervalNumberExpression("intervalsplit"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "Numeric, 0, 0.0, true",
+        "Numeric, 0, 0.0, false",
+        "integer, 1, 1, true",
+        "date, 2026-01-01, 2026-01-01, false"
+    })
+    void keepsSingleValueCasesCompatibleWithRangeBranches(String type, String lower, String upper,
+            boolean singleFirst) throws Exception {
+        String single = interval(lower, "true", upper, "true");
+        String range = interval(lower, "true", null, "false");
+        Step branch = intervalSplit(type, singleFirst ? single + range : range + single,
+            singleFirst ? cell("single") + cell("range") : cell("range") + cell("single"));
+
+        assertEquals("range", branch.getBranchType());
+        assertBranchOperatorContract(branch);
+        com.sas.rtdm2id.model.id.decision.BranchCase singleCase = branch.getBranchCases().get(singleFirst ? 0 : 1);
+        assertEquals("single", singleCase.getLabel());
+        assertNull(singleCase.getSimpleCondition());
+        com.sas.rtdm2id.model.id.decision.CompoundBranchCondition condition = singleCase.getCompoundCondition();
+        assertNotNull(condition);
+        assertEquals(com.sas.rtdm2id.model.id.decision.CompoundBranchCondition.BooleanOperatorEnum.AND,
+            condition.getBooleanOperator());
+        assertEquals(">=", condition.getLhsSimpleCondition().getOperator());
+        assertEquals("<=", condition.getRhsSimpleCondition().getOperator());
+        if ("date".equals(type)) {
+            assertEquals("'01JAN2026:00:00:00'dt", condition.getLhsSimpleCondition().getRhsConstant());
+            assertEquals("'01JAN2026:00:00:00'dt", condition.getRhsSimpleCondition().getRhsConstant());
+        } else {
+            assertEquals(0, new BigDecimal(lower).compareTo(new BigDecimal(condition.getLhsSimpleCondition().getRhsConstant())));
+            assertEquals(0, new BigDecimal(upper).compareTo(new BigDecimal(condition.getRhsSimpleCondition().getRhsConstant())));
+        }
+        assertNotNull(branch.getDefaultCase());
+    }
+
+    private static final String MISSING_GROUP = "<IntervalLineItemDO><MissingGroup>true</MissingGroup>"
+        + "<LowerBound StoredType=\"String\">unset</LowerBound><LowerBoundInclusive>true</LowerBoundInclusive>"
+        + "<UpperBound StoredType=\"String\">unset</UpperBound><UpperBoundInclusive>true</UpperBoundInclusive>"
+        + "</IntervalLineItemDO>";
+
+    // Shape of the FMCC DPD splits (UK_POD_Score, UK_Collection_Strategy, ...): missing, [-infinite, 31), [31, infinite]
+    @ParameterizedTest
+    @CsvSource({"infinite", "-infinite", "' InFiNiTe '"})
+    void numbersMissingAndInfiniteDpdIntervalsInARuleSet(String lowerInfinity) throws Exception {
+        Step branch = intervalSplit("Numeric", MISSING_GROUP
+                + interval(lowerInfinity, "true", "31.0", "false")
+                + interval("31.0", "true", "infinite", "true"),
+            cell("missing") + cell("below31") + cell("atLeast31"));
+
+        assertIntervalNumberBranch(branch, "intervalsplit", "missing", "1", "below31", "2", "atLeast31", "3");
+        assertEquals("ifn(missing(RequestScore), 1, ifn(RequestScore < 31.0, 2, ifn(RequestScore >= 31.0, 3, 0)))",
+            intervalNumberExpression("intervalsplit"));
+        assertNotNull(branch.getDefaultCase());
+    }
+
+    // Shape of FMCC Collections_Master "Check Random Numbers": a missing group and an "all RNDM1_NB values" group
+    @ParameterizedTest
+    @CsvSource({"infinite, infinite", "-infinite, infinite", "' InFiNiTe ', INFINITE"})
+    void numbersAllValuesIntervalAsAnyNonMissingValue(String lower, String upper) throws Exception {
+        Step branch = intervalSplit("Numeric", MISSING_GROUP + interval(lower, "true", upper, "true"),
+            cell("missing") + cell("allValues"));
+
+        assertIntervalNumberBranch(branch, "intervalsplit", "missing", "1", "allValues", "2");
+        assertEquals("ifn(missing(RequestScore), 1, ifn(1, 2, 0))", intervalNumberExpression("intervalsplit"));
+        assertTrue(writtenRuleSet.getSignature().stream().anyMatch(term -> "RequestScore".equals(term.getName())
+            && "decimal".equals(term.getDataType()) && "input".equals(term.getDirection())));
+        assertTrue(lastSteps.get(0).getMappings().stream().anyMatch(mapping -> "RequestScore".equals(mapping.getStepTermName())
+            && "RequestScore".equals(mapping.getTargetDecisionTermName())
+            && mapping.getDirection() == com.sas.rtdm2id.model.id.decision.Mapping.DirectionEnum.INPUT));
+    }
+
+    @Test
+    void stillRejectsIntervalWithUnsetBoundsOutsideMissingGroup() throws Exception {
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> intervalSplit("Numeric",
+            interval("unset", "true", "unset", "true"), cell("broken")));
     }
 
     @ParameterizedTest
@@ -568,15 +766,20 @@ class SplitNodeConverterTest {
 
         Step branch = intervalSplit("Numeric", bounds + interval("2.0", "true", "3.0", "true"), cell("between") + cell("fixed"));
 
-        assertEquals("range", branch.getBranchType());
-        com.sas.rtdm2id.model.id.decision.CompoundBranchCondition condition = branch.getBranchCases().get(0).getCompoundCondition();
-        assertEquals(">=", condition.getLhsSimpleCondition().getOperator());
-        assertNull(condition.getLhsSimpleCondition().getRhsConstant());
-        assertTrue(condition.getLhsSimpleCondition().getRhsTerm().getName().contains("pubDouble"));
-        assertEquals("<", condition.getRhsSimpleCondition().getOperator());
-        assertTrue(condition.getRhsSimpleCondition().getRhsTerm().getName().contains("pubInt64"));
-        assertEquals("2", branch.getBranchCases().get(1).getCompoundCondition().getLhsSimpleCondition().getRhsConstant()
-            .replace(".0", ""));
+        // The exclusive upper bound needs the interval RuleSet; the referenced variables become its inputs
+        assertIntervalNumberBranch(branch, "intervalsplit", "between", "1", "fixed", "2");
+        String expression = intervalNumberExpression("intervalsplit");
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
+            "ifn\\(missing\\(RequestScore\\), 0, ifn\\(RequestScore >= (\\w*pubDouble\\w*) and RequestScore < (\\w*pubInt64\\w*), 1, "
+            + "ifn\\(RequestScore >= 2\\.0 and RequestScore <= 3\\.0, 2, 0\\)\\)\\)").matcher(expression);
+        assertTrue(matcher.matches(), expression);
+        for (String term : new String[] {matcher.group(1), matcher.group(2)}) {
+            assertTrue(writtenRuleSet.getSignature().stream().anyMatch(signature -> term.equals(signature.getName())
+                && "input".equals(signature.getDirection())), term);
+            assertTrue(lastSteps.get(lastSteps.size() - 2).getMappings().stream().anyMatch(mapping ->
+                term.equals(mapping.getStepTermName())
+                    && mapping.getDirection() == com.sas.rtdm2id.model.id.decision.Mapping.DirectionEnum.INPUT), term);
+        }
     }
 
     @Test

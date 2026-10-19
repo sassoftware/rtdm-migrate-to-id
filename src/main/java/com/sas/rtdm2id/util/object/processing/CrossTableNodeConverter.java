@@ -153,13 +153,16 @@ public class CrossTableNodeConverter {
             }
 
                 String targetDecisionTermName;
-                if (source != null && mappingDirection == Mapping.DirectionEnum.OUTPUT) {
+                if (source != null && (mappingDirection == Mapping.DirectionEnum.OUTPUT
+                        || mappingDirection == Mapping.DirectionEnum.INOUT)) {
                     String outputName = source.getOutputVariable() == null ? null : source.getOutputVariable().getName();
                     if (outputName == null || outputName.isEmpty()) {
                         outputName = treeTerm.getName();
                     }
-                targetDecisionTermName = commonProcessing.sanitizeVariableName(commonProcessing.changeVariableNameToFormat(
-                            source.getNodeName() + "." + outputName));
+                    // <NodeName>.<Output>, or the identifier's term when the output is linked to one
+                    // (CommonProcessing.registerNodeOutputs), which is where later nodes read it
+                targetDecisionTermName = commonProcessing.nodeOutputTermName(
+                            CommonProcessing.nodeOutputId(source.getNodeName(), null, outputName));
                 } else {
                 targetDecisionTermName = resolveTargetDecisionTermName(decision, treeTerm,
                     mappingDirection, dataType, objId);

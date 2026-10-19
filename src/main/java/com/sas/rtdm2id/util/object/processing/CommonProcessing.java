@@ -2037,6 +2037,16 @@ public class CommonProcessing {
                 });
             }
         }
+        // A Cross-Table writes its output variable, read as <NodeName>.<Output> or, when linked, as the identifier
+        for (CrossTableNodeDataDO node : batch.getLogicalUnit().getCrossTableNodeDataDOs()) {
+            CrossTableNodeDataDO.OutputVariable output = node.getOutputVariable();
+            if (output == null || output.getName() == null || output.getName().isEmpty()) {
+                continue;
+            }
+            String outputId = nodeOutputId(node.getNodeName(), null, output.getName());
+            registerNodeOutput(outputs, outputId, output.getIdentifier() == null ? null : output.getIdentifier().getName());
+            registerNodeOutputType(outputId, output.getTypeDescription(), true);
+        }
         // Assignment nodes write a term named after the variable, which is also how calculated expressions read it
         // (<<Node Name.Variable>>)
         for (AssignmentNodeDataDO node : batch.getLogicalUnit().getAssignmentNodeDataDOs()) {
