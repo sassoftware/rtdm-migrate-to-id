@@ -139,35 +139,35 @@ class CrossTableNodeConverterTest {
         assertThrows(IllegalArgumentException.class, () -> converter.convert(node));
     }
 
-    // Shape of the FMCC GCS_BNKRP_BTCH_RUL_LOGIC flag tables (e.g. NEW_ACCT_STAT_1001_CRTBL): columns Yes / No /
-    // (Missing) but RTDM stores only the first cell, leaving out the trailing empty ones, which assign nothing
+    // Flag table shape from customer extracts: columns Yes / No / (Missing) but RTDM stores only the first cell,
+    // leaving out the trailing empty ones, which assign nothing
     @Test
     void omittedTrailingCellsOfAColumnOnlyTableAssignNothing() {
         CrossTableNodeDataDO node = columnOnlyNode();
         node.getColumnCriteria().getLineItems().setCrossTableLineItemDOs(
                 Arrays.asList(discreteItem("true"), discreteItem("false"), missingCriterion()));
         ListOfValues onlyYes = new ListOfValues();
-        onlyYes.setValues(new ArrayList<>(List.of(cell("1001"))));
+        onlyYes.setValues(new ArrayList<>(List.of(cell("700"))));
         node.getCrossTable().setLists(List.of(onlyYes));
 
         SegmentationTree tree = new SegmentationTreeConverter(mockCommonProcessing(node)).convert(node);
 
-        assertEquals(List.of("set_1001", "no_assignment", "no_assignment"), referencedOutcomes(tree.getNode()));
-        assertEquals("1001", outcome(tree, "set_1001").getActions().get(0).getValue());
+        assertEquals(List.of("set_700", "no_assignment", "no_assignment"), referencedOutcomes(tree.getNode()));
+        assertEquals("700", outcome(tree, "set_700").getActions().get(0).getValue());
         assertTrue(outcome(tree, "no_assignment").getActions().isEmpty());
         SegmentationTree.SignatureTerm output = tree.getSignature().get(tree.getSignature().size() - 1);
         assertEquals("Result", output.getName());
         assertEquals("inOut", output.getDirection());
     }
 
-    // Shape of FMCC NEW_GCS_ACCT_STAT_2203: three rows, two columns, only the first row stored
+    // Matrix shape from customer extracts: three rows, two columns, only the first row stored
     @Test
     void omittedTrailingRowsOfAMatrixAssignNothingAndPassTheOutputThrough() {
         CrossTableNodeDataDO node = createNode(false, false);
         node.getRowCriteria().getLineItems().getCrossTableLineItemDOs().add(missingCriterion());
         node.getCrossTable().setLists(List.of(values("a", "b")));
         CommonProcessing processing = mockCommonProcessing(node);
-        when(processing.nodeOutputTermName(anyString())).thenReturn("NEW_GCS_ACCT_STAT_CD");
+        when(processing.nodeOutputTermName(anyString())).thenReturn("RequestAccountStatus");
 
         SegmentationTree tree = new SegmentationTreeConverter(processing).convert(node);
 
@@ -190,7 +190,7 @@ class CrossTableNodeConverterTest {
         assertEquals("Result", outputMapping.getStepTermName());
         assertEquals(Mapping.DirectionEnum.INOUT, outputMapping.getDirection());
         // The registered term, i.e. the identifier's when the output is linked to one
-        assertEquals("NEW_GCS_ACCT_STAT_CD", outputMapping.getTargetDecisionTermName());
+        assertEquals("RequestAccountStatus", outputMapping.getTargetDecisionTermName());
     }
 
     @Test

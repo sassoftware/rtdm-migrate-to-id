@@ -3,11 +3,17 @@ package com.sas.rtdm2id.util.object.processing;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sas.rtdm2id.dao.MapStorage;
+import com.sas.rtdm2id.model.id.decision.BranchCase;
+import com.sas.rtdm2id.model.id.decision.CompoundBranchCondition;
 import com.sas.rtdm2id.model.id.decision.ConditionBranch;
 import com.sas.rtdm2id.model.id.decision.Decision;
+import com.sas.rtdm2id.model.id.decision.Mapping;
+import com.sas.rtdm2id.model.id.decision.RuleSetStep;
 import com.sas.rtdm2id.model.id.decision.SignatureTerm;
 import com.sas.rtdm2id.model.id.decision.SimpleBranchCondition;
 import com.sas.rtdm2id.model.id.decision.Step;
+import com.sas.rtdm2id.model.id.rules.Rule;
+import com.sas.rtdm2id.model.id.rules.RuleSet;
 import com.sas.rtdm2id.model.rtdm.Batch;
 import com.sas.rtdm2id.model.rtdm.SplitNodeDataDO;
 import com.sas.rtdm2id.util.tree.impl.TreeUtil;
@@ -15,24 +21,38 @@ import jakarta.xml.bind.JAXBContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.springframework.web.client.RestTemplate;
 
 import javax.xml.transform.stream.StreamSource;
 import java.io.File;
 import java.io.StringReader;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 class SplitNodeConverterTest {
 
@@ -161,7 +181,7 @@ class SplitNodeConverterTest {
             return;
         }
         assertEquals(1, lastSteps.size());
-        com.sas.rtdm2id.model.id.decision.BranchCase missingCase = branch.getBranchCases().get(0);
+        BranchCase missingCase = branch.getBranchCases().get(0);
         assertEquals("missing", missingCase.getLabel());
         assertNull(missingCase.getCompoundCondition());
         if (decision.getSignature().get(0).getDataType() == SignatureTerm.DataTypeEnum.STRING) {
@@ -247,7 +267,7 @@ class SplitNodeConverterTest {
                 if ("(Remainder)".equals(line.getValue())) {
                     continue;
                 }
-                com.sas.rtdm2id.model.id.decision.BranchCase branchCase = branch.getBranchCases().get(caseIndex++);
+                BranchCase branchCase = branch.getBranchCases().get(caseIndex++);
                 if (Boolean.parseBoolean(source.getSplitOnNodeDataDO().getLineItems().getIntervalLineItemDOs()
                         .get(sourceIndex).getMissingGroup())) {
                     missingGroups++;
@@ -275,7 +295,7 @@ class SplitNodeConverterTest {
                 branch.getDefaultCase() != null, source.getNodeName());
         }
         assertTrue(missingGroups > 0, "Expected at least one missing interval group in the extract");
-        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+        verifyNoInteractions(restTemplate);
     }
 
     @Test
@@ -300,7 +320,7 @@ class SplitNodeConverterTest {
             Step branch = steps.get(steps.size() - 1);
             assertEquals("equals", branch.getBranchType(), source.getNodeName());
             String variableName = processing.sanitizeVariableName(processing.buildVariableName(source.getSplitOnNodeDataDO().getVarRefDO()));
-            for (com.sas.rtdm2id.model.id.decision.BranchCase branchCase : branch.getBranchCases()) {
+            for (BranchCase branchCase : branch.getBranchCases()) {
                 assertNull(branchCase.getCompoundCondition(), source.getNodeName());
                 assertEquals("=", branchCase.getSimpleCondition().getOperator(), source.getNodeName());
                 assertEquals(variableName, branchCase.getSimpleCondition().getLhsTerm().getName(), source.getNodeName());
@@ -319,7 +339,7 @@ class SplitNodeConverterTest {
             }
         }
         assertTrue(remaining.isEmpty(), "Missing reported branches: " + remaining);
-        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+        verifyNoInteractions(restTemplate);
     }
 
     private void assertNumericMissingCondition(SimpleBranchCondition condition, String variableName) throws Exception {
@@ -357,7 +377,7 @@ class SplitNodeConverterTest {
         }
     }
     private static List<int[]> ranges(String... percentages) {
-        List<BigDecimal> values = new java.util.ArrayList<>();
+        List<BigDecimal> values = new ArrayList<>();
         for (String percentage : percentages) {
             values.add(new BigDecimal(percentage));
         }
@@ -400,12 +420,12 @@ class SplitNodeConverterTest {
 
     private Step randomNumberStep(MapStorage storage, String name, boolean existing) {
         Step step = new Step();
-        com.sas.rtdm2id.model.id.decision.RuleSetStep ruleSet = new com.sas.rtdm2id.model.id.decision.RuleSetStep();
+        RuleSetStep ruleSet = new RuleSetStep();
         ruleSet.setName(name);
         ruleSet.setId("rs-id");
         step.setRuleSet(ruleSet);
         storage.getRuleSetStepMap().put(name, step);
-        storage.getRuleSetModifiedDate().put(name, new java.util.Date());
+        storage.getRuleSetModifiedDate().put(name, new Date());
         storage.getRuleSetIsUpdated().put(name, existing);
         storage.getRuleSetIsActionUpdated().put(name, existing);
         storage.setBaseIp("viya.example");
@@ -435,17 +455,17 @@ class SplitNodeConverterTest {
         String seed = processing.sanitizeAndReduceVariableName("Customer Id");
         assertEquals(seed, randomNumber.getMappings().get(0).getStepTermName());
 
-        org.mockito.ArgumentCaptor<org.springframework.http.HttpEntity> rule =
-            org.mockito.ArgumentCaptor.forClass(org.springframework.http.HttpEntity.class);
-        org.mockito.InOrder order = org.mockito.Mockito.inOrder(restTemplate);
-        order.verify(restTemplate).exchange(org.mockito.ArgumentMatchers.any(java.net.URI.class),
-            org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.PUT),
-            org.mockito.ArgumentMatchers.any(org.springframework.http.HttpEntity.class),
-            org.mockito.ArgumentMatchers.eq(com.sas.rtdm2id.model.id.rules.RuleSet.class));
-        order.verify(restTemplate).exchange(org.mockito.ArgumentMatchers.any(java.net.URI.class),
-            org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.POST), rule.capture(),
-            org.mockito.ArgumentMatchers.eq(com.sas.rtdm2id.model.id.rules.Rule.class));
-        String expression = ((com.sas.rtdm2id.model.id.rules.Rule) rule.getValue().getBody()).getActions().get(0).getExpression();
+        ArgumentCaptor<org.springframework.http.HttpEntity> rule =
+            ArgumentCaptor.forClass(org.springframework.http.HttpEntity.class);
+        InOrder order = inOrder(restTemplate);
+        order.verify(restTemplate).exchange(any(java.net.URI.class),
+            eq(org.springframework.http.HttpMethod.PUT),
+            any(org.springframework.http.HttpEntity.class),
+            eq(RuleSet.class));
+        order.verify(restTemplate).exchange(any(java.net.URI.class),
+            eq(org.springframework.http.HttpMethod.POST), rule.capture(),
+            eq(Rule.class));
+        String expression = ((Rule) rule.getValue().getBody()).getActions().get(0).getExpression();
         assertEquals("random_number = FLOOR(MODZ(ABS(" + seed + ") * 811, 100))", expression);
     }
 
@@ -460,7 +480,7 @@ class SplitNodeConverterTest {
         List<Step> steps = new SplitNodeConverter(processing, storage).createBranch(source, new Decision(), "pctnode");
 
         assertEquals("49", steps.get(1).getBranchCases().get(0).getCompoundCondition().getRhsSimpleCondition().getRhsConstant());
-        org.mockito.Mockito.verifyNoInteractions(restTemplate);
+        verifyNoInteractions(restTemplate);
     }
 
     @Test
@@ -474,13 +494,13 @@ class SplitNodeConverterTest {
         new SplitNodeConverter(new CommonProcessing(restTemplate, storage, new TreeUtil()), storage)
             .createBranch(source, new Decision(), "pctnode");
 
-        org.mockito.ArgumentCaptor<org.springframework.http.HttpEntity> rule =
-            org.mockito.ArgumentCaptor.forClass(org.springframework.http.HttpEntity.class);
-        org.mockito.Mockito.verify(restTemplate).exchange(org.mockito.ArgumentMatchers.any(java.net.URI.class),
-            org.mockito.ArgumentMatchers.eq(org.springframework.http.HttpMethod.POST), rule.capture(),
-            org.mockito.ArgumentMatchers.eq(com.sas.rtdm2id.model.id.rules.Rule.class));
+        ArgumentCaptor<org.springframework.http.HttpEntity> rule =
+            ArgumentCaptor.forClass(org.springframework.http.HttpEntity.class);
+        verify(restTemplate).exchange(any(java.net.URI.class),
+            eq(org.springframework.http.HttpMethod.POST), rule.capture(),
+            eq(Rule.class));
         assertEquals("random_number = FLOOR(RAND('uniform') * 100)",
-            ((com.sas.rtdm2id.model.id.rules.Rule) rule.getValue().getBody()).getActions().get(0).getExpression());
+            ((Rule) rule.getValue().getBody()).getActions().get(0).getExpression());
     }
 
     @Test
@@ -517,31 +537,31 @@ class SplitNodeConverterTest {
     }
 
     private List<Step> lastSteps;
-    private com.sas.rtdm2id.model.id.rules.RuleSet writtenRuleSet;
-    private com.sas.rtdm2id.model.id.rules.Rule writtenRule;
+    private RuleSet writtenRuleSet;
+    private Rule writtenRule;
 
     /** Stands in for Viya: findOrAddRuleSet registers a new RuleSet step; the signature and rule writes are captured. */
     private void stubRuleSetWrites(CommonProcessing processing, MapStorage storage) {
-        org.mockito.Mockito.doAnswer(invocation -> {
+        doAnswer(invocation -> {
             String name = invocation.getArgument(0);
-            com.sas.rtdm2id.model.id.decision.RuleSetStep ruleSet = new com.sas.rtdm2id.model.id.decision.RuleSetStep();
+            RuleSetStep ruleSet = new RuleSetStep();
             ruleSet.setName(name);
             ruleSet.setId("id-" + name);
             Step step = new Step();
             step.setType(Step.TypeEnum.RULESET);
-            step.setMappings(new java.util.ArrayList<>());
+            step.setMappings(new ArrayList<>());
             step.setRuleSet(ruleSet);
             storage.getRuleSetStepMap().put(name, step);
             return null;
-        }).when(processing).findOrAddRuleSet(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any());
-        org.mockito.Mockito.doAnswer(invocation -> {
+        }).when(processing).findOrAddRuleSet(anyString(), any());
+        doAnswer(invocation -> {
             writtenRuleSet = invocation.getArgument(1);
             return null;
-        }).when(processing).callPutRuleSet(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
-        org.mockito.Mockito.doAnswer(invocation -> {
+        }).when(processing).callPutRuleSet(any(), any());
+        doAnswer(invocation -> {
             writtenRule = invocation.getArgument(1);
             return null;
-        }).when(processing).addActionToRuleSet(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
+        }).when(processing).addActionToRuleSet(any(), any());
     }
 
     /** Asserts an equals branch on the interval number term with one case per RTDM cell, numbered by line position. */
@@ -550,7 +570,7 @@ class SplitNodeConverterTest {
         assertBranchOperatorContract(branch);
         assertEquals(cellsAndNumbers.length / 2, branch.getBranchCases().size());
         for (int i = 0; i < cellsAndNumbers.length; i += 2) {
-            com.sas.rtdm2id.model.id.decision.BranchCase branchCase = branch.getBranchCases().get(i / 2);
+            BranchCase branchCase = branch.getBranchCases().get(i / 2);
             assertEquals(cellsAndNumbers[i], branchCase.getLabel());
             assertNull(branchCase.getCompoundCondition());
             assertEquals("interval_number_" + nodeId, branchCase.getSimpleCondition().getLhsTerm().getName());
@@ -566,7 +586,7 @@ class SplitNodeConverterTest {
         assertTrue(ruleSetStep.getRuleSet().getName().endsWith("_interval"), ruleSetStep.getRuleSet().getName());
         assertTrue(ruleSetStep.getMappings().stream().anyMatch(mapping -> "interval_number".equals(mapping.getStepTermName())
             && ("interval_number_" + nodeId).equals(mapping.getTargetDecisionTermName())
-            && mapping.getDirection() == com.sas.rtdm2id.model.id.decision.Mapping.DirectionEnum.OUTPUT));
+            && mapping.getDirection() == Mapping.DirectionEnum.OUTPUT));
         assertTrue(writtenRuleSet.getSignature().stream().anyMatch(term -> "interval_number".equals(term.getName())
             && "integer".equals(term.getDataType()) && "output".equals(term.getDirection())));
         assertEquals(1, writtenRule.getActions().size());
@@ -614,7 +634,7 @@ class SplitNodeConverterTest {
         assertBranchOperatorContract(branch);
         assertEquals("<=", branch.getBranchCases().get(0).getSimpleCondition().getOperator());
         assertEquals("0", branch.getBranchCases().get(0).getSimpleCondition().getRhsConstant());
-        com.sas.rtdm2id.model.id.decision.CompoundBranchCondition low = branch.getBranchCases().get(1).getCompoundCondition();
+        CompoundBranchCondition low = branch.getBranchCases().get(1).getCompoundCondition();
         assertEquals(">=", low.getLhsSimpleCondition().getOperator());
         assertEquals("<=", low.getRhsSimpleCondition().getOperator());
         assertNull(branch.getBranchCases().get(2).getCompoundCondition());
@@ -649,12 +669,12 @@ class SplitNodeConverterTest {
 
         assertEquals("range", branch.getBranchType());
         assertBranchOperatorContract(branch);
-        com.sas.rtdm2id.model.id.decision.BranchCase singleCase = branch.getBranchCases().get(singleFirst ? 0 : 1);
+        BranchCase singleCase = branch.getBranchCases().get(singleFirst ? 0 : 1);
         assertEquals("single", singleCase.getLabel());
         assertNull(singleCase.getSimpleCondition());
-        com.sas.rtdm2id.model.id.decision.CompoundBranchCondition condition = singleCase.getCompoundCondition();
+        CompoundBranchCondition condition = singleCase.getCompoundCondition();
         assertNotNull(condition);
-        assertEquals(com.sas.rtdm2id.model.id.decision.CompoundBranchCondition.BooleanOperatorEnum.AND,
+        assertEquals(CompoundBranchCondition.BooleanOperatorEnum.AND,
             condition.getBooleanOperator());
         assertEquals(">=", condition.getLhsSimpleCondition().getOperator());
         assertEquals("<=", condition.getRhsSimpleCondition().getOperator());
@@ -673,10 +693,10 @@ class SplitNodeConverterTest {
         + "<UpperBound StoredType=\"String\">unset</UpperBound><UpperBoundInclusive>true</UpperBoundInclusive>"
         + "</IntervalLineItemDO>";
 
-    // Shape of the FMCC DPD splits (UK_POD_Score, UK_Collection_Strategy, ...): missing, [-infinite, 31), [31, infinite]
+    // Interval shape from customer extracts: missing, [-infinite, 31), [31, infinite]
     @ParameterizedTest
     @CsvSource({"infinite", "-infinite", "' InFiNiTe '"})
-    void numbersMissingAndInfiniteDpdIntervalsInARuleSet(String lowerInfinity) throws Exception {
+    void numbersMissingAndInfiniteIntervalsInARuleSet(String lowerInfinity) throws Exception {
         Step branch = intervalSplit("Numeric", MISSING_GROUP
                 + interval(lowerInfinity, "true", "31.0", "false")
                 + interval("31.0", "true", "infinite", "true"),
@@ -688,7 +708,7 @@ class SplitNodeConverterTest {
         assertNotNull(branch.getDefaultCase());
     }
 
-    // Shape of FMCC Collections_Master "Check Random Numbers": a missing group and an "all RNDM1_NB values" group
+    // Shape from customer extracts: a missing group and an "all <variable> values" group
     @ParameterizedTest
     @CsvSource({"infinite, infinite", "-infinite, infinite", "' InFiNiTe ', INFINITE"})
     void numbersAllValuesIntervalAsAnyNonMissingValue(String lower, String upper) throws Exception {
@@ -701,12 +721,12 @@ class SplitNodeConverterTest {
             && "decimal".equals(term.getDataType()) && "input".equals(term.getDirection())));
         assertTrue(lastSteps.get(0).getMappings().stream().anyMatch(mapping -> "RequestScore".equals(mapping.getStepTermName())
             && "RequestScore".equals(mapping.getTargetDecisionTermName())
-            && mapping.getDirection() == com.sas.rtdm2id.model.id.decision.Mapping.DirectionEnum.INPUT));
+            && mapping.getDirection() == Mapping.DirectionEnum.INPUT));
     }
 
     @Test
     void stillRejectsIntervalWithUnsetBoundsOutsideMissingGroup() throws Exception {
-        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> intervalSplit("Numeric",
+        assertThrows(IllegalArgumentException.class, () -> intervalSplit("Numeric",
             interval("unset", "true", "unset", "true"), cell("broken")));
     }
 
@@ -769,7 +789,7 @@ class SplitNodeConverterTest {
         // The exclusive upper bound needs the interval RuleSet; the referenced variables become its inputs
         assertIntervalNumberBranch(branch, "intervalsplit", "between", "1", "fixed", "2");
         String expression = intervalNumberExpression("intervalsplit");
-        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(
+        Matcher matcher = Pattern.compile(
             "ifn\\(missing\\(RequestScore\\), 0, ifn\\(RequestScore >= (\\w*pubDouble\\w*) and RequestScore < (\\w*pubInt64\\w*), 1, "
             + "ifn\\(RequestScore >= 2\\.0 and RequestScore <= 3\\.0, 2, 0\\)\\)\\)").matcher(expression);
         assertTrue(matcher.matches(), expression);
@@ -778,7 +798,7 @@ class SplitNodeConverterTest {
                 && "input".equals(signature.getDirection())), term);
             assertTrue(lastSteps.get(lastSteps.size() - 2).getMappings().stream().anyMatch(mapping ->
                 term.equals(mapping.getStepTermName())
-                    && mapping.getDirection() == com.sas.rtdm2id.model.id.decision.Mapping.DirectionEnum.INPUT), term);
+                    && mapping.getDirection() == Mapping.DirectionEnum.INPUT), term);
         }
     }
 
@@ -815,7 +835,7 @@ class SplitNodeConverterTest {
         SplitNodeConverter converter = new SplitNodeConverter(
             new CommonProcessing(mock(RestTemplate.class), storage, new TreeUtil()), storage);
 
-        IllegalArgumentException exception = org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class,
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
             () -> converter.createBranch(source, new Decision(), "Broken"));
         assertTrue(exception.getMessage().contains("Broken"));
     }

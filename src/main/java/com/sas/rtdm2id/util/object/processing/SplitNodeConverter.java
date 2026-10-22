@@ -562,7 +562,7 @@ public class SplitNodeConverter {
         return step;
     }
 
-    /** DS2 condition for one non-missing interval, e.g. "DPD >= 0 and DPD < 31"; bounds may be constants or variables. */
+    /** DS2 condition for one non-missing interval, e.g. "Score >= 0 and Score < 31"; bounds may be constants or variables. */
     private String intervalExpression(IntervalLineItemDO interval, String value, String dataType, Step step,
             Map<String, Signature> signature, SplitNodeDataDO splitNodeDataDO, String cellId, ReferenceContext references) {
         if (isAllValuesInterval(interval)) {

@@ -60,27 +60,26 @@ class ProcessNodeConverterTest {
         assertTrue(converted.contains("h.call('MyPkg');"), converted);
     }
 
-    // Banner from FMCC US_Optimal_Extension_Model ("Get optimal extension number"): DS2 ends the comment at the first
-    // "*/", but ID's DS2 parser nests "/*", so the comment never closed and ID reported that the package
-    // "${PACKAGE_NAME}" was not found.
+    // Comment banner style from a customer extract: DS2 ends the comment at the first "*/", but ID's DS2 parser nests
+    // "/*", so the comment never closed and ID reported that the package "${PACKAGE_NAME}" was not found.
     @Test
     void endsCommentsWhereDs2DoesForIdsNestingCommentParser() {
-        String ds2 = "package get_optimal_extension_nb_priv /overwrite=yes;\n"
-            + "   method execute(double apr, in_out double extension_nb);\n"
+        String ds2 = "package score_helper /overwrite=yes;\n"
+            + "   method execute(double rate, in_out double result);\n"
             + "      declare varchar(200) key;\n"
             + "      /* *****************************************************\n"
-            + "      Data cleaning and preparation\n"
+            + "      Prepare inputs\n"
             + "      /********************************************************/\n"
-            + "      extension_nb = apr;\n"
+            + "      result = rate;\n"
             + "   end;\n"
             + "endpackage;\n";
 
-        String converted = ProcessNodeConverter.convertDs2PackageToIdFormat(ds2, "Get optimal extension number");
+        String converted = ProcessNodeConverter.convertDs2PackageToIdFormat(ds2, "Score helper");
 
         String asIdReadsIt = stripCommentsWithNesting(converted);
-        assertTrue(asIdReadsIt.contains("extension_nb = apr;"), asIdReadsIt);
+        assertTrue(asIdReadsIt.contains("result = rate;"), asIdReadsIt);
         assertTrue(asIdReadsIt.contains("endpackage;"), asIdReadsIt);
-        assertTrue(converted.contains("Data cleaning and preparation\n      / *******"), converted);
+        assertTrue(converted.contains("Prepare inputs\n      / *******"), converted);
         assertTrue(stripCommentsWithNesting(ds2).trim().endsWith("declare varchar(200) key;"),
             "the original code hides endpackage from a nesting parser");
     }
